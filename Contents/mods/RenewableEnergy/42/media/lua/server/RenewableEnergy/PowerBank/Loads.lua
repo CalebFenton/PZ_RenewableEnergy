@@ -1,5 +1,5 @@
 -- What a payer (Payers) pays for: every switched-on appliance in its reach that it
--- pays for (Payers decides who, by `pays`), an unwired treadmill while a run draws power through it,
+-- pays for (Payers decides who), an unwired treadmill while a run draws power through it,
 -- and the running generators whose reach covers the payer.
 --
 -- getGeneratorPowerConsumption reads the appliance's own switch, powered or not, so a bank that
@@ -13,8 +13,8 @@
 -- and it is billed on the same squares as an appliance. Nor of another mod's appliances, such as
 -- Enhanced Irrigation's Pump Houses: the mod says what each draws (GeneratorReach.addDraw), and
 -- they are billed the same way. It is asked of every placed object in reach that isn't a vanilla
--- appliance, a treadmill or a generator, floor tiles included. A vanilla generator's scan doesn't
--- ask: its bill is vanilla's own total, so that mod bills a generator itself.
+-- appliance, a treadmill or a generator, floor tiles included. A vanilla generator doesn't count
+-- those (Loads.counts): its bill is vanilla's own total, so that mod bills a generator itself.
 
 if isClient() then return end
 
@@ -100,60 +100,70 @@ function Loads.byKind(load)
     return list
 end
 
--- Whether a generator here, rather than the grid, would power `object`
--- (IsoGenerator.setSurroundingElectricity). With `gridGone`, as if the grid were down: whatever the
--- grid powers now counts too, since every grid check (ItemContainer.isObjectPowered) then fails.
-local function offGrid(object, allowExterior, gridGone)
-    return (gridGone or not ItemContainer.isObjectPowered(object, false))
-        and (allowExterior or not object:getSquare():isOutside())
+-- Whether the grid powers `object` now (ItemContainer.isObjectPowered), so a generator wouldn't.
+local function onGrid(object)
+    return ItemContainer.isObjectPowered(object, false)
 end
 
--- Positive native fuel demand when the engine would bill this generator, otherwise false.
-local function generatorFuel(object, allowExterior, gridGone)
-    local fuel = object:couldBePoweredByGenerator() and object:getGeneratorPowerConsumption()
-    return fuel and fuel > 0 and offGrid(object, allowExterior, gridGone) and fuel
+-- A generator may power `object` where it stands (IsoGenerator.setSurroundingElectricity).
+local function mayPower(object, allowExterior)
+    return allowExterior or not object:getSquare():isOutside()
 end
 
 local function isRunningGenerator(object)
     return GeneratorReach.isVanillaGenerator(object) and object:isActivated()
 end
 
---- What a payer on `square` pays for: each appliance in its reach for which `pays(object)` holds,
---- and the running generators, banks aside, that power its square (`generators`). With `gridGone`,
---- what is switched on in its reach whether or not the grid powers it now. A `vanilla` generator's
---- scan leaves out other mods' draws: vanilla bills those to it already.
+--- Each draw in the reach of a payer on `square`, as `fn(draw)`, and each running generator there,
+--- banks aside, as `onGenerator(generator)`: those power the payer's square. A draw is { object,
+--- x, y, z, index (its object index on its square), watts, fuel (vanilla's bill an hour for an
+--- appliance; nil for a treadmill or another mod's draw), kind (a treadmill's or another mod's),
+--- onGrid (whether the grid powers it now) }.
 ---@param square IsoGridSquare the payer's square
-function Loads.scan(square, pays, gridGone, vanilla)
-    local load = Loads.new()
+function Loads.eachDraw(square, fn, onGenerator)
     local allowExterior = SandboxVars.AllowExteriorGenerator
     GeneratorReach.eachSquare(square:getX(), square:getY(), square:getZ(), function(scanned)
         local objects = scanned:getObjects()
+        local x, y, z = scanned:getX(), scanned:getY(), scanned:getZ()
         local i = scanned:getNextNonItemObjectIndex(0)
         while i ~= -1 do
             local object = objects:get(i)
-            local fuel = generatorFuel(object, allowExterior, gridGone)
-            if fuel then
-                if pays(object) then
-                    addAppliances(load, object, fuel)
-                else
-                    load.othersFuel = load.othersFuel + fuel
-                end
-            elseif Treadmill.isDrawing(object) and offGrid(object, allowExterior, gridGone) then
-                if pays(object) then
-                    Loads.add(load, "treadmill", Specs.wattsFromFuel(Treadmill.SPEC.drawFuel))
-                end
+            local fuel = object:couldBePoweredByGenerator() and object:getGeneratorPowerConsumption()
+            local draw
+            if fuel and fuel > 0 then
+                draw = { fuel = fuel, watts = Specs.wattsFromFuel(fuel) }
+            elseif Treadmill.isDrawing(object) then
+                draw = { kind = "treadmill", watts = Specs.wattsFromFuel(Treadmill.SPEC.drawFuel) }
             elseif isRunningGenerator(object) then
-                table.insert(load.generators, object)
-            elseif not vanilla then
-                local kind, fuel = GeneratorReach.drawOf(object)
-                if kind and offGrid(object, allowExterior, gridGone) and pays(object) then
-                    Loads.add(load, kind, Specs.wattsFromFuel(fuel))
-                end
+                onGenerator(object)
+            else
+                local kind, modFuel = GeneratorReach.drawOf(object)
+                draw = kind and { kind = kind, watts = Specs.wattsFromFuel(modFuel) }
+            end
+            if draw and mayPower(object, allowExterior) then
+                draw.object, draw.x, draw.y, draw.z, draw.index = object, x, y, z, i
+                draw.onGrid = onGrid(object)
+                fn(draw)
             end
             i = scanned:getNextNonItemObjectIndex(i + 1)
         end
     end)
-    return load
+end
+
+--- Whether a payer counts `draw` at all: with `gridGone`, what the grid powers too, since every
+--- grid check then fails; a `vanilla` generator leaves out other mods' draws, which vanilla bills
+--- it already (that mod bills a generator itself).
+function Loads.counts(draw, gridGone, vanilla)
+    return (gridGone or not draw.onGrid) and not (vanilla and draw.kind and draw.kind ~= "treadmill")
+end
+
+--- Adds `draw` (Loads.eachDraw) to `load`, at vanilla's figure for an appliance.
+function Loads.addDraw(load, draw)
+    if draw.fuel then
+        addAppliances(load, draw.object, draw.fuel)
+    else
+        Loads.add(load, draw.kind, draw.watts)
+    end
 end
 
 return Loads

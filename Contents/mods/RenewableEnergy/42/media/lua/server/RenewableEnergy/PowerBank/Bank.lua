@@ -258,7 +258,7 @@ function Bank:measure()
         return {}
     end
     self.gridPowered = square:hasGridPower()
-    local load = (self.on or self:chargerMaxW() > 0) and Payers.scan(square, Payers.ofBank(self), Payers.running(), true)
+    local load = (self.on or self:chargerMaxW() > 0) and Payers.scan(Payers.ofBank(self), Payers.running(), true)
         or Loads.new()
     self.loadW = load.watts
     self.loadByKind = Loads.byKind(load)

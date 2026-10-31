@@ -143,9 +143,11 @@ Every part takes a screwdriver, Electric Wire and light to see by; an L-16's cab
 
 The bank powers everything a generator in its spot would, including the floors above and below. It takes over within minutes of the grid shutoff, which comes when vanilla's Electricity Shutoff option says. It keeps charging and draining while you're away, and anything left switched on in its reach keeps drawing. Mods that tell it what their machines draw are billed the same way: Enhanced Irrigation's Pump Houses show in the status window while they run.
 
+Where two banks, or a bank and a running generator, both reach an appliance, only one pays for it: the nearest one that's working. A bank that's off, empty or missing its inverter leaves its appliances to the next nearest. A bank that would overload hands the appliances farthest from it to the nearest other bank or generator with room for them, so two banks share a load neither could carry alone.
+
 ### Overload
 
-If more is switched on than the inverters can carry, the whole area goes dark. A bank powers everything or nothing; it never drops just the dryer. Switch something off and the power comes back at the next update, or turn the bank off and on to bring it back at once. Every overload costs each inverter a little condition.
+If more is switched on than the inverters can carry, and no other bank or generator in reach has room for the extra, the whole area goes dark. A bank powers everything or nothing; it never drops just the dryer. Switch something off and the power comes back at the next update, or turn the bank off and on to bring it back at once. Every overload costs each inverter a little condition.
 
 At zero charge the power cuts too. It comes back by itself once some charge has built up, so a bank that barely charges doesn't flicker on and off.
 

@@ -622,6 +622,54 @@ test("renewable_energy_bank_nearest_bank_pays_shared_appliance", {
     end,
 })
 
+-- Three fridges by a bank whose plug-in inverter carries one, with a bigger bank farther off
+-- reaching them all: the nearer keeps what it carries and hands the rest to the farther, and
+-- both stay on, where before the nearer overloaded, dumped everything on the farther, and that
+-- overloaded too.
+test("renewable_energy_bank_overloaded_bank_hands_load_to_one_with_room", {
+    run = function(self)
+        T.setGrid(self, false)
+        local near = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY, T.CAR_BATTERY, T.PLUG_IN_INVERTER }, { charge = 1 })
+        local fridges = near and T.need(self, T.squares(self, 3, { indoors = true, near = near.square }), "three free indoor squares for fridges")
+        if not fridges then return end
+        local farSquare
+        for _, square in ipairs(T.squares(self, 40, { indoors = true, near = fridges[1], minDistance = 4 }) or {}) do
+            local fits = not farSquare
+            for _, fridge in ipairs(fridges) do
+                fits = fits and distanceSquared(square, fridge) > distanceSquared(near.square, fridge)
+                    and distanceSquared(square, fridge) <= SandboxVars.GeneratorTileRange ^ 2
+            end
+            farSquare = fits and square or farSquare
+        end
+        if not T.need(self, farSquare, "a square for the second bank farther from every fridge, in their reach") then return end
+        local far = T.bank(self, "batteryBoxWood", SHARING_PARTS, { charge = 1, square = farSquare })
+        if not far then return end
+        T.switchOn(self, near)
+        T.switchOn(self, far)
+        passBoth(self, near, far, "before")
+        T.step(function()
+            for _, fridge in ipairs(fridges) do
+                T.placeTile(self, fridge, T.MINI_FRIDGE)
+            end
+        end)
+        passBoth(self, near, far, "fridges")
+    end,
+    validate = function(self)
+        local reads = self.reads
+        local nearNow, farNow = reads.fridgesNear, reads.fridgesFar
+        if not expect(T.fridgeW() < nearNow.status.limitW and 2 * T.fridgeW() > nearNow.status.limitW,
+            "the nearer bank's inverter carries one fridge and not two") then return end
+        expect(nearNow.activated and not nearNow.status.overloaded, "the nearer bank overloaded with load it could hand on")
+        expect(farNow.activated and not farNow.status.overloaded, "the farther bank overloaded taking the nearer one's load")
+        expect(nearNow.status.loadW <= nearNow.status.limitW, "the nearer bank carries " .. nearNow.status.loadW
+            .. " W, beyond its inverter's " .. nearNow.status.limitW .. " W")
+        local farGained = farNow.status.loadW - reads.beforeFar.status.loadW
+        expect(farGained > 0, "the farther bank took none of the fridges")
+        expectNear("watts the three fridges added to the two banks together",
+            nearNow.status.loadW - reads.beforeNear.status.loadW + farGained, 3 * T.fridgeW(), 0.01)
+    end,
+})
+
 -- Two running generators reach a fridge: the nearer one's bill counts it and the farther one's
 -- doesn't, also after vanilla rebuilds both bills.
 test("renewable_energy_bank_nearest_generator_pays_shared_appliance", {

@@ -1,17 +1,21 @@
 -- What each running payer must supply, and who pays for an appliance that more than one running
--- payer reaches: the nearest one, alone. Vanilla bills every generator for everything in its reach,
+-- payer reaches: one of them, alone. Vanilla bills every generator for everything in its reach,
 -- so overlapping generators each burn fuel for the same fridge, and banks, measuring their load the
 -- same way, would each drain for it.
 --
--- A payer is a running vanilla generator or a bank powering its squares. Nearest is by tiles,
--- each level counting as one; a tie goes to the lower position (Places.key), so every
--- payer agrees on who pays. A bank measures its own load against the payers running now
--- (Payers.scan). A generator's bill is vanilla's totalPowerUsing, which the engine rebuilds
--- whenever anything in its reach switches (IsoGenerator.setSurroundingElectricity) and burns at
--- the hour (IsoGenerator.update); so its share is set after each rebuild, before the next hour.
--- A generator also pays for an unwired treadmill it powers, which vanilla doesn't know of, for the
--- load of each bank it backs up (Bank.backupCarriesLoad), and for the chargers of each bank that
--- charges from it, within what its gas line carries (GasKit.capW).
+-- A payer is a running vanilla generator or a bank that may power its squares. The nearest that
+-- reaches an appliance pays for it, unless that leaves a bank more than its inverters carry: then
+-- the bank hands what lies farthest from it to the nearest other payer with room for it, until it
+-- fits. A generator has room for anything. A bank that still doesn't fit overloads and drops out,
+-- and the rest share again without it. Nearest is by tiles, each level counting as one; a tie goes
+-- to the lower position (Places.key), so every payer agrees on who pays. A bank measures its own
+-- load against the payers that may run now (Payers.scan). A generator's bill is vanilla's
+-- totalPowerUsing, which the engine rebuilds whenever anything in its reach switches
+-- (IsoGenerator.setSurroundingElectricity) and burns at the hour (IsoGenerator.update); so its
+-- share is set after each rebuild, before the next hour. A generator also pays for an unwired
+-- treadmill it powers, which vanilla doesn't know of, for the load of each bank it backs up
+-- (Bank.backupCarriesLoad), and for the chargers of each bank that charges from it, within what its
+-- gas line carries (GasKit.capW).
 
 if isClient() then return end
 
@@ -58,25 +62,23 @@ local function newPayer(x, y, z, fields)
     return fields
 end
 
---- The payer a bank is.
+--- The payer a bank is: it carries what its inverters do, and anything while a backup generator
+--- carries its load.
 function Payers.ofBank(bank)
-    return newPayer(bank.x, bank.y, bank.z, {})
+    return newPayer(bank.x, bank.y, bank.z, { capW = not bank:backupCarriesLoad() and bank:limitW() or nil })
 end
 
 local function ofGenerator(generator)
     return newPayer(generator:getX(), generator:getY(), generator:getZ(), { generator = generator })
 end
 
--- A bank runs while its generator does; unloaded, while it would.
-local function bankRuns(bank)
-    local isoObject = bank:getIsoObject()
-    if isoObject then
-        return isoObject:isActivated()
-    end
-    return bank:shouldPower()
+-- A bank may run unless something besides its load keeps it off: an overload is for the share to
+-- decide (Payers.scan), so a bank that overloaded comes back once its share fits.
+local function bankMayRun(bank)
+    return bank:canCarryLoad() and not bank.empty
 end
 
---- The payers running now.
+--- The payers that may run now: the running generators and the banks that may.
 function Payers.running()
     local list = {}
     generators:each(function(generator)
@@ -85,7 +87,7 @@ function Payers.running()
         end
     end)
     PowerBank.each(function(bank)
-        if bankRuns(bank) then
+        if bankMayRun(bank) then
             table.insert(list, Payers.ofBank(bank))
         end
     end)
@@ -110,9 +112,179 @@ function Payers.sharers(payer, payers)
     return list
 end
 
---- The payer among `sharers` that pays for an appliance at x, y, z: the nearest that reaches it.
-function Payers.payerAt(sharers, x, y, z)
-    return Places.nearest(sharers, x, y, z, nil, function(sharer) return reaches(sharer, x, y, z) end)
+-- `payer` and every payer of `payers` linked to it by sharers of sharers: all whose shares can move
+-- each other's. Sorted by place, so whichever of them asks, they share alike.
+local function sharingGroup(payer, payers)
+    local group, seen, i = { payer }, { [payer.key] = true }, 1
+    while i <= #group do
+        for _, other in ipairs(Payers.sharers(group[i], payers)) do
+            if not seen[other.key] then
+                seen[other.key] = true
+                table.insert(group, other)
+            end
+        end
+        i = i + 1
+    end
+    table.sort(group, function(a, b) return a.key < b.key end)
+    return group
+end
+
+-- Every draw in the reach of any of `group`, each once, in a fixed order; and by member key, the
+-- running generators powering its square, which are tracked from then on.
+local function drawsOf(group)
+    local draws, seen, found = {}, {}, {}
+    for _, member in ipairs(group) do
+        local mine = {}
+        found[member.key] = mine
+        local square = getCell():getGridSquare(member.x, member.y, member.z)
+        if square then
+            Loads.eachDraw(square, function(draw)
+                local place = Places.key(draw.x, draw.y, draw.z)
+                local onSquare = seen[place] or {}
+                seen[place] = onSquare
+                if not onSquare[draw.index] then
+                    onSquare[draw.index] = true
+                    draw.place = place
+                    table.insert(draws, draw)
+                end
+            end, function(generator)
+                generators:add(generator)
+                table.insert(mine, generator)
+            end)
+        end
+    end
+    table.sort(draws, function(a, b) return a.place < b.place or (a.place == b.place and a.index < b.index) end)
+    return draws, found
+end
+
+local function overCap(payer, watts)
+    return payer.capW ~= nil and watts > payer.capW + EPSILON
+end
+
+-- Who of `payers` pays for each of `draws` (by draw), and each payer's watts (by key): the nearest
+-- that reaches it; then each payer over its cap, in place order, hands its draws, the farthest
+-- first, to the nearest other payer with room for each, until it fits.
+local function shareOnce(payers, draws)
+    local owner, watts = {}, {}
+    for _, payer in ipairs(payers) do
+        watts[payer.key] = 0
+    end
+    for _, draw in ipairs(draws) do
+        local payer = Places.nearest(payers, draw.x, draw.y, draw.z, nil, function(each)
+            return reaches(each, draw.x, draw.y, draw.z)
+        end)
+        if payer then
+            owner[draw] = payer
+            watts[payer.key] = watts[payer.key] + draw.watts
+        end
+    end
+    for _, payer in ipairs(payers) do
+        if overCap(payer, watts[payer.key]) then
+            local mine = {}
+            for _, draw in ipairs(draws) do
+                if owner[draw] == payer then
+                    table.insert(mine, draw)
+                end
+            end
+            -- Farthest first: the reverse of nearest first, ties included.
+            Places.sortNearest(mine, payer.x, payer.y, payer.z)
+            for i = #mine, 1, -1 do
+                if not overCap(payer, watts[payer.key]) then break end
+                local draw = mine[i]
+                local to = Places.nearest(payers, draw.x, draw.y, draw.z, nil, function(each)
+                    return each ~= payer and reaches(each, draw.x, draw.y, draw.z)
+                        and not overCap(each, watts[each.key] + draw.watts)
+                end)
+                if to then
+                    owner[draw] = to
+                    watts[payer.key] = watts[payer.key] - draw.watts
+                    watts[to.key] = watts[to.key] + draw.watts
+                end
+            end
+        end
+    end
+    return owner, watts
+end
+
+-- Who of `group` pays for each of `draws`: shareOnce, again without the banks it leaves over their
+-- cap, until every bank left fits. A bank left over its cap pays, as its overload, for what it held
+-- when it dropped out.
+local function share(group, draws)
+    local payers, tripped = group, {}
+    while true do
+        local owner, watts = shareOnce(payers, draws)
+        local fitting = {}
+        for _, payer in ipairs(payers) do
+            if overCap(payer, watts[payer.key]) then
+                tripped[payer.key] = owner
+            else
+                table.insert(fitting, payer)
+            end
+        end
+        if #fitting == #payers then
+            return owner, tripped
+        end
+        payers = fitting
+    end
+end
+
+-- The sharing of each group worked out during one pass of every bank (Payers.duringPass), by its
+-- members and their caps, so each group is scanned once per pass, not once per member. Nothing a
+-- pass does switches an appliance; outside a pass, every scan looks again.
+local sharedThisPass
+
+--- Run `fn` as one pass of every bank, sharing each group's scan among its members.
+function Payers.duringPass(fn)
+    sharedThisPass = {}
+    local ok, err = pcall(fn)
+    sharedThisPass = nil
+    if not ok then error(err) end
+end
+
+local function groupKey(group)
+    local parts = {}
+    for i, member in ipairs(group) do
+        parts[i] = string.format("%.0f:%s", member.key, tostring(member.capW))
+    end
+    return table.concat(parts, ";")
+end
+
+-- The draws of `group`, the generators by member key, who pays for each draw and what each bank
+-- that overloaded held (share).
+local function sharingOf(group)
+    local key = sharedThisPass and groupKey(group)
+    local sharing = key and sharedThisPass[key]
+    if not sharing then
+        local draws, found = drawsOf(group)
+        local owner, tripped = share(group, draws)
+        sharing = { draws = draws, found = found, owner = owner, tripped = tripped }
+        if key then
+            sharedThisPass[key] = sharing
+        end
+    end
+    return sharing
+end
+
+--- What the payer `payer` pays for of its share among `payers` (Payers.running, it
+--- among them or not), and the running generators powering its square (`generators`), which are
+--- tracked from then on. With `gridGone`, what is switched on in its reach whether or not the grid
+--- powers it now. A bank whose share overloads it gets what it held as it dropped out.
+function Payers.scan(payer, payers, gridGone)
+    local sharing = sharingOf(sharingGroup(payer, payers))
+    local owner = sharing.tripped[payer.key] or sharing.owner
+    local vanilla = payer.generator ~= nil
+    local load = Loads.new()
+    load.generators = sharing.found[payer.key]
+    for _, draw in ipairs(sharing.draws) do
+        if reaches(payer, draw.x, draw.y, draw.z) and Loads.counts(draw, gridGone, vanilla) then
+            if owner[draw] and owner[draw].key == payer.key then
+                Loads.addDraw(load, draw)
+            elseif draw.fuel then
+                load.othersFuel = load.othersFuel + draw.fuel
+            end
+        end
+    end
+    return load
 end
 
 -- Watts of the loads of the banks the generator `payer` carries as their backup.
@@ -135,25 +307,11 @@ local function treadmillInReach(payer)
     return found
 end
 
---- What the payer `payer` on `square` pays for of its share among `payers`, and the running
---- generators reaching it, which are tracked from then on (Loads.scan).
-function Payers.scan(square, payer, payers, gridGone)
-    local sharers = Payers.sharers(payer, payers)
-    local function pays(object)
-        return #sharers == 1 or Payers.payerAt(sharers, object:getX(), object:getY(), object:getZ()) == payer
-    end
-    local load = Loads.scan(square, pays, gridGone, payer.generator ~= nil)
-    for _, generator in ipairs(load.generators) do
-        generators:add(generator)
-    end
-    return load
-end
-
 -- What the running `generator` powers of its share of `payers` (default: those running now): the
 -- load it pays for, plus `backedW`, the banks it carries.
 local function loadOf(generator, payers)
     local payer = ofGenerator(generator)
-    local load = Payers.scan(generator:getSquare(), payer, payers or Payers.running())
+    local load = Payers.scan(payer, payers or Payers.running())
     load.backedW = backedW(payer)
     return load
 end
@@ -244,7 +402,7 @@ local function bill(generator, payers, consumption)
         if billed[payer.key] then unbill(payer.key) end
         return
     end
-    load = load or Payers.scan(generator:getSquare(), payer, payers)
+    load = load or Payers.scan(payer, payers)
     local treadmillW = load.kinds.treadmill and load.kinds.treadmill.watts or 0
     local entry = billed[payer.key] or {}
     billed[payer.key] = entry

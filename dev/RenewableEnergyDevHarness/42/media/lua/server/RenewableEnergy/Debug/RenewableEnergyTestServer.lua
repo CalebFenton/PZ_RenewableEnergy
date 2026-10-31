@@ -257,9 +257,8 @@ end)
 -- What the load scan of the bank on the square at `args` finds, as the payer there: its watts and
 -- the count of each kind.
 handler("scanLoad", function(_, args)
-    local square = PZHarness.squareAt(args)
     local payer = { x = args.x, y = args.y, z = args.z, key = Places.key(args.x, args.y, args.z) }
-    local load = Payers.scan(square, payer, Payers.running())
+    local load = Payers.scan(payer, Payers.running())
     local counts = {}
     for name, kind in pairs(load.kinds) do
         counts[name] = kind.count

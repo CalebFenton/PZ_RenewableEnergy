@@ -337,14 +337,17 @@ function BankSystem.creditTreadmill(tile, hours)
     return true
 end
 
---- Every bank up to now in one pass sharing the contexts of their spans, then one bill for every
+--- Every bank up to now in one pass sharing the contexts of their spans and the scans of the
+--- banks and generators that share their reach (Payers.duringPass), then one bill for every
 --- change they made, then what each shows and tells.
 function BankSystem.updateAll()
     local contextFor = sharedContexts()
-    PowerBank.each(function(bank)
-        bank:catchUp(contextFor)
+    Payers.duringPass(function()
+        PowerBank.each(function(bank)
+            bank:catchUp(contextFor)
+        end)
+        Payers.billGenerators()
     end)
-    Payers.billGenerators()
     PowerBank.each(function(bank)
         bank:showBatteries()
         bank:sendStatus()
