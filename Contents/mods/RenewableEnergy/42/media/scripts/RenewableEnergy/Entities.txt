@@ -446,7 +446,7 @@ module Base
                 item 2 [Base.WeldingRods] flags[DontRecordInput],
                 item 1 [Base.MetalDrum],
                 item 1 [RenewableEnergy.TreadmillMotor],
-                item 2 [Base.MetalPipe],
+                item 2 [Base.MetalBar;Base.IronBar;Base.SteelBar],
                 item 2 [Base.ElectricWire],
                 item 1 [Base.ElectronicsScrap],
             }
@@ -454,7 +454,7 @@ module Base
     }
 
     /* The treadmill wind charger: three blades on a treadmill motor, with a sheet-metal tail to
-       keep it in the wind, on a welded pipe mast. Real power in a good wind, but brake it before a
+       keep it in the wind, on a welded steel mast. Real power in a good wind, but brake it before a
        storm. */
     entity RenewableEnergy_PropellerWood
     {
@@ -491,7 +491,7 @@ module Base
                 item 1 [RenewableEnergy.WoodenBlades;RenewableEnergy.PipeBlades;RenewableEnergy.SteelBlades],
                 item 1 [RenewableEnergy.TreadmillMotor],
                 item 1 [Base.SheetMetal],
-                item 4 [Base.MetalPipe],
+                item 4 [Base.MetalBar;Base.IronBar;Base.SteelBar],
                 item 3 [Base.ElectricWire],
                 item 1 [Base.ElectronicsScrap],
             }
@@ -537,7 +537,7 @@ module Base
         }
     }
 
-    /* The car alternator wind charger: three blades on a pipe mast, with a rigid sheet-metal tail,
+    /* The car alternator wind charger: three blades on a steel mast, with a rigid sheet-metal tail,
        turning a big pulley that a leather belt steps up to a car's alternator, which wants far
        more speed than a rotor turns. More power than the treadmill motor in any wind; brake it
        before a storm. Its skills sit between the treadmill charger's and the turbine's, with the
@@ -579,7 +579,7 @@ module Base
                 item 1 [RenewableEnergy.CarAlternator],
                 item 1 [Base.Belt2],
                 item 2 [Base.SheetMetal],
-                item 8 [Base.MetalPipe],
+                item 8 [Base.MetalBar;Base.IronBar;Base.SteelBar],
                 item 3 [Base.ElectricWire],
                 item 3 [Base.ElectronicsScrap],
             }
@@ -662,7 +662,7 @@ module Base
                 item 1 [RenewableEnergy.WoodenBlades;RenewableEnergy.PipeBlades;RenewableEnergy.SteelBlades],
                 item 1 [RenewableEnergy.HomemadeAlternator],
                 item 3 [Base.SheetMetal],
-                item 12 [Base.MetalPipe],
+                item 12 [Base.MetalBar;Base.IronBar;Base.SteelBar],
                 item 4 [Base.ElectricWire],
                 item 3 [Base.ElectronicsScrap],
             }

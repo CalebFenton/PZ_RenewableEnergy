@@ -7128,9 +7128,21 @@
           "items": [
             {
               "count": 4,
-              "fullType": "Base.MetalPipe",
-              "icon": "icon_Base_MetalPipe",
-              "name": "Iron Pipe"
+              "fullType": "Base.MetalBar",
+              "icon": "icon_Base_MetalBar",
+              "name": "Steel Rod"
+            },
+            {
+              "count": 4,
+              "fullType": "Base.IronBar",
+              "icon": "icon_Base_IronBar",
+              "name": "Iron Bar"
+            },
+            {
+              "count": 4,
+              "fullType": "Base.SteelBar",
+              "icon": "icon_Base_SteelBar",
+              "name": "Steel Bar"
             }
           ],
           "keep": false,
@@ -7452,9 +7464,21 @@
           "items": [
             {
               "count": 12,
-              "fullType": "Base.MetalPipe",
-              "icon": "icon_Base_MetalPipe",
-              "name": "Iron Pipe"
+              "fullType": "Base.MetalBar",
+              "icon": "icon_Base_MetalBar",
+              "name": "Steel Rod"
+            },
+            {
+              "count": 12,
+              "fullType": "Base.IronBar",
+              "icon": "icon_Base_IronBar",
+              "name": "Iron Bar"
+            },
+            {
+              "count": 12,
+              "fullType": "Base.SteelBar",
+              "icon": "icon_Base_SteelBar",
+              "name": "Steel Bar"
             }
           ],
           "keep": false,
@@ -7760,9 +7784,21 @@
           "items": [
             {
               "count": 2,
-              "fullType": "Base.MetalPipe",
-              "icon": "icon_Base_MetalPipe",
-              "name": "Iron Pipe"
+              "fullType": "Base.MetalBar",
+              "icon": "icon_Base_MetalBar",
+              "name": "Steel Rod"
+            },
+            {
+              "count": 2,
+              "fullType": "Base.IronBar",
+              "icon": "icon_Base_IronBar",
+              "name": "Iron Bar"
+            },
+            {
+              "count": 2,
+              "fullType": "Base.SteelBar",
+              "icon": "icon_Base_SteelBar",
+              "name": "Steel Bar"
             }
           ],
           "keep": false,
@@ -7951,9 +7987,21 @@
           "items": [
             {
               "count": 8,
-              "fullType": "Base.MetalPipe",
-              "icon": "icon_Base_MetalPipe",
-              "name": "Iron Pipe"
+              "fullType": "Base.MetalBar",
+              "icon": "icon_Base_MetalBar",
+              "name": "Steel Rod"
+            },
+            {
+              "count": 8,
+              "fullType": "Base.IronBar",
+              "icon": "icon_Base_IronBar",
+              "name": "Iron Bar"
+            },
+            {
+              "count": 8,
+              "fullType": "Base.SteelBar",
+              "icon": "icon_Base_SteelBar",
+              "name": "Steel Bar"
             }
           ],
           "keep": false,

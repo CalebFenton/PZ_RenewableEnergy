@@ -307,7 +307,7 @@ The figures here are at the default **Wind Multiplier** of 2, which scales them 
 | Homebuilt Wind Turbine | Homemade Alternator | 1600 W at 40 km/h | 3 | Yes, but turns aside in a gale |
 
 - **Scoop rotor**: two half-drum scoops on a short pole. It never needs the brake and never breaks, but it makes little. It's the one charger that needs no controller.
-- **Treadmill wind charger**: three blades high on a pipe mast. It's the first charger that makes real power.
+- **Treadmill wind charger**: three blades high on a steel mast. It's the first charger that makes real power.
 - **Car alternator wind charger**: the same mast belted to a car's alternator. It makes a third more in any wind for the same inputs, a straight upgrade.
 - **Homebuilt wind turbine**: speaker magnets on a car's brake hub turning past hand-wound coils. It makes well over twice the treadmill charger's power, and its tail swings it out of a gale.
 
