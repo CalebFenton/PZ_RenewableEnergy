@@ -132,22 +132,35 @@ function SourceSite.connectSource(object, bank)
     site.tell(place)
 end
 
---- The authority's side of the jobs at a treadmill's tile.
-SourceSite.treadmill = Jobs.targetSite({
-    [Treadmill.WIRE] = function(character, row, tile)
+-- What each job at a treadmill's tile does to it and the banks it touches.
+local TREADMILL = {
+    [Treadmill.CONNECT] = function(character, place, row, tile)
+        if not place.target then
+            return false
+        end
         TreadmillSource.wire(tile, character)
+        place.target:addSource(tile, character)
         return true
     end,
     -- What its runs banked up to now counts.
-    [Treadmill.UNWIRE] = function(character, row, tile)
-        local bank = bankFedBy(tile)
-        if bank then
-            BankSystem.dropSource(bank, tile:getX(), tile:getY(), tile:getZ())
+    [Treadmill.UNWIRE] = function(character, place, row, tile)
+        if place.bank then
+            place.bank:removeSource(tile:getX(), tile:getY(), tile:getZ())
         end
         TreadmillSource.unwire(tile, character)
         return true
     end,
-})
+}
+
+--- The authority's side of the jobs at a treadmill's tile, its banks prepared and told as a
+--- source job's are.
+SourceSite.treadmill = {
+    open = SourceSite.source.open,
+    act = function(character, job, place, row, tile)
+        return TREADMILL[job](character, place, row, tile)
+    end,
+    tell = SourceSite.source.tell,
+}
 
 Action.serve({ source = SourceSite.source, treadmill = SourceSite.treadmill })
 

@@ -75,7 +75,7 @@ end
 -- A wind charger's brake, a lever or pin at the foot of the mast, set to `braked`.
 local function brakeJob(braked)
     return {
-        braked = braked, minutes = 1,
+        braked = braked, minutes = 1, tooltip = braked and "Tooltip_RenewableEnergy_Brake" or "Tooltip_RenewableEnergy_ReleaseBrake",
         blocker = function(character, source)
             if not Wind.isCharger(source) then
                 return "no wind charger"
@@ -93,7 +93,7 @@ SourceJobs.JOBS = {
     -- (SourceSite.source); a client has its summary's.
     [SourceJobs.CONNECT] = {
         minutes = function(source, bank, character) return connectMinutes(character) end,
-        light = true, sound = "GeneratorConnect",
+        light = true, sound = "GeneratorConnect", tooltip = "Tooltip_RenewableEnergy_ConnectSource",
         blocker = function(character, source, bank)
             local summary = PowerBank.isBank(bank) and PowerBank.currentSummary(bank)
             if not summary then
@@ -105,12 +105,12 @@ SourceJobs.JOBS = {
     },
     [SourceJobs.DISCONNECT] = {
         minutes = function(source, bank, character) return connectMinutes(character) / 2 end,
-        light = true,
+        light = true, tooltip = "Tooltip_RenewableEnergy_DisconnectSource",
         blocker = function(character, source) return not PowerBank.connectedBank(source) and "not connected" or nil end,
     },
     -- With the broom or snow shovel in hand.
     [SourceJobs.CLEAR_SNOW] = {
-        minutes = 5, metabolics = Metabolics.LightWork, wield = true,
+        minutes = 5, metabolics = Metabolics.LightWork, wield = true, tooltip = "Tooltip_RenewableEnergy_ClearSnow",
         begin = function(self)
             if self.with:getType() == "SnowShovel" then
                 self:setActionAnim(BuildingHelper.getShovelAnim(self.with))

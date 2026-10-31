@@ -1,5 +1,6 @@
 -- Vanilla's treadmill (Sprites.treadmill), two tiles. Unwired, a run on it draws its motor's watts
--- like any appliance. Wired to feed a bank, a run on it banks watt-hours instead.
+-- like any appliance. Connected to a bank, which wires its motor to make power, a run on it banks
+-- watt-hours instead.
 
 local Sprites = require "RenewableEnergy/Sprites"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
@@ -9,7 +10,9 @@ local Squares = require "cf_commonlib/Squares"
 
 local Treadmill = {}
 
--- Tile modData: the tile wired to feed a bank (one of the treadmill's two tiles).
+-- Tile modData: the tile wired to feed a bank (one of the treadmill's two tiles). Connecting wires
+-- it and disconnecting unwires it; a tile left wired without a bank (its bank gone, or out of
+-- reach) connects again without wiring, or is unwired on its own.
 Treadmill.WIRED_KEY = "RenewableEnergy_treadmillWired"
 -- The item dismantling a treadmill gives.
 Treadmill.MOTOR = "RenewableEnergy.TreadmillMotor"
@@ -88,25 +91,43 @@ function Treadmill.wiredHalf(tile)
     return nil
 end
 
-Treadmill.WIRE = "WireTreadmill"
+Treadmill.CONNECT = "ConnectTreadmill"
 Treadmill.UNWIRE = "UnwireTreadmill"
 
 local WIRING = Treadmill.SPEC.wiring
 
--- The jobs at a treadmill's tile, by name (cf_commonlib's Jobs): wiring it to feed a bank, as a
--- part is wired in, and unwiring it. SourceSite does them.
+-- Why the bank `bank` can't take the treadmill tile `tile` now, or nil: the refusals of Connect
+-- Source (SourceJobs), for a tile that isn't a source until it is wired. Sources requires this
+-- module, so it is required here when first asked.
+local function bankRefusal(tile, bank)
+    local Sources = require "RenewableEnergy/PowerBank/Sources"
+    local summary = PowerBank.isBank(bank) and PowerBank.currentSummary(bank)
+    if not summary then
+        return "no bank"
+    elseif not Sources.isInReach(Squares.positionOf(bank), tile:getX(), tile:getY(), tile:getZ()) then
+        return "out of reach"
+    end
+    return Sources.bankRefusal(bank:isConnected()) or Sources.slotRefusal("treadmill", summary.freeSlots)
+end
+
+-- The jobs at a treadmill's tile, by name (cf_commonlib's Jobs). Connect wires a loose treadmill's
+-- motor to make power, as a part is wired in, and connects it to the bank `with`; a wired one
+-- moves between banks by Connect Source like any source. Unwire takes it out of its bank and
+-- unwires it, labelled Disconnect while it feeds one. SourceSite does them.
 Treadmill.JOBS = {
     -- Either tile wired already refuses it, so a treadmill is wired once.
-    [Treadmill.WIRE] = {
-        units = function(tile, with, character) return Wiring.units(character, WIRING) end,
-        light = true, sound = "GeneratorConnect",
-        blocker = function(character, tile) return Treadmill.wiredHalf(tile) and "already wired" or nil end,
+    [Treadmill.CONNECT] = {
+        units = function(tile, bank, character) return Wiring.units(character, WIRING) end,
+        light = true, sound = "GeneratorConnect", tooltip = "Tooltip_RenewableEnergy_ConnectTreadmill",
+        blocker = function(character, tile, bank)
+            return Treadmill.wiredHalf(tile) and "already wired" or bankRefusal(tile, bank)
+        end,
         materials = Wiring.materials(WIRING),
     },
     -- As a part comes out of a bank: quicker than wiring, with the same tools, the wire given back.
     [Treadmill.UNWIRE] = {
         units = function(tile, with, character) return Wiring.units(character, WIRING, 0.5) end,
-        light = true, sound = "GeneratorConnect",
+        light = true, sound = "GeneratorConnect", tooltip = "Tooltip_RenewableEnergy_UnwireTreadmill",
         blocker = function(character, tile) return not Treadmill.isWired(tile) and "not wired" or nil end,
         materials = WIRING.tools,
     },

@@ -374,11 +374,11 @@ From 55 km/h, the homebuilt turbine's tail swings its head out of the wind ("tur
 
 No sun and no wind? Run for it.
 
-**Wire the Motor** on a treadmill (Electricity 2, a screwdriver, wire and an Electronics Scrap), then connect it to a bank like any source. **Run on Treadmill** lasts half an hour and banks roughly what a fridge-freezer draws in that time. The energy goes in when the run ends and reaches the batteries over the next half hour; stopping early banks your share of the run.
+Right-click a treadmill and **Connect to** a bank in reach (Electricity 2, a screwdriver, wire and an Electronics Scrap): that wires its motor to make power instead of using it. **Run on Treadmill** lasts half an hour and banks roughly what a fridge-freezer draws in that time. The energy goes in when the run ends and reaches the batteries over the next half hour; stopping early banks your share of the run.
 
 A run costs a good chunk of endurance and some thirst, and trains Fitness and Sprinting. You stop by yourself when you're nearly spent. If the bank has no free input, the run still tires you, but the energy is lost.
 
-**Unwire the Motor** with the screwdriver gives the wire back, and so does picking the treadmill up, which forgets its wiring. Where there's power from the grid, a generator or a bank, an unwired treadmill is plain exercise equipment, and on a bank it draws about what a washer does.
+**Disconnect** with the screwdriver wires the motor back and gives the wire back, and so does picking the treadmill up, which forgets its wiring. A treadmill whose bank is gone or out of reach stays wired: **Connect to** another bank takes no more wire, and **Unwire the Motor** gives the wire back. Where there's power from the grid, a generator or a bank, an unwired treadmill is plain exercise equipment, and on a bank it draws about what a washer does.
 
 ## Generators on gas
 
@@ -560,7 +560,7 @@ Tow it home and it keeps charging its batteries on the way, or strip it for part
 
 Most recipes need a table, and every one needs light to see by, as most of vanilla's do. Recasting plates and reducing dross need a furnace, the plate mold a hand press and a kiln, and steel blades a forge.
 
-Light is also needed for wiring and fittings: wiring parts in and out, wiring a treadmill, connecting or disconnecting a source or a bank, replacing blades, repairing parts and panels, and fitting or removing a Gas Conversion Kit or its gas line. Switches, valves, brakes, bulbs and chores like clearing snow or ash don't need it.
+Light is also needed for wiring and fittings: wiring parts in and out, connecting or disconnecting a source, a treadmill or a bank, replacing blades, repairing parts and panels, and fitting or removing a Gas Conversion Kit or its gas line. Switches, valves, brakes, bulbs and chores like clearing snow or ash don't need it.
 
 ### Blades
 

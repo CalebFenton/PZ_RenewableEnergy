@@ -88,13 +88,35 @@ local function addSealOptions(playerNum, menu, source)
     end
 end
 
+-- Adds Connect to each bank in reach that `target` (a source of `kind`, or a treadmill not yet
+-- wired) doesn't feed yet, by `job` of `Module`. Returns whether it added any.
+local function addConnectOptions(playerNum, menu, target, kind, Module, job)
+    local here = Squares.positionOf(target)
+    local offered = false
+    for _, bankPosition in ipairs(Sources.banksInReach(here.x, here.y, here.z, kind)) do
+        local bank = PowerBank.findOn(getSquare(bankPosition.x, bankPosition.y, bankPosition.z))
+        if bank and not Squares.samePosition(PowerBank.connectedBank(target), bankPosition) then
+            JobOptions.add(menu, playerNum, Module, job, target, bank,
+                getText("ContextMenu_RenewableEnergy_ConnectSource", BankMenu.bankLabel(bank), Format.away(here, bankPosition)))
+            offered = true
+        end
+    end
+    return offered
+end
+
 function SourceMenu.addSourceOptions(playerNum, context, source)
     local menu = JobOptions.addSubMenu(context, SourceMenu.nameOf(source))
     local here = Squares.positionOf(source)
     local connected = PowerBank.connectedBank(source)
+    local treadmill = Treadmill.isWiredTile(source)
     if connected then
         menu:addOption(getText("ContextMenu_RenewableEnergy_WiredTo", bankNameAt(connected), Format.away(here, connected)))
-        JobOptions.add(menu, playerNum, SourceJobs, SourceJobs.DISCONNECT, source)
+        -- A treadmill's motor is unwired as it comes out of its bank.
+        if treadmill then
+            JobOptions.add(menu, playerNum, Treadmill, Treadmill.UNWIRE, source, nil, getText("ContextMenu_RenewableEnergy_DisconnectSource"))
+        else
+            JobOptions.add(menu, playerNum, SourceJobs, SourceJobs.DISCONNECT, source)
+        end
         addSnowOption(playerNum, menu, source, sourceSummary(connected, here))
     end
     -- A wind charger's brake, set or let go, connected or not.
@@ -105,30 +127,29 @@ function SourceMenu.addSourceOptions(playerNum, context, source)
     addBladesOption(playerNum, menu, source)
     addSealOptions(playerNum, menu, source)
 
-    local offered = false
     local kind = Sources.kindOf(source)
-    for _, bankPosition in ipairs(Sources.banksInReach(here.x, here.y, here.z, kind)) do
-        local bank = PowerBank.findOn(getSquare(bankPosition.x, bankPosition.y, bankPosition.z))
-        if bank and not Sources.connectRefusal(source, bankPosition) then
-            JobOptions.add(menu, playerNum, SourceJobs, SourceJobs.CONNECT, source, bank,
-                getText("ContextMenu_RenewableEnergy_ConnectSource", BankMenu.bankLabel(bank), Format.away(here, bankPosition)))
-            offered = true
-        end
-    end
+    local offered = addConnectOptions(playerNum, menu, source, kind, SourceJobs, SourceJobs.CONNECT)
     if not (offered or connected) then
         local option = menu:addOption(getText("ContextMenu_RenewableEnergy_ConnectToBank"))
         local placed = Sources.squareOk(source:getSquare(), kind)
         Needs.refuse(option, placed and "Tooltip_RenewableEnergy_NoBankInReach" or "Tooltip_RenewableEnergy_SourceIndoors")
     end
+    -- A treadmill left wired without a bank (its bank gone or out of reach) can still be unwired.
+    if treadmill and not connected then
+        JobOptions.add(menu, playerNum, Treadmill, Treadmill.UNWIRE, source)
+    end
     return menu
 end
 
--- Run on Treadmill, greyed saying why while it can't go (Treadmill.runRefusal), then Unwire for a
--- wired treadmill or Wire the Motor for one neither of whose tiles is wired yet.
+-- Run on Treadmill, greyed saying why while it can't go (Treadmill.runRefusal); for a treadmill
+-- neither of whose tiles is wired, Connect to each bank in reach, which wires its motor.
 local function addTreadmillJobs(playerNum, menu, treadmill, wired)
     local run = menu:addOption(getText("ContextMenu_RenewableEnergy_RunOnTreadmill"), playerNum, queueRun, treadmill)
+    Needs.describe(run, "Tooltip_RenewableEnergy_RunOnTreadmill")
     Needs.refuse(run, Treadmill.runRefusal(treadmill))
-    JobOptions.add(menu, playerNum, Treadmill, wired and Treadmill.UNWIRE or Treadmill.WIRE, treadmill)
+    if not wired and not addConnectOptions(playerNum, menu, treadmill, "treadmill", Treadmill, Treadmill.CONNECT) then
+        Needs.refuse(menu:addOption(getText("ContextMenu_RenewableEnergy_ConnectToBank")), "Tooltip_RenewableEnergy_NoBankInReach")
+    end
 end
 
 local sourceOrTreadmill = JobOptions.clicked(function(object)
