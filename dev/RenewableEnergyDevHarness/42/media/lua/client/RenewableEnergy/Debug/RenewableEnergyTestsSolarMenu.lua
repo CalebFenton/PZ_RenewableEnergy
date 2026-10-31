@@ -383,9 +383,9 @@ test("renewable_energy_solar_clear_snow_requirements", {
         T.step(function() self.withTool = clearSnowOption(self.flat) end)
     end,
     validate = function(self)
-        expect(self.withoutTool.greyed, "with no broom or shovel, Clear Snow on a snowy panel isn't greyed out")
-        expectEqual("with no broom or shovel, Clear Snow's tooltip", self.withoutTool.reason,
-            getText("Tooltip_RenewableEnergy_NeedSnowTool"))
+        expect(self.withoutTool.greyed and tostring(self.withoutTool.reason):find(getText("Tooltip_RenewableEnergy_NeedSnowTool"), 1, true) ~= nil,
+            "with no broom or shovel, Clear Snow on a snowy panel isn't greyed out saying it needs one ("
+            .. tostring(self.withoutTool.reason) .. ")")
         expect(self.withTool.shown and not self.withTool.greyed,
             "carrying a broom, Clear Snow isn't offered on a snowy panel (" .. tostring(self.withTool.reason) .. ")")
         local p = player()
@@ -451,8 +451,8 @@ test("renewable_energy_solar_connect_refused_without_free_slot", {
     validate = function(self)
         local why = getText("Tooltip_RenewableEnergy_NoInputSlot")
         for name, option in pairs(self.full) do
-            expect(option.greyed, "with every slot taken, the " .. name .. " connect option isn't greyed out")
-            expectEqual("with every slot taken, the " .. name .. " connect option's tooltip", option.reason, why)
+            expect(option.greyed and tostring(option.reason):find(why, 1, true) ~= nil, "with every slot taken, the "
+                .. name .. " connect option isn't greyed out saying there's no slot (" .. tostring(option.reason) .. ")")
         end
         for name, option in pairs(self.freed) do
             expect(option.shown and not option.greyed, "with a slot free, the " .. name

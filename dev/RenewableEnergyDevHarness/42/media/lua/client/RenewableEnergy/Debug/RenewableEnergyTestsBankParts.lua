@@ -169,8 +169,7 @@ test("renewable_energy_bank_wiring_refused_in_the_dark", {
         local context = T.newContext()
         local function refusedDark(label, option)
             T.noteOption(self, label, option)
-            T.expectOptionRefused(self, label)
-            expectEqual(label .. "'s tooltip", self.menu[label].tooltip, getText("Tooltip_RenewableEnergy_TooDark"))
+            T.expectOptionRefused(self, label, "Tooltip_RenewableEnergy_TooDark")
         end
         refusedDark("Wire In", T.optionFor(BankMenu.addWireInOptions(0, context, bank), battery))
         local unwire = BankMenu.addUnwireOptions(0, context, bank)

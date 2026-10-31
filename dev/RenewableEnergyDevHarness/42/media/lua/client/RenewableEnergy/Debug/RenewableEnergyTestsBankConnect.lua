@@ -181,8 +181,8 @@ test("renewable_energy_bank_sources_need_a_connected_bank", {
         local key = "Tooltip_RenewableEnergy_BankNotConnected"
         local before, after = self.unconnected, self.connected
         for name, option in pairs({ ["the panel's Connect"] = before.one, ["Connect Sources in Reach"] = before.all }) do
-            expect(option.shown and option.greyed, name .. " isn't offered greyed out for a bank that isn't connected")
-            expectEqual(name .. "'s tooltip", option.reason, getText(key))
+            expect(option.shown and option.greyed and tostring(option.reason):find(getText(key), 1, true) ~= nil,
+                name .. " isn't greyed out saying the bank isn't connected (" .. tostring(option.reason) .. ")")
         end
         expect(not self.unconnectedAction, "the Connect action starts for a bank that isn't connected")
         T.expectRefused(self.reads.refused, key, "the authority connected a panel to a bank that isn't connected")

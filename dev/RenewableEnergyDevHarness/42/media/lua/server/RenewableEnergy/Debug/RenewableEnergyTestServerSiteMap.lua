@@ -47,11 +47,12 @@ local function expectHomesteadSpots(expect, metaGrid, site, kind)
 end
 
 -- Every site's spots make sense on the map: banks and crates in a room (banks only work indoors),
--- panels outdoors, wall panels on a building's wall, garden lights at a building, arrow boards
--- outdoors with a facing, homestead installations as expectHomesteadSpots says; each site has a
--- unique name, a known kind, and the spots its kind uses, as many panel spots as the kind may
--- place. Every name a world that rolled all sites at once stands for is a site's, since a renamed
--- site would be rolled again in such worlds.
+-- panels outdoors, wall panels on a building, its wall or the railing of its catwalk (a
+-- building's unroofed part: IsoMetaGrid.getBuildingAt's empty-outside rooms), garden lights at a
+-- building, arrow boards outdoors with a facing, homestead installations as expectHomesteadSpots
+-- says; each site has a unique name, a known kind, and the spots its kind uses, as many panel
+-- spots as the kind may place. Every name a world that rolled all sites at once stands for is a
+-- site's, since a renamed site would be rolled again in such worlds.
 PZHarness.checkHandler("sitesPlacedSensibly", function(expect)
     local metaGrid = getWorld():getMetaGrid()
     local sites = SolarSites.sites()
@@ -69,7 +70,7 @@ PZHarness.checkHandler("sitesPlacedSensibly", function(expect)
                 expect(kindOf == "flat" or kindOf == "wall" or kindOf == "rack", where .. " names no mount tile")
                 expect(metaGrid:getRoomAt(x, y, z) == nil, where .. " is indoors")
                 if mount == "wallMetal" then
-                    expect(metaGrid:getRoomAt(x, y - 1, z) ~= nil, where .. " has no building wall behind it")
+                    expect(metaGrid:getBuildingAt(x, y - 1, z) ~= nil, where .. " hangs on no building")
                 end
             end
             local panels = #(site.panels or {})
