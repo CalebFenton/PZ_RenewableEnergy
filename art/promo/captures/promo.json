@@ -1650,9 +1650,21 @@
           "items": [
             {
               "count": 4,
-              "fullType": "Base.MetalPipe",
-              "icon": "icon_Base_MetalPipe",
-              "name": "Iron Pipe"
+              "fullType": "Base.MetalBar",
+              "icon": "icon_Base_MetalBar",
+              "name": "Steel Rod"
+            },
+            {
+              "count": 4,
+              "fullType": "Base.IronBar",
+              "icon": "icon_Base_IronBar",
+              "name": "Iron Bar"
+            },
+            {
+              "count": 4,
+              "fullType": "Base.SteelBar",
+              "icon": "icon_Base_SteelBar",
+              "name": "Steel Bar"
             }
           ],
           "keep": false,
@@ -2058,6 +2070,12 @@
               "fullType": "Base.IronBar",
               "icon": "icon_Base_IronBar",
               "name": "Iron Bar"
+            },
+            {
+              "count": 4,
+              "fullType": "Base.SteelBar",
+              "icon": "icon_Base_SteelBar",
+              "name": "Steel Bar"
             }
           ],
           "keep": false,
@@ -5207,9 +5225,9 @@
       "outputs": [
         {
           "count": 4,
-          "fullType": "Base.MetalPipe",
-          "icon": "icon_Base_MetalPipe",
-          "name": "Iron Pipe"
+          "fullType": "Base.MetalBar",
+          "icon": "icon_Base_MetalBar",
+          "name": "Steel Rod"
         },
         {
           "count": 2,
@@ -5466,6 +5484,12 @@
               "fullType": "Base.IronBar",
               "icon": "icon_Base_IronBar",
               "name": "Iron Bar"
+            },
+            {
+              "count": 2,
+              "fullType": "Base.SteelBar",
+              "icon": "icon_Base_SteelBar",
+              "name": "Steel Bar"
             }
           ],
           "keep": false,
@@ -6408,6 +6432,12 @@
               "fullType": "Base.IronBar",
               "icon": "icon_Base_IronBar",
               "name": "Iron Bar"
+            },
+            {
+              "count": 2,
+              "fullType": "Base.SteelBar",
+              "icon": "icon_Base_SteelBar",
+              "name": "Steel Bar"
             }
           ],
           "keep": false,
@@ -7210,6 +7240,12 @@
               "fullType": "Base.ClayBrick",
               "icon": "icon_Base_ClayBrick",
               "name": "Brick"
+            },
+            {
+              "count": 40,
+              "fullType": "Base.StoneBlock",
+              "icon": "icon_Base_StoneBlock",
+              "name": "Stone Block"
             }
           ],
           "keep": false,
@@ -8696,7 +8732,9 @@
       "icon_Base_SmithingHammer",
       "icon_Base_Speaker",
       "icon_Base_Splinters",
+      "icon_Base_SteelBar",
       "icon_Base_SteelScrap",
+      "icon_Base_StoneBlock",
       "icon_Base_Strainer",
       "icon_Base_Straw2",
       "icon_Base_Tarp",

@@ -126,7 +126,7 @@ module Base
             item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],
             item 2 [Base.BlowTorch],
             item 4 [Base.SmallSheetMetal],
-            item 2 [Base.MetalBar;Base.IronBar],
+            item 2 [Base.MetalBar;Base.IronBar;Base.SteelBar],
             item 4 [Base.ElectricWire],
             item 4 [Base.Screws],
         }
@@ -179,7 +179,7 @@ module Base
             item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],
             item 4 [Base.BlowTorch],
             item 2 [Base.SheetMetal],
-            item 4 [Base.MetalBar;Base.IronBar],
+            item 4 [Base.MetalBar;Base.IronBar;Base.SteelBar],
             item 6 [Base.ElectricWire],
             item 8 [Base.Screws],
         }
@@ -264,7 +264,7 @@ module Base
             item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],
             item 1 tags[base:drillmetal] mode:keep flags[MayDegradeLight],
             item 1 [RenewableEnergy.SolarModule;RenewableEnergy.HomemadeSolarModule],
-            item 2 [Base.MetalBar;Base.IronBar],
+            item 2 [Base.MetalBar;Base.IronBar;Base.SteelBar],
             item 3 [Base.ElectricWire],
             item 4 [Base.Screws],
         }
@@ -318,7 +318,7 @@ module Base
             item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],
             item 1 tags[base:wrench] mode:keep flags[MayDegradeLight],
             item 2 [RenewableEnergy.SolarModule;RenewableEnergy.HomemadeSolarModule],
-            item 4 [Base.MetalPipe],
+            item 4 [Base.MetalBar;Base.IronBar;Base.SteelBar],
             item 1 [Base.SmallSheetMetal],
             item 6 [Base.Screws],
             item 4 [Base.ElectricWire],
@@ -434,7 +434,7 @@ module Base
         }
         outputs
         {
-            item 4 Base.MetalPipe,
+            item 4 Base.MetalBar,
             item 2 Base.ElectricWire,
             item 4 Base.Screws,
         }
