@@ -405,6 +405,34 @@ test("renewable_energy_tiles_turned_banks_place_and_pick_up", {
     end,
 })
 
+-- The cursor takes a table for a battery box, not for a rack, and the box goes down on the
+-- tabletop as a working bank.
+test("renewable_energy_tiles_battery_box_on_a_table", {
+    spOnly = "it places with the moveables code on this client, which is the authority only in single player",
+    run = function(self)
+        local square = T.square(self, { indoors = true }, "a free indoor square for a table")
+        if not square then return end
+        electrician(self)
+        T.placeTile(self, square, PZHarness.Fixtures.WORK_TABLE_SPRITE)
+        T.step(function()
+            local box, rack = Sprites.batteryBoxWood.S, Sprites.batteryRackWood.S
+            local item = instanceItem("RenewableEnergy.BatteryBoxWood")
+            self.boxFits = ISMoveableSpriteProps.new(box):canPlaceMoveable(T.player(), square, item)
+            self.rackFits = ISMoveableSpriteProps.new(rack):canPlaceMoveable(T.player(), square, instanceItem("RenewableEnergy.BatteryRackWood"))
+            ISMoveableSpriteProps.new(box):placeMoveableInternal(T.player(), square, item, box)
+            local bank = PowerBank.findOn(square)
+            T.track(self, bank or T.objectWithSprite(square, box))
+            self.height = bank and bank:getRenderYOffset()
+        end)
+    end,
+    validate = function(self)
+        expect(self.boxFits, "the cursor refuses a battery box on a table")
+        expect(not self.rackFits, "the cursor takes a battery rack on a table")
+        expect(self.height ~= nil, "the box placed on the table isn't a working bank")
+        expect((self.height or 0) > 0, "the bank stands on the floor under the table, at height " .. tostring(self.height))
+    end,
+})
+
 -- A bank turned to face E or W shows its batteries, and facing E its meter, with that facing's
 -- overlays, on the authority and on this client.
 test("renewable_energy_tiles_turned_banks_show_their_overlays", {

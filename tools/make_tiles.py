@@ -137,10 +137,11 @@ for material, first_wall, first_rack, _ in MOUNTS:
 # Battery storage by item: its GroupName and CustomName, pick-up level, container capacity, and its
 # other properties. The cursor turns a tile only to numbers at most 96 away (offsets outside -96 to
 # 96 read as -96: IsoWorld.SetCustomPropertyValues), and none near the tiles a save's storage
-# stands on is free, so they don't turn; the turned tiles do.
+# stands on is free, so they don't turn; the turned tiles do. A box goes on the floor or, like the
+# game's small chest (furniture_storage_02_28), on a table, counter or shelf (IsTableTop).
 STORAGE = {
-    "BatteryBoxWood": ("Wooden", "Battery Box", 1, 40, {"ContainerPosition": "Low", "IsLow": ""}),
-    "BatteryBoxMetal": ("Metal", "Battery Box", 1, 40, {"ContainerPosition": "Low", "IsLow": ""}),
+    "BatteryBoxWood": ("Wooden", "Battery Box", 1, 40, {"ContainerPosition": "Low", "IsLow": "", "IsTableTop": ""}),
+    "BatteryBoxMetal": ("Metal", "Battery Box", 1, 40, {"ContainerPosition": "Low", "IsLow": "", "IsTableTop": ""}),
     "BatteryRackWood": ("Wooden", "Battery Rack", 3, 100, {}),
     "BatteryRackMetal": ("Metal", "Battery Rack", 3, 100, {}),
     "BatteryBankWood": ("Wooden", "Battery Bank", 4, 100, {}),

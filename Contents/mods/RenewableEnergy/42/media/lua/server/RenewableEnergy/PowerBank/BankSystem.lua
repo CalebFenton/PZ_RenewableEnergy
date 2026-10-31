@@ -71,7 +71,8 @@ local rebuilding = false
 
 --- Make a bank tile into a working bank: an IsoGenerator, the only thing that powers the
 --- squares around it, with the tile's container for its batteries. `from`, a placed bank
---- tile that isn't a generator yet, hands over its container and modData.
+--- tile that isn't a generator yet, hands over its container, modData and the height the cursor
+--- set it at (a box on a table: ISMoveableSpriteProps.placeMoveableInternal's setRenderYOffset).
 --- A bank the world spawns (no `from`) was installed, so it comes connected; a tile a player
 --- placed must be connected like a generator, and a bank rebuilt keeps its flag.
 local function makeBank(square, spriteName, index, from, fill)
@@ -90,6 +91,9 @@ local function makeBank(square, spriteName, index, from, fill)
     local generator = IsoGenerator.new(square:getCell())
     generator:setSprite(getSprite(spriteName))
     generator:setSquare(square)
+    if from then
+        generator:setRenderYOffset(from:getRenderYOffset())
+    end
     local generatorModData = generator:getModData()
     for key, value in pairs(modData) do
         generatorModData[key] = value
