@@ -65,7 +65,7 @@
     "Tooltip_RenewableEnergy_NoSourcesInReach": "No unconnected sources within reach.",
     "Tooltip_RenewableEnergy_BarrelDigester": "A drum of rotting scraps and manure that makes gas once it gets going, into garbage bags. Small, stinks the most, and stops in the cold.",
     "Tooltip_RenewableEnergy_InsulatedDigester": "A drum boxed in straw and planks under a floating gas drum. Bigger, works into the fall, smells less.",
-    "Tooltip_RenewableEnergy_BrickDome": "A brick dome over a pit dug in the ground, so it's built only on earth, grass or sand. Keeps itself warm on its own gas and works all winter. Hard to build; it hardly smells.",
+    "Tooltip_RenewableEnergy_BrickDome": "A dome of bricks or stone blocks over a pit dug in the ground, so it's built only on earth, grass or sand. Keeps itself warm on its own gas and works all winter. Hard to build; it hardly smells.",
     "Tooltip_RenewableEnergy_WoodAsh": "Wood ash. Compostable, and an alkali that settles a sour digester or cleans a battery for servicing in place of baking soda.",
     "Tooltip_RenewableEnergy_LeadDross": "Lead burnt to oxide, skimmed off a recast. Reduce it with charcoal at a furnace for a set of plates.",
     "Tooltip_RenewableEnergy_NoSludge": "Not enough sludge to fill a bag.",

@@ -259,7 +259,7 @@ module Base
             {
                 item 1 tags[base:masonstrowel] mode:keep flags[Prop1;MayDegradeLight],
                 item 1 tags[base:diggrave] mode:keep flags[MayDegradeLight],
-                item 40 [Base.ClayBrick],
+                item 40 [Base.ClayBrick;Base.StoneBlock],
                 item 4 tags[base:concrete] flags[DontRecordInput],
                 item 2 [Base.RubberHose],
                 item 1 [Base.Pipe;Base.ClayPipeSegment;Base.LeadPipe;Base.MetalPipe],
