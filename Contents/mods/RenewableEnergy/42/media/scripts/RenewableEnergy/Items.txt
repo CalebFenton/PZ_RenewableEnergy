@@ -110,7 +110,7 @@ module RenewableEnergy
         WorldStaticModel = RenewableEnergy.SolarRackWood_Ground,
         WorldObjectSprite = renewable_energy_01_24,
         Tooltip = Tooltip_RenewableEnergy_SolarRackWood,
-        Tags = base:heavyitem;base:ignorezombiedensity,
+        Tags = base:ignorezombiedensity,
     }
 
     item SolarRackMetal
@@ -122,7 +122,7 @@ module RenewableEnergy
         WorldStaticModel = RenewableEnergy.SolarRackMetal_Ground,
         WorldObjectSprite = renewable_energy_01_3,
         Tooltip = Tooltip_RenewableEnergy_SolarRackMetal,
-        Tags = base:heavyitem;base:hasmetal;base:ignorezombiedensity,
+        Tags = base:hasmetal;base:ignorezombiedensity,
     }
 
     /**************************** Battery banks *****************************/
@@ -163,7 +163,7 @@ module RenewableEnergy
         WorldStaticModel = RenewableEnergy.BatteryRackWood_Ground,
         WorldObjectSprite = renewable_energy_01_348,
         Tooltip = Tooltip_RenewableEnergy_BatteryRackWood,
-        Tags = base:heavyitem;base:ignorezombiedensity,
+        Tags = base:ignorezombiedensity,
     }
 
     item BatteryRackMetal
@@ -175,7 +175,7 @@ module RenewableEnergy
         WorldStaticModel = RenewableEnergy.BatteryRackMetal_Ground,
         WorldObjectSprite = renewable_energy_01_352,
         Tooltip = Tooltip_RenewableEnergy_BatteryRackMetal,
-        Tags = base:heavyitem;base:hasmetal;base:ignorezombiedensity,
+        Tags = base:hasmetal;base:ignorezombiedensity,
     }
 
     item BatteryBankWood
@@ -187,7 +187,7 @@ module RenewableEnergy
         WorldStaticModel = RenewableEnergy.BatteryBankWood_Ground,
         WorldObjectSprite = renewable_energy_01_356,
         Tooltip = Tooltip_RenewableEnergy_BatteryBankWood,
-        Tags = base:heavyitem;base:ignorezombiedensity,
+        Tags = base:ignorezombiedensity,
     }
 
     item BatteryBankMetal
@@ -199,7 +199,7 @@ module RenewableEnergy
         WorldStaticModel = RenewableEnergy.BatteryBankMetal_Ground,
         WorldObjectSprite = renewable_energy_01_360,
         Tooltip = Tooltip_RenewableEnergy_BatteryBankMetal,
-        Tags = base:heavyitem;base:hasmetal;base:ignorezombiedensity,
+        Tags = base:hasmetal;base:ignorezombiedensity,
     }
 
     /* Starts the backup generator it sits under when the bank runs low. */
@@ -260,7 +260,7 @@ module RenewableEnergy
         ConditionMax = 100,
         Tooltip = Tooltip_RenewableEnergy_InverterCharger,
         ResearchableRecipes = RenewableEnergy_BuildBatteryBankWood;RenewableEnergy_BuildBatteryBankMetal;RenewableEnergy_MakeSolarFailsafe,
-        Tags = base:heavyitem;base:hasmetal;base:ignorezombiedensity;base:showcondition,
+        Tags = base:hasmetal;base:ignorezombiedensity;base:showcondition,
     }
 
     /* A car battery charger's or a microwave's transformer run backwards on one heatsink of
@@ -303,7 +303,7 @@ module RenewableEnergy
         WorldStaticModel = RenewableEnergy.MicrowaveTransformer_Ground,
         MetalValue = 2.0,
         Tooltip = Tooltip_RenewableEnergy_MicrowaveTransformer,
-        Tags = base:heavyitem;base:hasmetal;base:ignorezombiedensity,
+        Tags = base:hasmetal;base:ignorezombiedensity,
     }
 
     item ChargeController
@@ -360,7 +360,7 @@ module RenewableEnergy
         MetalValue = 2.0,
         ConditionMax = 100,
         Tooltip = Tooltip_RenewableEnergy_L16Battery,
-        Tags = base:heavyitem;base:hasmetal;base:ignorezombiedensity;base:showcondition,
+        Tags = base:hasmetal;base:ignorezombiedensity;base:showcondition,
     }
 
     /*
@@ -381,7 +381,7 @@ module RenewableEnergy
         KeepOnDeplete = true,
         ConditionMax = 100,
         Tooltip = Tooltip_RenewableEnergy_JarBattery,
-        Tags = base:heavyitem;base:ignorezombiedensity;base:showcondition,
+        Tags = base:ignorezombiedensity;base:showcondition,
     }
 
     /**************************** Battery rebuilding ************************/
@@ -895,7 +895,7 @@ module RenewableEnergy
         Icon = RenewableEnergy_FridgeCompressor,
         WorldStaticModel = RenewableEnergy.FridgeCompressor_Ground,
         Tooltip = Tooltip_RenewableEnergy_FridgeCompressor,
-        Tags = base:heavyitem;base:hasmetal;base:ignorezombiedensity,
+        Tags = base:hasmetal;base:ignorezombiedensity,
     }
 
     /* Placed beside a digester, burns its gas to keep it warm (Lua: RenewableEnergy/Biogas/GasHeater). */
