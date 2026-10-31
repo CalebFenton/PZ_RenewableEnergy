@@ -15,7 +15,7 @@ local player = T.player
 --- client's action changes there later; the answer goes in self.reads[label or "vehicleState"].
 function T.awaitVehicleState(self, vehicle, done, label)
     label = label or "vehicleState"
-    T.readUntil(self, "vehicleState", function() return T.vehicleArgs(vehicle) end, label,
+    T.readUntil(self, "vehicleState", function() return T.at(vehicle, { id = vehicle.id }) end, label,
         function(reply) return done(reply.state) end)
     T.step(function() vehicle.state = self.reads[label].state end)
 end
@@ -36,6 +36,9 @@ function T.waitForVehicleCopy(self, vehicle, matches, what)
     T.waitFor(self, function() return vehicle.vehicle ~= nil and matches(T.copyState(vehicle)) end, what)
 end
 
+-- The squares an arrow board takes north and south of its centre.
+local TRAILER_AHEAD, TRAILER_BEHIND = 3, 3
+
 -- Ground a trailer can stand on: outdoors, with nothing on it that blocks, whatever else lies there.
 local function isTrailerGround(x, y, z)
     local square = getSquare(x, y, z)
@@ -43,48 +46,28 @@ local function isTrailerGround(x, y, z)
         and square:getVehicleContainer() == nil
 end
 
--- The nearest square with open ground three squares across, `ahead` north to `behind` south,
--- clear of the character.
-local function openStrip(ahead, behind)
-    local here = player():getSquare()
-    local hx, hy, z = here:getX(), here:getY(), here:getZ()
-    for radius = 1, 25 do
-        for x, y in PZHarness.Fixtures.ring(hx, hy, radius) do
-            local dx, dy = x - hx, y - hy
-            local coversCharacter = math.abs(dx) <= 1 and -dy >= -ahead and -dy <= behind
-            if not coversCharacter then
-                local open = true
-                for sx = x - 1, x + 1 do
-                    for sy = y - ahead, y + behind do
-                        open = open and isTrailerGround(sx, sy, z)
-                    end
-                end
-                if open then
-                    return getSquare(x, y, z)
-                end
+-- Whether open ground runs three squares across around `square`, TRAILER_AHEAD north to
+-- TRAILER_BEHIND south.
+local function stripOpen(square)
+    local x, y, z = square:getX(), square:getY(), square:getZ()
+    for sx = x - 1, x + 1 do
+        for sy = y - TRAILER_AHEAD, y + TRAILER_BEHIND do
+            if not isTrailerGround(sx, sy, z) then
+                return false
             end
         end
     end
-    return nil
+    return true
 end
-
--- The squares an arrow board takes north and south of its centre.
-local TRAILER_AHEAD, TRAILER_BEHIND = 3, 3
 
 local LEFT, RIGHT = ArrowBoard.PANELS[1], ArrowBoard.PANELS[2]
-
-function T.lidOf(vehicle)
-    return vehicle:getPartById(ArrowBoard.LID)
-end
-
-function T.boxOf(vehicle)
-    return vehicle:getPartById(ArrowBoard.BATTERY_BOX)
-end
 
 -- Queues an arrow board on open ground near the character, spawned with `args` and facing `facing`
 -- (default north). Leaves its T.placeVehicle handle in self.trailer and returns it.
 function T.spawnTrailer(self, args, facing)
-    local square = T.need(self, openStrip(TRAILER_AHEAD, TRAILER_BEHIND), "open ground for the arrow board")
+    -- Far enough that the strip never covers the character.
+    local square = T.square(self, { accept = stripOpen, minDistance = math.max(TRAILER_AHEAD, TRAILER_BEHIND) + 1 },
+        "open ground for the arrow board")
     self.trailer = square and T.placeVehicle(self, ArrowBoard.SCRIPT, { square = square, args = args, facing = facing })
     return self.trailer
 end

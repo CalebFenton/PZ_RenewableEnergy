@@ -10,7 +10,7 @@
 require "PZHarness/ServerHandlers"
 require "PZHarness/Fixtures"
 local Items = require "cf_commonlib/Items"
-local Squares = require "cf_commonlib/Squares"
+local Kinds = require "RenewableEnergy/Debug/RenewableEnergyTestKinds"
 local BuildingWatch = require "RenewableEnergy/World/BuildingWatch"
 
 local Helpers = {}
@@ -38,8 +38,7 @@ function Helpers.buildingRoll(modDataName, def)
 end
 
 --- Keeps the roll of the building `def` that the ModData table `modDataName` holds (by
---- BuildingWatch.key) as it stands now, and puts it back when the test ends. Returns the table and
---- the building's key, for a caller that forgets the roll.
+--- BuildingWatch.key) as it stands now, and puts it back when the test ends.
 function Helpers.keepBuildingRoll(modDataName, def, defer)
     local store, key = ModData.getOrCreate(modDataName), BuildingWatch.key(def)
     local saved = store[key]
@@ -51,20 +50,24 @@ function Helpers.keepBuildingRoll(modDataName, def, defer)
         saved = copy
     end
     defer(function() store[key] = saved end)
-    return store, key
 end
 
---- How many ground squares within BuildingWatch.REACH of the building `def` hold an object that
---- `isFind(object)` takes, leaving out the square `except` ({ x, y }), if given.
-function Helpers.findsAround(def, isFind, except)
-    local reach, count = BuildingWatch.REACH, 0
-    for x = def:getX() - reach, def:getX2() + reach - 1 do
-        for y = def:getY() - reach, def:getY2() + reach - 1 do
-            if not (except and x == except[1] and y == except[2]) and Squares.findObjectOn(getSquare(x, y, 0), isFind) then
-                count = count + 1
-            end
+--- Forgets the roll of the building `def` that the ModData table `modDataName` holds until the
+--- test ends (Helpers.keepBuildingRoll), so that it can be rolled again.
+function Helpers.forgetBuildingRoll(modDataName, def, defer)
+    Helpers.keepBuildingRoll(modDataName, def, defer)
+    ModData.getOrCreate(modDataName)[BuildingWatch.key(def)] = nil
+end
+
+--- How many ground squares within BuildingWatch.REACH of the building `def` hold a `kind`
+--- (Kinds.findOn), leaving out the square `except` ({ x, y }), if given.
+function Helpers.findsAround(def, kind, except)
+    local count = 0
+    BuildingWatch.eachSquare(def, BuildingWatch.REACH, 0, function(_, x, y)
+        if not (except and x == except[1] and y == except[2]) and Kinds.findOn({ x = x, y = y, z = 0, kind = kind }) then
+            count = count + 1
         end
-    end
+    end)
     return count
 end
 

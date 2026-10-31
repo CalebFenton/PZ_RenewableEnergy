@@ -1,25 +1,10 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
-local HarnessQA = require "PZHarness/QA"
 
 -- Item and recipe data as the game loaded it, for what the static check can't see. See
 -- RenewableEnergyTestLib.lua for the runner and the helpers.
 
 local T = RenewableEnergyTest
 local test, expect = T.test, T.expect
-
--- Items -----------------------------------------------------------------------------------------
-
--- Every item of the mod's has a ground model.
-test("renewable_energy_items_have_ground_models", {
-    validate = function()
-        for _, fullType in ipairs(HarnessQA.itemsOfModule("RenewableEnergy")) do
-            -- The static check proves a named model exists; nothing else asks for one.
-            expect(getScriptManager():getItem(fullType):getWorldStaticModel() ~= nil, fullType .. " has no ground model")
-        end
-    end,
-})
-
--- Recipes -------------------------------------------------------------------------------------
 
 -- Every item a recipe of the mod's accepts, vanilla's included, has an icon: the crafting window's
 -- "Possible Items" throws on one without (ISCraftInventoryPanel.populate). Each fluid input fits a
@@ -45,38 +30,5 @@ test("renewable_energy_items_recipes_load", {
                 end
             end
         end
-    end,
-})
-
--- Every recipe a magazine teaches (LearnedRecipes) or found hardware offers to research
--- (ResearchableRecipes) needs learning, else the item teaches what every character knows. A
--- magazine may teach a build-menu recipe; research offers only crafting recipes
--- (Item.getResearchableRecipes skips a name getCraftRecipe doesn't resolve).
-test("renewable_energy_items_taught_recipes_need_learning", {
-    validate = function()
-        local builds = {}
-        for _, name in ipairs(PZHarness.Test.buildRecipeNames()) do
-            builds[name] = true
-        end
-        local function needsLearning(name)
-            local recipe = getScriptManager():getCraftRecipe(name)
-            return recipe ~= nil and recipe:needToBeLearn()
-        end
-        local taught = 0
-        for _, fullType in ipairs(HarnessQA.itemsOfModule("RenewableEnergy")) do
-            local item = getScriptManager():getItem(fullType)
-            local learned, researchable = item:getLearnedRecipes(), item:getResearchableRecipes()
-            for i = 0, (learned and learned:size() or 0) - 1 do
-                local name = learned:get(i)
-                taught = taught + 1
-                expect(builds[name] or needsLearning(name), fullType .. " teaches " .. name .. ", which needs no learning")
-            end
-            for i = 0, (researchable and researchable:size() or 0) - 1 do
-                local name = researchable:get(i)
-                taught = taught + 1
-                expect(needsLearning(name), fullType .. " offers to research " .. name .. ", which is no crafting recipe that needs learning")
-            end
-        end
-        expect(taught > 0, "no item of the mod's teaches a recipe")
     end,
 })

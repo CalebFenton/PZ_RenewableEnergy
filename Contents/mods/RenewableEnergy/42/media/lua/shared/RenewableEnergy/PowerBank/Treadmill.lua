@@ -2,6 +2,7 @@
 -- like any appliance. Connected to a bank, which wires its motor to make power, a run on it banks
 -- watt-hours instead.
 
+local Specs = require "RenewableEnergy/Specs"
 local Sprites = require "RenewableEnergy/Sprites"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local Wiring = require "RenewableEnergy/PowerBank/Wiring"
@@ -20,10 +21,11 @@ Treadmill.MOTOR = "RenewableEnergy.TreadmillMotor"
 -- Wiring cost (as Specs.wiring), the input slots it takes in a bank, watts a runner puts in (an
 -- hour of running is roughly an hour of a fridge-freezer), run length, and an hour's cost and XP.
 -- Unwired, a run draws drawFuel: vanilla bills nothing for a treadmill, so it is billed like the
--- other clothing appliances (IsoGenerator.ClothingAppliancePowerConsumption).
+-- other clothing appliances, at IsoGenerator.ClothingAppliancePowerConsumption, a static field Lua
+-- can't read.
 Treadmill.SPEC = {
     slots = 1,
-    wiring = { seconds = 90, wire = 2, scrap = 1, tools = { { tool = "SCREWDRIVER", item = "Base.Screwdriver" } },
+    wiring = { seconds = 90, wire = 2, scrap = 1, tools = { Specs.SCREWDRIVER },
         skill = 2, xp = 10 },
     watts = 240, runMinutes = 30, drawFuel = 0.09,
     endurancePerHour = 0.6, thirstPerHour = 0.2,
@@ -96,24 +98,18 @@ Treadmill.UNWIRE = "UnwireTreadmill"
 
 local WIRING = Treadmill.SPEC.wiring
 
--- Why the bank `bank` can't take the treadmill tile `tile` now, or nil: the refusals of Connect
--- Source (SourceJobs), for a tile that isn't a source until it is wired. Sources requires this
--- module, so it is required here when first asked.
+-- Why the bank `bank` can't take the treadmill tile `tile` now, or nil: Connect Source's refusals
+-- (PowerBank.sourceRefusal), for a tile that isn't a source until it is wired.
 local function bankRefusal(tile, bank)
-    local Sources = require "RenewableEnergy/PowerBank/Sources"
-    local summary = PowerBank.isBank(bank) and PowerBank.currentSummary(bank)
-    if not summary then
-        return "no bank"
-    elseif not Sources.isInReach(Squares.positionOf(bank), tile:getX(), tile:getY(), tile:getZ()) then
-        return "out of reach"
-    end
-    return Sources.bankRefusal(bank:isConnected()) or Sources.slotRefusal("treadmill", summary.freeSlots)
+    return PowerBank.sourceRefusal(bank, Treadmill.SPEC.slots, function(bankPosition)
+        return not PowerBank.inSourceReach(bankPosition, tile:getX(), tile:getY(), tile:getZ()) and "out of reach" or nil
+    end)
 end
 
 -- The jobs at a treadmill's tile, by name (cf_commonlib's Jobs). Connect wires a loose treadmill's
 -- motor to make power, as a part is wired in, and connects it to the bank `with`; a wired one
 -- moves between banks by Connect Source like any source. Unwire takes it out of its bank and
--- unwires it, labelled Disconnect while it feeds one. SourceSite does them.
+-- unwires it, labelled Disconnect while it feeds one.
 Treadmill.JOBS = {
     -- Either tile wired already refuses it, so a treadmill is wired once.
     [Treadmill.CONNECT] = {

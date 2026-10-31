@@ -11,7 +11,6 @@ if isClient() then return end
 local Utilities = require "RenewableEnergy/Utilities"
 local Sprites = require "RenewableEnergy/Sprites"
 local ObjectSystem = require "RenewableEnergy/ObjectSystem"
-local Fumes = require "RenewableEnergy/Fumes"
 local GasKit = require "RenewableEnergy/GasLine/GasKit"
 local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
 local GeneratorReach = require "cf_commonlib/GeneratorReach"
@@ -59,39 +58,35 @@ function GasifierObject:stateToIsoObject(isoObject)
 end
 
 function GasifierObject:loaded(isoObject)
-    local square = isoObject:getSquare()
-    self.indoors = Fumes.buildingOf(square) ~= nil
+    ObjectSystem.Object.loaded(self, isoObject)
     self:afterChange()
+end
+
+local function isFuel(item)
+    return Gasifier.fuelKg(item) ~= nil
 end
 
 -- Puts the next item of fuel from the hopper into the firebox. Returns whether there was one.
 function GasifierObject:stoke(hopper)
-    local items = hopper and hopper:getItems()
-    for i = 0, (items and items:size() or 0) - 1 do
-        local item = items:get(i)
-        local kg = Gasifier.fuelKg(item)
-        if kg then
-            Items.removeItem(item)
-            self.fireKg = self.fireKg + kg
-            self.fireCharcoal = Gasifier.isCharcoal(item)
-            return true
-        end
+    local item = hopper and hopper:getFirstEval(isFuel)
+    if not item then
+        return false
     end
-    return false
+    Items.removeItem(item)
+    self.fireKg = self.fireKg + Gasifier.fuelKg(item)
+    self.fireCharcoal = Gasifier.isCharcoal(item)
+    return true
 end
 
 -- Turns one clean packing item in the filter to Tarry Packing. Returns whether there was one.
 function GasifierObject:tarOne(filter)
-    local items = filter and filter:getItems()
-    for i = 0, (items and items:size() or 0) - 1 do
-        local item = items:get(i)
-        if Gasifier.isPacking(item) then
-            Items.removeItem(item)
-            Items.addItem(filter, Gasifier.TARRY)
-            return true
-        end
+    local item = filter and filter:getFirstEval(Gasifier.isPacking)
+    if not item then
+        return false
     end
-    return false
+    Items.removeItem(item)
+    Items.addItem(filter, Gasifier.TARRY)
+    return true
 end
 
 --- Burns up to `kg` of fuel, stoking from the hopper as the firebox empties, and leaves its ash

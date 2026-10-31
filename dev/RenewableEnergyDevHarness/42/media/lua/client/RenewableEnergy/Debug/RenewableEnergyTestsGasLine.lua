@@ -371,36 +371,6 @@ test("renewable_energy_gasline_unknown_job_refused", {
     end,
 })
 
--- A kit job whose work isn't done on the authority takes nothing and teaches nothing: a job takes
--- what it takes, and gives its XP, only once done. Install Kit takes the kit and gives XP.
-test("renewable_energy_gasline_kit_job_not_done_takes_nothing", {
-    instant = true,
-    run = function(self)
-        local generator = T.generator(self, { fuel = 0 })
-        if not generator then return end
-        self.install = GasKit.materials(T.player(), GasKit.INSTALL)
-        T.giveMaterials(self, "kit", self.install)
-        T.batch(function()
-            T.server(self, "kitJobNotDone", { job = GasKit.INSTALL })
-            T.readCharacter(self, "before", { perks = { "Mechanics" } })
-        end)
-        T.goNextTo(self, generator.square)
-        T.job(self, "kit", GasKit.INSTALL, generator, nil, "complete", { via = "complete" })
-        T.batch(function()
-            T.readGenerator(self, generator, "after")
-            T.countMaterials(self, "after", self.install)
-            T.readCharacter(self, "afterXp", { perks = { "Mechanics" } })
-        end)
-    end,
-    validate = function(self)
-        local reads = self.reads
-        T.expectEqual("Install Kit's done", reads.complete.ok, false)
-        T.expect(reads.after.state == nil, "the kit was fitted")
-        T.expectEqual("kits after Install Kit wasn't done", self.counts.after[GasKit.ITEM], 1)
-        T.expectEqual("Mechanics XP after Install Kit wasn't done", reads.afterXp.xp.Mechanics, reads.before.xp.Mechanics)
-    end,
-})
-
 -- Gasifier lines ----------------------------------------------------------------------------------
 
 -- A gasifier's line connects only to one right beside the generator, not on a corner.

@@ -39,6 +39,8 @@ Places.HOMESTEAD = {
     flatPanels = { { 0, 5 }, { 1, 5 }, { 2, 5 }, { 3, 5 } },
     -- Where the character looks around first, out in the yard the shots also show.
     scouts = { { -4, 3 }, { -3, 8 }, { 2, 9 } },
+    -- The yard shots leave out the bank, indoors behind the wall.
+    shot = { "generator", "player", "digester", "windCharger", "wallPanels", "racks", "flatPanels" },
 }
 -- The ground that must be clear (grass and weeds are cleared), and the plain wall the wall panels
 -- hang on.
@@ -57,6 +59,7 @@ Places.STAGE0 = {
     -- Where the character looks around first, among the panels.
     scout = { 0, 2 },
     open = { along = { -1, 2 }, out = { 1, 2 } },
+    shot = { "box", "player", "cellCharger", "gardenLight", "flatPanels" },
 }
 
 -- Every setup stands at least this far from the others along x or y, out of each other's shots.
@@ -198,9 +201,9 @@ Places.LAYOUTS = {
     },
 }
 
--- Open ground (Harness.isOpenGround) the character isn't standing on.
-local function isUnoccupiedGround(square, player)
-    return Harness.isOpenGround(square) and square ~= player:getCurrentSquare()
+-- Open ground (Harness.isOpenGround, with `opts`) the character isn't standing on.
+local function isUnoccupiedGround(square, player, opts)
+    return Harness.isOpenGround(square, opts) and square ~= player:getCurrentSquare()
 end
 
 -- Walls, their trim and what hangs on them: lamps, pipes, signs.
@@ -370,15 +373,13 @@ local function isRoadPaint(object)
 end
 
 local function isClearRoad(square, player)
-    return Harness.isOpenGround(square, { floor = "blends_street", allows = isRoadPaint })
-        and square ~= player:getCurrentSquare()
+    return isUnoccupiedGround(square, player, { floor = "blends_street", allows = isRoadPaint })
 end
 
 -- Outdoors on natural ground (grass or dirt, not a road or a yard's paving) with nothing on it but
 -- ground cover and trees, which the setups take away.
 local function isYardSquare(square, player)
-    return Harness.isOpenGround(square, { floor = Harness.NATURAL_FLOOR, trees = true })
-        and square ~= player:getCurrentSquare()
+    return isUnoccupiedGround(square, player, { floor = Harness.NATURAL_FLOOR, trees = true })
 end
 
 -- Whether `square` is floor of `room` with nothing standing on it, such as furniture or a pot

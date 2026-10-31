@@ -10,7 +10,6 @@ local Sources = require "RenewableEnergy/PowerBank/Sources"
 local Panel = require "RenewableEnergy/PowerBank/Panel"
 local ModuleRepair = require "RenewableEnergy/PowerBank/ModuleRepair"
 local Treadmill = require "RenewableEnergy/PowerBank/Treadmill"
-local Action = require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 local TreadmillAction = require "RenewableEnergy/TimedActions/RenewableEnergyTreadmillAction"
 local Format = require "RenewableEnergy/UI/Format"
 local BankMenu = require "RenewableEnergy/UI/BankMenu"
@@ -47,9 +46,11 @@ local function sourceSummary(bankPosition, here)
     end
 end
 
+-- The name of the bank at `at` (BankMenu.bankLabel), or the status window's title while its square
+-- isn't loaded here.
 local function bankNameAt(at)
-    local summary = PowerBank.summaryAt(at.x, at.y, at.z)
-    return summary and Format.bankName(summary) or getText("IGUI_RenewableEnergy_StatusTitle")
+    local bank = PowerBank.findOn(getSquare(at.x, at.y, at.z))
+    return bank and BankMenu.bankLabel(bank) or getText("IGUI_RenewableEnergy_StatusTitle")
 end
 
 -- Clear Snow on a source whose summary entry says it is snowy, with the broom or snow shovel the
@@ -71,7 +72,7 @@ local function addBladesOption(playerNum, menu, source)
     if blades then
         JobOptions.add(menu, playerNum, SourceJobs, SourceJobs.REPLACE_BLADES, source, blades)
     else
-        Needs.refuse(menu:addOption(getText(Action.labelKey(SourceJobs.REPLACE_BLADES))), "Tooltip_RenewableEnergy_NeedBlades",
+        Needs.refuse(menu:addOption(JobOptions.jobName(SourceJobs, SourceJobs.REPLACE_BLADES)), "Tooltip_RenewableEnergy_NeedBlades",
             table.concat(names, ", "))
     end
 end

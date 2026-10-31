@@ -193,20 +193,7 @@ function Digester.feedsIn(container)
     return items, feeds
 end
 
---- The tier of a digester tile, or nil for any other object.
-function Digester.tierOf(isoObject)
-    local kind, tier = Sprites.kindOfObject(isoObject)
-    return kind == "digester" and tier or nil
-end
-
-function Digester.isDigester(isoObject)
-    return isoObject ~= nil and Digester.tierOf(isoObject) ~= nil
-end
-
---- The translation key of the name of a digester of `tier`.
-function Digester.nameKey(tier)
-    return "IGUI_RenewableEnergy_Digester_" .. tier
-end
+Digester.tierOf, Digester.isDigester, Digester.nameKey = Sprites.tiered("digester", "Digester")
 
 -- The floors a pit can be dug in: the ones vanilla digs a grave in (ISEmptyGraves:isValid).
 local DIGGABLE_FLOORS = { "floors_exterior_natural", "blends_natural_01" }

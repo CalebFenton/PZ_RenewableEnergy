@@ -38,7 +38,7 @@ local function passSource(self, label, handle, what)
 end
 
 -- A scoop rotor wired to a bank makes power once the wind is past its cut-in speed, none at it or
--- with its brake on, and the status says why.
+-- with its brake on, and the status says why; with the brake released it turns again.
 test("renewable_energy_wind_scoop_cut_in_and_brake", {
     run = function(self)
         local bank, rotor = scoopOnBank(self)
@@ -51,6 +51,8 @@ test("renewable_energy_wind_scoop_cut_in_and_brake", {
             pass("past cut-in", spec.cutInKph + 1)
             T.job(self, "source", SourceJobs.BRAKE, rotor)
             pass("braked", spec.ratedKph)
+            T.job(self, "source", SourceJobs.RELEASE_BRAKE, rotor)
+            pass("released", spec.ratedKph)
         end)
     end,
     validate = function(self)
@@ -75,13 +77,20 @@ test("renewable_energy_wind_scoop_cut_in_and_brake", {
             T.expectEqual("the braked scoop rotor's watts", braked.watts, 0)
             T.expectEqual("the braked scoop rotor's reason", braked.reason, "braked")
         end
+        local released = read("released")
+        if released then
+            expect(released.watts > 0, "with its brake released the scoop rotor made nothing at its rated speed")
+        end
     end,
 })
 
 -- Solid walls on the scoop rotor's own level, where it turns, shelter it and cut its output, but
 -- fences around it don't, low or tall, though vanilla's tiles give both a wall flag
 -- (newtiledefinitions.tiles: walls_exterior_house_low_01_1 HoppableN and WallN, fencing_01_8
--- TallHoppableN and WallN).
+-- TallHoppableN and WallN). A charger losing more than shelteredShare of its unsheltered watts to
+-- shelter gives "sheltered" as its reason, and one losing less gives none: a ring of walls beside
+-- it costs about 6%, walls filling the squares out to 5 about 43% (WindSource's shelter weights,
+-- worked by hand).
 local WALL = "walls_exterior_wooden_01_24"
 local LOW_WALL = "walls_exterior_house_low_01_1"
 local TALL_FENCE = "fencing_01_8"
@@ -100,18 +109,42 @@ test("renewable_energy_wind_walls_shelter_and_fences_dont", {
             T.ringOfTiles(self, rotor, level, TALL_FENCE)
             pass("fenced")
             T.ringOfTiles(self, rotor, level, WALL)
-            pass("walled")
+            pass("ring")
         end)
+        T.step(function()
+            T.batch(function()
+                for dx = -5, 5 do
+                    for dy = -5, 5 do
+                        local distance = math.sqrt(dx * dx + dy * dy)
+                        local square = getSquare(rotor.x + dx, rotor.y + dy, level)
+                        if distance > 1.5 and distance <= 5 and square then
+                            T.placeTile(self, square, WALL)
+                        end
+                    end
+                end
+            end)
+        end)
+        pass("walled")
     end,
     validate = function(self)
         if not T.expectConnected(self.rotor) then return end
         local function read(label) return passSource(self, label, self.rotor, "scoop rotor") end
-        local open, fenced, walled = read("open"), read("fenced"), read("walled")
-        if not (open and fenced and walled) then return end
+        local open, fenced, ring, walled = read("open"), read("fenced"), read("ring"), read("walled")
+        if not (open and fenced and ring and walled) then return end
         T.expectEqual("the fenced scoop rotor's shelter %", fenced.shelterPct, open.shelterPct)
-        expect(walled.shelterPct > open.shelterPct and walled.watts < open.watts, string.format(
-            "walls around it left it at %d%% shelter, %g W (open: %d%%, %g W)",
-            walled.shelterPct, walled.watts, open.shelterPct, open.watts))
+        expect(ring.shelterPct > open.shelterPct and ring.watts < open.watts, string.format(
+            "a ring of walls around it left it at %d%% shelter, %g W (open: %d%%, %g W)",
+            ring.shelterPct, ring.watts, open.shelterPct, open.watts))
+        local spec = Wind.SPEC.turbines.scoop
+        local function loss(source)
+            return 1 - source.watts / Wind.watts(spec, spec.ratedKph, source.z, 0)
+        end
+        local sheltered = Wind.SPEC.shelteredShare
+        expect(loss(ring) < sheltered and ring.reason ~= "sheltered", string.format(
+            "a ring of walls beside it, losing %.0f%% of its watts to shelter, it reads %s", 100 * loss(ring), tostring(ring.reason)))
+        expect(loss(walled) > sheltered, string.format("walled in out to 5 squares, it loses only %.0f%% of its watts to shelter",
+            100 * loss(walled)))
+        T.expectEqual("the walled-in scoop rotor's reason", walled.reason, "sheltered")
     end,
 })
 
@@ -181,14 +214,16 @@ test("renewable_energy_wind_chargers_close_together_crowd_each_other", {
             if not T.expectConnected(handle) then return end
         end
         local spec = Wind.SPEC.turbines.propeller
-        local wanted = Wind.crowding({ self.distance })
+        -- Two squares apart, crowdLoss 0.25 falls by one of crowdRadius 3's steps: 0.25 * 2 / 3,
+        -- a sixth of the wind, which the status rounds to 17%.
+        local crowding = 1 / 6
         for label, handle in pairs({ first = self.first, second = self.second }) do
             local source = T.stateSource(self.reads.crowded, handle)
             if expect(source ~= nil, "the bank's status lists no " .. label .. " treadmill charger") then
                 T.expectEqual(string.format("the %s charger's crowding %%, %g squares from the other", label, self.distance),
-                    source.crowdingPct, math.floor(100 * wanted + 0.5))
+                    source.crowdingPct, 17)
                 T.expectNear("the " .. label .. " charger's watts", source.watts,
-                    Wind.watts(spec, spec.ratedKph, source.z, source.shelterPct / 100, wanted), spec.watts * 0.01)
+                    (1 - crowding) * Wind.watts(spec, spec.ratedKph, source.z, source.shelterPct / 100), spec.watts * 0.01)
                 T.expectEqual("the " .. label .. " charger's reason", source.reason, "crowded")
             end
         end
@@ -259,34 +294,39 @@ test("renewable_energy_wind_power_curve_rule", {
 
 -- This client draws each wind charger as its turning model, once the charger is added to the map
 -- (OnObjectAdded, which the placePanel handler fires as placing does): each bladed kind's by its
--- blades and facing.
+-- blades and facing, with its kind's texture for those blades (scripts SpriteModels.txt).
 local DRAWN = {
-    scoop = Sprites.windScoop,
-    propellerPipeE = Sprites.windCharger.propeller.pipe.E,
-    propellerWoodN = Sprites.windCharger.propeller.wood.N,
-    propellerSteelS = Sprites.windCharger.propeller.steel.S,
-    carAlternatorWoodE = Sprites.windCharger.carAlternator.wood.E,
-    carAlternatorPipeN = Sprites.windCharger.carAlternator.pipe.N,
-    carAlternatorSteelW = Sprites.windCharger.carAlternator.steel.W,
-    turbineWoodS = Sprites.windCharger.alternator.wood.S,
-    turbinePipeE = Sprites.windCharger.alternator.pipe.E,
-    turbineSteelW = Sprites.windCharger.alternator.steel.W,
+    scoop = { sprite = Sprites.windScoop, texture = "WorldItems/RenewableEnergy_ScoopRotor" },
+    propellerPipeE = { sprite = Sprites.windCharger.propeller.pipe.E, texture = "WorldItems/RenewableEnergy_PropellerPipe" },
+    propellerWoodN = { sprite = Sprites.windCharger.propeller.wood.N, texture = "WorldItems/RenewableEnergy_PropellerWood" },
+    propellerSteelS = { sprite = Sprites.windCharger.propeller.steel.S, texture = "WorldItems/RenewableEnergy_PropellerSteel" },
+    carAlternatorWoodE = { sprite = Sprites.windCharger.carAlternator.wood.E,
+        texture = "WorldItems/RenewableEnergy_CarAlternatorWood" },
+    carAlternatorPipeN = { sprite = Sprites.windCharger.carAlternator.pipe.N,
+        texture = "WorldItems/RenewableEnergy_CarAlternatorPipe" },
+    carAlternatorSteelW = { sprite = Sprites.windCharger.carAlternator.steel.W,
+        texture = "WorldItems/RenewableEnergy_CarAlternatorSteel" },
+    turbineWoodS = { sprite = Sprites.windCharger.alternator.wood.S, texture = "WorldItems/RenewableEnergy_AlternatorWood" },
+    turbinePipeE = { sprite = Sprites.windCharger.alternator.pipe.E, texture = "WorldItems/RenewableEnergy_AlternatorPipe" },
+    turbineSteelW = { sprite = Sprites.windCharger.alternator.steel.W, texture = "WorldItems/RenewableEnergy_AlternatorSteel" },
 }
 
 test("renewable_energy_wind_charger_drawn_as_model", {
     run = function(self)
         self.chargers = {}
         T.batch(function()
-            for label, sprite in pairs(DRAWN) do
-                self.chargers[label] = T.panel(self, sprite)
+            for label, drawn in pairs(DRAWN) do
+                self.chargers[label] = T.panel(self, drawn.sprite)
             end
         end)
     end,
     validate = function(self)
-        for label, charger in pairs(self.chargers) do
+        for label, drawn in pairs(DRAWN) do
+            local charger = self.chargers[label]
             local object = charger and charger.object
             local model = object and object:getSpriteModel()
-            expect(model ~= nil and model:getTextureName() ~= nil, "the " .. label .. " charger has no sprite model on this client")
+            T.expectEqual("the texture this client draws the " .. label .. " charger's model with",
+                model and model:getTextureName(), drawn.texture)
         end
     end,
 })
@@ -547,25 +587,26 @@ swapTest("renewable_energy_wind_turbine_blades_swap_material", "wooden turbine",
     { kind = "batteryRackWood", parts = { T.CAR_BATTERY, T.PLUG_IN_INVERTER, CONTROLLER } },
     Sprites.windCharger.alternator.steel.N, Sprites.windCharger.alternator.wood.N, WOODEN_BLADES, "RenewableEnergy.BrokenSteelBlades")
 
--- Each bladed kind's one build menu entry, and the entity each of its blades makes of it: the
--- entities of the tiles Sprites.windCharger names, since a SpriteConfig takes only its own tiles.
+-- Each bladed kind's one build menu entry, which builds its wooden-bladed entity, and other blades
+-- to build it with, a different material for each kind, with the entity those blades make of it:
+-- the entity of the tile Sprites.windCharger names, since a SpriteConfig takes only its own tiles.
 local BUILT = {
-    { entry = "Base.RenewableEnergy_PropellerWood", kind = "propeller", entities = { wood = "RenewableEnergy_PropellerWood",
-        pipe = "RenewableEnergy_PropellerPipe", steel = "RenewableEnergy_PropellerSteel" } },
-    { entry = "Base.RenewableEnergy_CarAlternatorWood", kind = "carAlternator", entities = {
-        wood = "RenewableEnergy_CarAlternatorWood", pipe = "RenewableEnergy_CarAlternatorPipe",
-        steel = "RenewableEnergy_CarAlternatorSteel" } },
-    { entry = "Base.RenewableEnergy_TurbineWood", kind = "alternator", entities = { wood = "RenewableEnergy_TurbineWood",
-        pipe = "RenewableEnergy_TurbinePipe", steel = "RenewableEnergy_AlternatorWindCharger" } },
+    { entry = "Base.RenewableEnergy_PropellerWood", kind = "propeller", material = "pipe",
+        entity = "RenewableEnergy_PropellerPipe" },
+    { entry = "Base.RenewableEnergy_CarAlternatorWood", kind = "carAlternator", material = "steel",
+        entity = "RenewableEnergy_CarAlternatorSteel" },
+    { entry = "Base.RenewableEnergy_TurbineWood", kind = "alternator", material = "steel",
+        entity = "RenewableEnergy_AlternatorWindCharger" },
 }
 
--- The build menu's own path builds the bladed kind of `design` from its one entry with `material`
--- blades, and the charger's OnCreate fits the blades the build took: it stands on its kind's tile
--- of those blades, facing the way it was built, as that tile's entity, whose SpriteConfig takes
--- it. The entity is named, not inferred from a valid SpriteConfig: the config finds its tile once,
--- as it is added, so a tile swapped under the old entity still reads valid. One build a test, as
--- each built charger stands in the way of the next one's walk.
-local function buildsCharger(design, material)
+-- The build menu's own path builds the bladed kind of `design` from its one entry with its
+-- material's blades, and the charger's OnCreate fits the blades the build took: it stands on its
+-- kind's tile of those blades, facing the way it was built, as that tile's entity, whose
+-- SpriteConfig takes it. The entity is named, not inferred from a valid SpriteConfig: the config
+-- finds its tile once, as it is added, so a tile swapped under the old entity still reads valid.
+-- One build a test, as each built charger stands in the way of the next one's walk.
+local function buildsCharger(design)
+    local material = design.material
     local what = material .. " " .. design.kind
     return {
         instant = true,
@@ -591,60 +632,12 @@ local function buildsCharger(design, material)
             local tile = Sprites.windTileOf(design.kind, build.face, material)
             expect(tile ~= nil, "the " .. what .. " charger has no tile facing " .. tostring(build.face))
             T.expectEqual("the tile of the " .. what .. " charger built facing " .. tostring(build.face), self.sprite, tile)
-            T.expectEqual("the " .. what .. " charger's entity", self.built, design.entities[material])
+            T.expectEqual("the " .. what .. " charger's entity", self.built, design.entity)
             expect(self.configValid, "the " .. what .. " charger's SpriteConfig refused its tile")
         end,
     }
 end
 
 for _, design in ipairs(BUILT) do
-    for _, material in ipairs(Wind.SPEC.turbines[design.kind].blades) do
-        test("renewable_energy_wind_build_menu_fits_" .. material .. "_blades_" .. design.kind, buildsCharger(design, material))
-    end
+    test("renewable_energy_wind_build_menu_fits_" .. design.material .. "_blades_" .. design.kind, buildsCharger(design))
 end
-
--- A charger losing more than shelteredShare of its unsheltered watts to shelter gives "sheltered"
--- as its reason, and one losing less gives none: a ring of walls beside it costs about 6%, walls
--- filling the squares out to 5 about 43% (WindSource's shelter weights, worked by hand).
-test("renewable_energy_wind_sheltered_reason", {
-    run = function(self)
-        local bank, rotor = scoopOnBank(self)
-        if not bank then return end
-        local rated = Wind.SPEC.turbines.scoop.ratedKph
-        local function wallsOut(from, to)
-            T.step(function()
-                T.batch(function()
-                    for dx = -5, 5 do
-                        for dy = -5, 5 do
-                            local distance = math.sqrt(dx * dx + dy * dy)
-                            local square = getSquare(rotor.x + dx, rotor.y + dy, rotor.z)
-                            if distance > from and distance <= to and square then
-                                T.placeTile(self, square, WALL)
-                            end
-                        end
-                    end
-                end)
-            end)
-        end
-        wallsOut(0, 1.5)
-        T.bankPass(self, bank, 0, { windKph = rated, label = "ring" })
-        wallsOut(1.5, 5)
-        T.bankPass(self, bank, 0, { windKph = rated, label = "walled" })
-    end,
-    validate = function(self)
-        if not T.expectConnected(self.rotor) then return end
-        local spec = Wind.SPEC.turbines.scoop
-        local function loss(source)
-            return 1 - source.watts / Wind.watts(spec, spec.ratedKph, source.z, 0)
-        end
-        local ring = passSource(self, "ring", self.rotor, "scoop rotor")
-        local walled = passSource(self, "walled", self.rotor, "scoop rotor")
-        if not (ring and walled) then return end
-        local sheltered = Wind.SPEC.shelteredShare
-        expect(loss(ring) < sheltered and ring.reason ~= "sheltered", string.format(
-            "a ring of walls beside it, losing %.0f%% of its watts to shelter, it reads %s", 100 * loss(ring), tostring(ring.reason)))
-        expect(loss(walled) > sheltered, string.format("walled in out to 5 squares, it loses only %.0f%% of its watts to shelter",
-            100 * loss(walled)))
-        T.expectEqual("the walled-in scoop rotor's reason", walled.reason, "sheltered")
-    end,
-})

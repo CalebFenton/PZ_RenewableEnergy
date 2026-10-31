@@ -185,16 +185,13 @@ local function breaks(source, kph, hours)
     return chance > 0 and Chance.hit(chance)
 end
 
---- A newly connected wind charger's record: its brake, blades and broken blades as the object has
---- them, and its shelter. A charger teaches its wiring the first time a player connects it; the
---- world wires a site's charger with no player (SolarSites), which leaves the lesson to the one who
---- rewires it.
-function WindSource.connect(player, source, isoObject, _, material)
-    source.braked = Wind.isBraked(isoObject)
+--- A newly connected wind charger's record: its broken blades as the object has them, the rest as
+--- WindSource.reconcile reads them. A charger teaches its wiring the first time a player connects
+--- it; the world wires a site's charger with no player (SolarSites), which leaves the lesson to the
+--- one who rewires it.
+function WindSource.connect(player, source, isoObject)
     source.broken = Wind.isBroken(isoObject)
-    source.blades = Wind.bladesOf(source.kind, material)
-    source.shelter = shelterAt(source.kind, source.x, source.y, source.z)
-    source.crowding = crowdingAt(source.kind, source.x, source.y, source.z)
+    WindSource.reconcile(source, isoObject)
     if player and Utilities.teachOnce(player, isoObject, Panel.CONNECTED_ONCE_KEY, Perks.Electricity,
         Specs.connectXp * Sources.slotsOf(source.kind)) then
         isoObject:transmitModData()

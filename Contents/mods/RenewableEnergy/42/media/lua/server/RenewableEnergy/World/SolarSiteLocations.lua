@@ -13,8 +13,8 @@
 --   house: { x, y }, a square of the building that gets garden lights along its front, or whose
 --     containers hide a pamphlet;
 --   arrowBoard: { x, y, z, facing }, the middle of a road lane, facing along the road;
---   windCharger: { x, y, z }, open ground with nothing around it, within Sources.reach() of the
---     bank it is wired to;
+--   windCharger: { x, y, z }, open ground with nothing around it, within PowerBank.sourceReach()
+--     of the bank it is wired to;
 --   digester, gasifier and generator: { x, y, z }, open ground; the generator within GasKit.REACH
 --     of a digester, beside a gasifier.
 -- A site with `always` skips the Solar Sites roll, so that every world has a few things a

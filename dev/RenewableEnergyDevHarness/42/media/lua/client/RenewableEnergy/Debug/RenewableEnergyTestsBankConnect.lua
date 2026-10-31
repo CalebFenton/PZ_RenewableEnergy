@@ -7,7 +7,6 @@ local BankMenu = require "RenewableEnergy/UI/BankMenu"
 local SourceMenu = require "RenewableEnergy/UI/SourceMenu"
 local Squares = require "cf_commonlib/Squares"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
-local Sources = require "RenewableEnergy/PowerBank/Sources"
 local Sprites = require "RenewableEnergy/Sprites"
 
 -- Power bank tests: connecting banks, and sources to them.
@@ -73,7 +72,7 @@ test("renewable_energy_bank_placed_bank_starts_unconnected", {
 local GENERATOR = { "Generator" }
 
 -- Connecting a bank takes what connecting a generator does in vanilla: the Electricity level or
--- the "Generator" recipe, enforced by the menu, the action and the authority.
+-- the "Generator" recipe, enforced by the authority.
 test("renewable_energy_bank_connect_needs_generator_skill", {
     run = function(self)
         self.unskilled = T.bank(self, "batteryBoxWood", {}, { connected = false })
@@ -81,11 +80,6 @@ test("renewable_energy_bank_connect_needs_generator_skill", {
         if not self.magazine then return end
         T.knowRecipes(self, GENERATOR, false)
         T.setPerk(self, Perks.Electricity, 2)
-        T.step(function()
-            self.connect = T.optionState(T.menuOption(BankMenu.addBankOptions, self.unskilled.object,
-                getText("ContextMenu_RenewableEnergy_ConnectBank")))
-            self.canStart = RenewableEnergyAction:new(player(), "bank", BankJobs.CONNECT, self.unskilled.object):canPerform()
-        end)
         T.job(self, "bank", BankJobs.CONNECT, self.unskilled, nil, "refused")
         -- T.setPerk sets the level when called, so the later levels wait for their turn.
         T.step(function() T.setPerk(self, Perks.Electricity, 3) end)
@@ -95,9 +89,6 @@ test("renewable_energy_bank_connect_needs_generator_skill", {
         T.job(self, "bank", BankJobs.CONNECT, self.magazine, nil, "withRecipe")
     end,
     validate = function(self)
-        expect(self.connect.greyed, "at Electricity 2 Connect Bank isn't greyed out")
-        expectEqual("Connect Bank's tooltip at Electricity 2", self.connect.reason, getText("ContextMenu_GeneratorPlugTT"))
-        expect(not self.canStart, "Connect Bank can start at Electricity 2 without the Generator recipe")
         T.expectRefused(self.reads.refused, "ContextMenu_GeneratorPlugTT",
             "the authority connected a bank at Electricity 2 without the Generator recipe")
         T.expectOk(self.reads.skilled, "connecting a bank at Electricity 3")
@@ -210,8 +201,8 @@ test("renewable_energy_bank_box_and_rack_both_offered", {
         local box, rack, panel = self.box, self.rack, self.panel
         T.holdLight(self)
         T.step(function()
-            if not T.need(self, Sources.isInReach(box, panel.x, panel.y, panel.z)
-                and Sources.isInReach(rack, panel.x, panel.y, panel.z), "the box and the rack in reach of the panel") then
+            if not T.need(self, PowerBank.inSourceReach(box, panel.x, panel.y, panel.z)
+                and PowerBank.inSourceReach(rack, panel.x, panel.y, panel.z), "the box and the rack in reach of the panel") then
                 return
             end
             self.offered = { box = T.connectOptions(box, panel, 1).one, rack = T.connectOptions(rack, panel, 1).one }

@@ -1,6 +1,6 @@
 -- The hands-on jobs at a battery bank: what each takes of the character and what refuses it
--- (cf_commonlib's Jobs). BankSystem.jobSite does them. Parts enter and leave a bank only through
--- Wire In and Unwire (see RenewableEnergy/PowerBank/WiredPartsGuard.lua).
+-- (cf_commonlib's Jobs). Parts enter and leave a bank only through Wire In and Unwire (see
+-- RenewableEnergy/PowerBank/WiredPartsGuard.lua).
 
 local Specs = require "RenewableEnergy/Specs"
 local Sprites = require "RenewableEnergy/Sprites"
@@ -62,7 +62,7 @@ function BankJobs.switchRefusal(summary, on)
 end
 
 --- Turn On or Turn Off for a bank in `summary`'s state: its label key, its job, and why it is
---- refused (nil when it isn't). The bank's menu and its status window both offer it.
+--- refused (nil when it isn't).
 function BankJobs.switchOf(summary)
     local on = summary.on == true
     return on and "ContextMenu_Turn_Off" or "ContextMenu_Turn_On", on and BankJobs.TURN_OFF or BankJobs.TURN_ON,
@@ -111,7 +111,8 @@ local function inBank(bank, item, isKind)
         and isKind(item:getFullType()) and true or false
 end
 
-local function isPart(item)
+--- Whether `item` is a bank part (PowerBank.PARTS), which Wire In takes.
+function BankJobs.isPart(item)
     return PowerBank.partKind(item:getFullType()) ~= nil
 end
 
@@ -146,7 +147,7 @@ BankJobs.JOBS = {
     [BankJobs.WIRE_IN] = {
         units = function(bank, item, character) return Wiring.units(character, wiringOf(item)) end,
         light = true, sound = "GeneratorConnect",
-        with = isPart, withMissing = "Tooltip_RenewableEnergy_NotAPart",
+        with = BankJobs.isPart, withMissing = "Tooltip_RenewableEnergy_NotAPart",
         blocker = function(character, bank, item)
             local kind = instanceof(item, "InventoryItem") and PowerBank.partKind(item:getFullType())
             return kind and BankJobs.freePartSlots(bank, kind) == 0 and "Tooltip_RenewableEnergy_NoSlot" or nil

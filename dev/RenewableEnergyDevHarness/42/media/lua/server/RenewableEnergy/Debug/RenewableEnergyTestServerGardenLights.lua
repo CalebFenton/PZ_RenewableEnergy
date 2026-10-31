@@ -1,6 +1,5 @@
 -- The authority's half of the garden light tests: houses are rolled for lights only where the
--- authority runs them. Only registers handlers, so a --stay rerun loads it again (RELOAD_FILES);
--- RenewableEnergyTestHelpers.lua says how these handlers work.
+-- authority runs them.
 
 require "PZHarness/ServerHandlers"
 require "PZHarness/Fixtures"
@@ -33,13 +32,6 @@ local function lightsAround(def)
     return found
 end
 
--- Forgets the house's garden light roll until the test ends, so that it can be rolled or promised
--- lights again.
-local function forgetRoll(def, defer)
-    local store, key = Helpers.keepBuildingRoll(GardenLights.MOD_DATA, def, defer)
-    store[key] = nil
-end
-
 -- The house near the character, its roll forgotten (its chunk loading rolled it), is rolled for
 -- garden lights the way the world rolls it, then again: with `args.promise`, after promising it
 -- lights as a solar site does; else with the roll set to `args.roll`. Answers its chance, how many
@@ -49,7 +41,7 @@ end
 handler("gardenLightsRoll", function(player, args, defer)
     local def = need(PZHarness.Fixtures.buildingNear(math.floor(player:getX()), math.floor(player:getY()), 60, isHouse),
         "a house near the character on the server")
-    forgetRoll(def, defer)
+    Helpers.forgetBuildingRoll(GardenLights.MOD_DATA, def, defer)
     local before = lightsAround(def)
     if args.promise then
         GardenLights.promise(def)
@@ -92,7 +84,7 @@ end
 -- must load before it is rolled.
 handler("gardenLightsForgetHouse", function(_, args, defer)
     local def = houseAt(args)
-    forgetRoll(def, defer)
+    Helpers.forgetBuildingRoll(GardenLights.MOD_DATA, def, defer)
     return { x = def:getX(), y = def:getY(), x2 = def:getX2(), y2 = def:getY2(), reach = GardenLights.REACH }
 end)
 

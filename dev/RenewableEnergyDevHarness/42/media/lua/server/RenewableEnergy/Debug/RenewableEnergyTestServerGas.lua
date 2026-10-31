@@ -1,8 +1,6 @@
 -- The authority's half of the gas line and wood gas tests (RenewableEnergyTestsGasLine.lua,
 -- RenewableEnergyTestsWoodGas.lua): generators with the Gas Conversion Kit, the load they carry,
 -- burning a gasifier's wood, and vanilla's wood fires, and the bank tests' generators.
--- Only registers handlers, so a --stay rerun loads it again (RELOAD_FILES);
--- RenewableEnergyTestHelpers.lua says how these handlers work.
 
 require "PZHarness/ServerHandlers"
 require "PZHarness/ServerFixtures"
@@ -108,20 +106,6 @@ handler("generatorWearChance", function(player, args, defer)
     local was = item:getConditionLowerChance()
     item:setConditionLowerChance(args.oneIn)
     defer(function() item:setConditionLowerChance(was) end)
-    return {}
-end)
-
--- Has the kit job `args.job` not get done on the authority until the test ends, as a job whose
--- work fails there: its site's act (Jobs.perform) answers false and changes nothing.
-handler("kitJobNotDone", function(_, args, defer)
-    local site = GasLines.jobSite
-    local act = site.act
-    Fixtures.replace(defer, site, "act", function(character, job, ...)
-        if job == args.job then
-            return false
-        end
-        return act(character, job, ...)
-    end)
     return {}
 end)
 

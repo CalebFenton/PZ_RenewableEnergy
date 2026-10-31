@@ -5,70 +5,75 @@
 -- which tools/make_tiles.py writes from the art's tile numbers.
 
 local ModuleRepair = require "RenewableEnergy/PowerBank/ModuleRepair"
-local Tiles = require "RenewableEnergy/SpriteTiles"
 
-local Sprites = {}
-
--- Placed objects. Each tile's CustomItem is the item that picking it up gives back.
-Sprites.flat = Tiles.flat
--- Wall tiles by material and facing hang on their square's north edge (attachedN, facing south) or
--- its west edge (attachedW, facing east): the only two edges a square's walls are on.
-Sprites.wall = Tiles.wall
--- Racks by material and facing.
-Sprites.rack = Tiles.rack
-Sprites.failsafe = Tiles.failsafe
-Sprites.cellCharger = Tiles.cellCharger
--- The cardboard crate of solar modules that world spawns and stashes place, and its overlays.
-Sprites.crate = Tiles.crate
-Sprites.crateOverlays = Tiles.crateOverlays
-Sprites.gardenLight = Tiles.gardenLight
-
--- Banks, one tile per tier, material and facing. Specs.banks[itemType].sprite names the field. The
--- placing cursor finds a facing's tile by its number in the same tileset, at most 96 away
--- (ISMoveableSpriteProps.getFaces, IsoWorld.SetCustomPropertyValues), so each bank's four follow
--- one another.
-Sprites.batteryBoxWood = Tiles.batteryBoxWood
-Sprites.batteryBoxMetal = Tiles.batteryBoxMetal
-Sprites.batteryRackWood = Tiles.batteryRackWood
-Sprites.batteryRackMetal = Tiles.batteryRackMetal
-Sprites.batteryBankWood = Tiles.batteryBankWood
-Sprites.batteryBankMetal = Tiles.batteryBankMetal
-
--- Biogas digesters, built in place, one facing each. A barrel digester looks like the barrel it was
--- built from, so its tiles are keyed by that item's type (DigesterSystem.OnCreate).
-Sprites.digester = Tiles.digester
--- Their gas holders, drawn over the digester's own tile: `bags` and `tarp` beside any barrel,
--- from slack to taut, or torn; `drum` the insulated digester's floating drum, from low to risen
--- highest.
-Sprites.digesterHolder = Tiles.digesterHolder
--- The scrubber fitted to each digester, drawn over the digester's own tile, and the same scrubber
--- spent (Digester.scrubLeft), its lid off and its bucket dry.
-Sprites.digesterScrubber = Tiles.digesterScrubber
-Sprites.digesterScrubberSpent = Tiles.digesterScrubberSpent
--- The foam a sour digester heaves up out of its feed funnel, drawn over its own tile.
-Sprites.digesterSour = Tiles.digesterSour
--- The homemade gas heater, off and lit, by facing; every tile gives the heater back.
-Sprites.gasHeater = Tiles.gasHeater
--- Save compatibility: the S tiles banks and heaters stood on before they turned (commit 811e5f6),
--- each to its turnable twin, which looks the same. No numbers within 96 of them are free for other
--- facings, so they don't turn; they work as their twin, pick up as it (Moveables.lua), and an item
--- still carrying one places it facing S. Remove this table, its uses and the old tiles once saves
--- from before then needn't load (DEVELOPMENT.md, Save compatibility).
-Sprites.fixedTiles = Tiles.fixedTiles
+-- The generated tiles, by field:
+--
+-- Placed objects: flat, wall, rack, failsafe, cellCharger, crate (the cardboard crate of solar
+-- modules that world spawns and stashes place) with its crateOverlays, gardenLight. Each tile's
+-- CustomItem is the item that picking it up gives back. Wall tiles by material and facing hang on
+-- their square's north edge (attachedN, facing south) or its west edge (attachedW, facing east):
+-- the only two edges a square's walls are on. Racks by material and facing.
+--
+-- Banks, one tile per tier, material and facing: batteryBoxWood, batteryBoxMetal,
+-- batteryRackWood, batteryRackMetal, batteryBankWood, batteryBankMetal.
+-- Specs.banks[itemType].sprite names the field. The placing cursor finds a facing's tile by its
+-- number in the same tileset, at most 96 away (ISMoveableSpriteProps.getFaces,
+-- IsoWorld.SetCustomPropertyValues), so each bank's four follow one another.
+--
+-- digester: biogas digesters, built in place, one facing each. A barrel digester looks like the
+-- barrel it was built from, so its tiles are keyed by that item's type (DigesterSystem.OnCreate).
+-- Drawn over a digester's own tile: digesterHolder, its gas holders (`bags` and `tarp` beside any
+-- barrel, from slack to taut, or torn; `drum` the insulated digester's floating drum, from low to
+-- risen highest); digesterScrubber, the scrubber fitted to each, and digesterScrubberSpent, the
+-- same scrubber spent (Digester.scrubLeft), its lid off and its bucket dry; digesterSour, the foam
+-- a sour digester heaves up out of its feed funnel.
+--
+-- gasHeater: the homemade gas heater, off and lit, by facing; every tile gives the heater back.
+--
+-- fixedTiles, for save compatibility: the S tiles banks and heaters stood on before they turned
+-- (commit 811e5f6), each to its turnable twin, which looks the same. No numbers within 96 of them
+-- are free for other facings, so they don't turn; they work as their twin, pick up as it
+-- (Moveables.lua), and an item still carrying one places it facing S. Remove this table, its uses
+-- and the old tiles once saves from before then needn't load (DEVELOPMENT.md, Save compatibility).
+--
+-- gasKit and gasifierPipeGen: the gas kit fitted to a generator and the generator's half of a
+-- gasifier's pipe (by the gasifier's direction from the generator), drawn over the game's own
+-- generator tile. The kit sits on each generator body's air intake, so both are drawn per body and
+-- facing, by the generator's sprite; `default` lies on the floor for a generator the game doesn't
+-- know (another mod's).
+--
+-- gasifier and gasifierLit: wood gas generators, built in place, one facing each, and the glow at
+-- each one's door while lit, drawn over its own tile. gasifierPipe: the gasifier's half of the
+-- metal gas pipe to a generator on the next square, by the generator's direction from it; the two
+-- halves meet at the squares' shared edge.
+--
+-- windScoop and windCharger: the scoop rotor's tile, and each bladed kind's per blade material and
+-- rotor facing (propeller the treadmill wind charger, alternator the homebuilt wind turbine, as
+-- Wind.SPEC.turbines). In play the game draws each as a sprite model instead: windModels gives each
+-- kind's (scripts SpriteModels.txt), the name before the step number, suffixed with blade material
+-- and/or facing per the by* flags; `steps` models each turn the rotor one step, and stepsPerTurn is
+-- how many steps bring it back round (fewer for rotors that look the same after part of a turn).
+--
+-- snow: snow lying on a panel, drawn over the panel's own tile. Wall panels are upright and hold
+-- none.
+--
+-- cracks: a cracked module's glass, drawn over its mount's tile, by the look
+-- ModuleRepair.crackLookOf gives it, as a list by module slot. A rack's slot 1 is the lower module,
+-- so it shows only the modules that are cracked, each as it is cracked.
+--
+-- bankFill: each bank tile's overlays, by the bank's Sprites field and facing:
+-- `batteries[look][n]` shows a battery of that look in slot n, linked to the one before it, and
+-- `meter[level]` its charge meter lit from 1 (empty) to the last level (full). A bank draws one
+-- battery overlay per battery it holds, in slot order, then its meter. The meter is on the bank's
+-- front, so facing N or W, away from the camera, a bank shows none and has no `meter`. The E, N
+-- and W overlays are in a second tileset: a tileset holds 512 tiles (IsoWorld.LoadTileDefinitions).
+local Sprites = require "RenewableEnergy/SpriteTiles"
 
 --- The tile a placed `spriteName` turns as: its turnable twin for one of Sprites.fixedTiles, else
 --- itself.
 function Sprites.turnable(spriteName)
     return Sprites.fixedTiles[spriteName] or spriteName
 end
-
--- The gas kit fitted to a generator and the generator's half of a gasifier's pipe, drawn over the
--- game's own generator tile. The kit sits on each generator body's air intake, so both are drawn per
--- body and facing, by the generator's sprite; `default` lies on the floor for a generator the game
--- doesn't know (another mod's).
-Sprites.gasKit = Tiles.gasKit
--- The pipe by the gasifier's direction from the generator.
-Sprites.gasifierPipeGen = Tiles.gasifierPipeGen
 
 --- The gas kit's overlay for a generator whose sprite is `generatorSprite`.
 function Sprites.gasKitFor(generatorSprite)
@@ -81,25 +86,6 @@ function Sprites.gasifierPipeGenFor(generatorSprite, side)
     return (Sprites.gasifierPipeGen.bySprite[generatorSprite] or Sprites.gasifierPipeGen.default)[side]
 end
 
--- Wood gas generators, built in place, one facing each, and the glow at each one's door while lit,
--- drawn over its own tile.
-Sprites.gasifier = Tiles.gasifier
-Sprites.gasifierLit = Tiles.gasifierLit
--- The metal gas pipe from a gasifier to a generator on the next square, in two halves that meet at
--- the squares' shared edge: `gasifierPipe` on the gasifier's tile, by the generator's direction from
--- it, and the generator's half (Sprites.gasifierPipeGenFor) on the generator's tile with the kit.
-Sprites.gasifierPipe = Tiles.gasifierPipe
--- Wind charger tiles: the scoop rotor's, and each bladed kind's per blade material and rotor
--- facing (propeller the treadmill wind charger, alternator the homebuilt wind turbine, as
--- Wind.SPEC.turbines). In play the game draws each as a sprite model instead (Sprites.windModels).
-Sprites.windScoop = Tiles.windScoop
-Sprites.windCharger = Tiles.windCharger
--- Each wind charger kind's sprite models (scripts SpriteModels.txt): the name before the step
--- number, suffixed with blade material and/or facing per the by* flags; `steps` models each turn
--- the rotor one step, and stepsPerTurn is how many steps bring it back round (fewer for rotors that
--- look the same after part of a turn).
-Sprites.windModels = Tiles.windModels
-
 -- Vanilla's treadmill (the "Hamster Wheel" moveable), two tiles per facing, keyed by the way a runner
 -- faces: away from the tiles' Facing. The console tile is the one its depth geometry
 -- (tileGeometry.txt) puts the console's box on; the runner stands on the rear.
@@ -109,22 +95,6 @@ Sprites.treadmill = {
     E = { console = "recreational_sports_01_29", rear = "recreational_sports_01_28" },
     S = { console = "recreational_sports_01_30", rear = "recreational_sports_01_31" },
 }
-
--- Snow lying on a panel, drawn over the panel's own tile. Wall panels are upright and hold none.
-Sprites.snow = Tiles.snow
-
--- A cracked module's glass, drawn over its mount's tile, by the look ModuleRepair.crackLookOf
--- gives it. A rack has one per module slot, slot 1 the lower module, so it shows only the modules
--- that are cracked, each as it is cracked.
-Sprites.cracks = Tiles.cracks
-
--- Each bank tile's overlays, by the bank's Sprites field and facing: `batteries[look][n]` shows a
--- battery of that look in slot n, linked to the one before it, and `meter[level]` its charge meter
--- lit from 1 (empty) to the last level (full). A bank draws one battery overlay per battery it
--- holds, in slot order, then its meter. The meter is on the bank's front, so facing N or W, away
--- from the camera, a bank shows none and has no `meter`. The E, N and W overlays are in a second
--- tileset: a tileset holds 512 tiles (IsoWorld.LoadTileDefinitions).
-Sprites.bankFill = Tiles.bankFill
 
 -- The look a battery's overlay draws it with, by item type: any other battery is drawn as a car
 -- battery.
@@ -157,7 +127,7 @@ for _, mount in ipairs({ "wall", "rack" }) do
 end
 for field, facings in pairs(Sprites.bankFill) do
     for facing in pairs(facings) do
-        KINDS[Sprites[field][facing]] = { field, facing, field:find("Wood$") and "wood" or "metal" }
+        KINDS[Sprites[field][facing]] = { field, facing }
     end
 end
 for state, facings in pairs(Sprites.gasHeater) do
@@ -212,7 +182,7 @@ end
 ---@param spriteName string?
 ---@return string? kind "flat", "wall", "rack", "failsafe", "cellCharger", "crate", "gardenLight", "scoop", "propeller", "carAlternator", "alternator", "treadmill", "digester", "gasifier", "gasHeater", or a bank's Sprites field such as "batteryRackWood"; nil for any other sprite
 ---@return string? facing "S", "E", "N" or "W" for walls, racks, banks, gas heaters, bladed wind chargers and treadmills; a digester's or gasifier's tier
----@return string? variant the material: "wood" or "metal" for walls, racks and banks, the blades' "wood", "pipe" or "steel" for bladed wind chargers, the item type of a barrel digester's barrel, such as "MetalDrum"; a treadmill tile's end, "console" or "rear"; a gas heater's "off" or "lit"
+---@return string? variant the material: "wood" or "metal" for walls and racks, the blades' "wood", "pipe" or "steel" for bladed wind chargers, the item type of a barrel digester's barrel, such as "MetalDrum"; a treadmill tile's end, "console" or "rear"; a gas heater's "off" or "lit"
 function Sprites.kindOf(spriteName)
     local entry = spriteName and KINDS[spriteName]
     if not entry then
@@ -244,6 +214,23 @@ end
 --- What a placed object is, by its tile (Sprites.kindOf); nil for anything else.
 function Sprites.kindOfObject(isoObject)
     return Sprites.kindOf(Sprites.nameOf(isoObject))
+end
+
+--- For a `kind` built in tiers (Sprites.kindOf), named `name` in the translations: the tier of an
+--- object's tile (nil for any other object), whether an object is one, and the translation key of
+--- the name of one of a tier.
+function Sprites.tiered(kind, name)
+    local function tierOf(isoObject)
+        local objectKind, tier = Sprites.kindOfObject(isoObject)
+        return objectKind == kind and tier or nil
+    end
+    local function isObject(isoObject)
+        return isoObject ~= nil and tierOf(isoObject) ~= nil
+    end
+    local function nameKey(tier)
+        return "IGUI_RenewableEnergy_" .. name .. "_" .. tier
+    end
+    return tierOf, isObject, nameKey
 end
 
 --- Whether a sprite is a snow overlay.
@@ -281,26 +268,22 @@ function Sprites.windModelOf(spriteName)
     return prefix, model
 end
 
--- What a mount's tile shows of `byKind` (Sprites.snow or a look of Sprites.cracks): the kind's own
--- entry, or for a kind that has one per material and facing, that one; nil for none.
+-- What a mount's tile shows of `byKind` (Sprites.snow or a look of Sprites.cracks): a flat mount's
+-- entry, a wall's or rack's of its material and facing; nil for none.
 local function ofMount(byKind, kind, facing, material)
     local entry = byKind[kind]
-    if type(entry) == "table" then
-        entry = entry[material]
-        return entry and entry[facing]
+    if kind == "flat" then
+        return entry
     end
-    return entry
+    entry = entry and entry[material]
+    return entry and entry[facing]
 end
 
 local NO_SLOTS = {}
 
--- A mount's crack overlays of `look` by module slot. May be Sprites.cracks' own list: don't change it.
+-- A mount's crack overlays of `look` by module slot.
 local function crackSlots(look, kind, facing, material)
-    local slots = ofMount(Sprites.cracks[look], kind, facing, material)
-    if type(slots) == "string" then
-        return { slots }
-    end
-    return slots or NO_SLOTS
+    return ofMount(Sprites.cracks[look], kind, facing, material) or NO_SLOTS
 end
 
 --- The snow overlay a mount's tile shows under snow (Sprites.snow), or nil for a mount that holds

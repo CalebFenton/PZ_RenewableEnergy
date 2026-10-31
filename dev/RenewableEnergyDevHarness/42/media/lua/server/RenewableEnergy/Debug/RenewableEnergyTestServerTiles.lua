@@ -1,6 +1,4 @@
--- The authority's half of the tile tests: placed panels and scrapping. Only registers handlers, so
--- a --stay rerun loads it again (RELOAD_FILES); RenewableEnergyTestHelpers.lua says how these
--- handlers work.
+-- The authority's half of the tile tests: placed panels and scrapping.
 
 require "PZHarness/ServerHandlers"
 require "PZHarness/Fixtures"

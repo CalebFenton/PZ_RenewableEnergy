@@ -1,9 +1,7 @@
 -- The authority's half of the solar site tests. The tests arm a site's spots with
 -- SolarSites.addSite and let the world place them: when the chunk that holds a spot loads, the
 -- system's OnChunkLoaded places it, or queues it, a line for the next tick and a spot that waits
--- for a later game minute. Nothing here places a spot by hand. Only registers handlers, so a
--- --stay rerun loads it again (RELOAD_FILES); RenewableEnergyTestHelpers.lua says how these
--- handlers work.
+-- for a later game minute. Nothing here places a spot by hand.
 
 require "PZHarness/ServerHandlers"
 require "PZHarness/ServerChecks"
@@ -25,7 +23,6 @@ local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local RuralFinds = require "RenewableEnergy/World/RuralFinds"
 local SolarSites = require "RenewableEnergy/World/SolarSites"
-local Sources = require "RenewableEnergy/PowerBank/Sources"
 local Specs = require "RenewableEnergy/Specs"
 local Wind = require "RenewableEnergy/Wind"
 local WorldSpawns = require "RenewableEnergy/World/WorldSpawns"
@@ -353,11 +350,11 @@ end)
 -- square, nearest first, or nil.
 local function chargerSquareFor(bank)
     local position = { x = bank:getX(), y = bank:getY(), z = bank:getZ() }
-    for r = 1, Sources.reach().tiles do
+    for r = 1, PowerBank.sourceReach().tiles do
         for x, y in PZHarness.Fixtures.ring(position.x, position.y, r) do
             local square = getSquare(x, y, 0)
             if RuralFinds.canPlace("wind", square)
-                and Sources.isInReach(position, x, y, 0) then
+                and PowerBank.inSourceReach(position, x, y, 0) then
                 return square
             end
         end
@@ -478,7 +475,7 @@ check("siteVisited", function(expect, expectNear, _, args)
         return
     end
     for key, def in pairs(defs) do
-        local others = Helpers.findsAround(def, RuralFinds.FINDS[kind].is, at)
+        local others = Helpers.findsAround(def, kind, at)
         expect(others == 0, args.name .. ": " .. others .. " more " .. kind .. " finds by the building at " .. key)
     end
 end)

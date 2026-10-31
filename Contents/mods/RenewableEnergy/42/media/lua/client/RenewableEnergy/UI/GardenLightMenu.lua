@@ -12,8 +12,7 @@ local GardenLightMenu = {}
 --- light's submenu.
 function GardenLightMenu.addOptions(playerNum, context, light)
     local menu = JobOptions.addSubMenu(context, Format.tileName(light))
-    if SolarGardenLight.getBulb(light) then
-        JobOptions.add(menu, playerNum, SolarGardenLight, SolarGardenLight.REMOVE_BULB, light)
+    if JobOptions.add(menu, playerNum, SolarGardenLight, SolarGardenLight.REMOVE_BULB, light) then
         return menu
     end
     local bulbs = SolarGardenLight.bulbsOf(getSpecificPlayer(playerNum))

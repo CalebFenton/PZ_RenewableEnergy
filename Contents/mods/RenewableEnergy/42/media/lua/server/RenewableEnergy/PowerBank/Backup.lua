@@ -14,9 +14,6 @@ local Bank = require "RenewableEnergy/PowerBank/Bank"
 local GeneratorReach = require "cf_commonlib/GeneratorReach"
 local Squares = require "cf_commonlib/Squares"
 
--- A backup generator a failsafe can start is one plugged in within this many squares of its bank
--- on either axis, on the bank's floor.
-local BACKUP_REACH = 3
 -- At or below this condition a running generator may catch fire or explode at every hour it runs
 -- (IsoGenerator.update), so a relay, which nobody stands by, never starts one that worn.
 local FIRE_CONDITION = 20
@@ -29,12 +26,12 @@ local function generatorPlace(found)
     return Places.objectPlace(found.generator)
 end
 
--- Every plugged-in generator within BACKUP_REACH on the bank's floor, nearest
+-- Every plugged-in generator within PowerBank.BACKUP_REACH on the bank's floor, nearest
 -- first (Places.sortNearest): { generator, failsafe }, `failsafe` whether one stands on its
 -- square.
 local function generatorsInReach(bank)
     local found = {}
-    Squares.eachAround(bank.x, bank.y, bank.z, BACKUP_REACH, function(square)
+    Squares.eachAround(bank.x, bank.y, bank.z, PowerBank.BACKUP_REACH, function(square)
         local generator = square:getGenerator()
         if GeneratorReach.isVanillaGenerator(generator) and generator:isConnected() then
             Payers.track(generator)
@@ -50,7 +47,7 @@ end
 -- switch it against each other.
 local function failsafeBank(generator)
     local gx, gy, gz = Places.objectPlace(generator)
-    local reach, banks = BACKUP_REACH, {}
+    local reach, banks = PowerBank.BACKUP_REACH, {}
     PowerBank.each(function(bank)
         if bank.z == gz and math.abs(bank.x - gx) <= reach and math.abs(bank.y - gy) <= reach then
             table.insert(banks, bank)

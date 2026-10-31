@@ -2,7 +2,7 @@
 -- (cf_commonlib's Jobs). GasifierSystem does them. Loading wood and changing the filter's
 -- packing are the loot window's.
 
-local GasHeater = require "RenewableEnergy/Biogas/GasHeater"
+local Specs = require "RenewableEnergy/Specs"
 local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
 local Items = require "cf_commonlib/Items"
 local Jobs = require "cf_commonlib/Jobs"
@@ -41,6 +41,14 @@ function GasifierJobs.cleanAshRow(ashItems)
     }
 end
 
+--- Clean Out Ash done on `subject`, which holds `ashItems(subject)` Wood Ash: `character` gets it
+--- and `take(subject, count)` takes that many out of it. Authority only.
+function GasifierJobs.cleanAsh(character, subject, ashItems, take)
+    local count = ashItems(subject)
+    Items.giveItems(character, Gasifier.WOOD_ASH, count)
+    take(subject, count)
+end
+
 -- Every job, by name (Jobs.define), read against the gasifier's summary
 -- (Gasifier.currentSummary); `with` is the container Drain Condensate fills, or nil to drain it
 -- onto the ground.
@@ -60,9 +68,9 @@ GasifierJobs.JOBS = {
         -- A cold one also takes bellows.
         materials = function(character, summary)
             if summary and summary.cold then
-                return { GasHeater.FIRE_STARTER, BELLOWS }
+                return { Specs.FIRE_STARTER, BELLOWS }
             end
-            return { GasHeater.FIRE_STARTER }
+            return { Specs.FIRE_STARTER }
         end,
     },
     [GasifierJobs.PUT_OUT] = {

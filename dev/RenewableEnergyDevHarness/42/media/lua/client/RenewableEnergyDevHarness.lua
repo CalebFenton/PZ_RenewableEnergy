@@ -16,11 +16,19 @@ local TownReport = require "RenewableEnergyDevTownReport"
 -- Samples per list: enough to measure a rare drop to a fraction of a percentage point.
 local LOOT_SAMPLES = 10000
 
+-- Both reports read one sampling of the world stocks, at the default loot settings and loot rarity
+-- options 1.
 local function reportLoot(_, done)
     local mark = PZHarness.run.mark
     print(mark .. " START")
-    Loot.printReport(LOOT_SAMPLES, mark)
-    TownReport.print(LOOT_SAMPLES, mark)
+    PZHarness.Loot.withMeasureOptions(Loot.MEASURE_OPTIONS, function()
+        Loot.withLootRarity(1, function()
+            local stocks = Loot.sampleWorldStocks(LOOT_SAMPLES,
+                { items = PZHarness.Loot.countItems, finds = TownReport.findsIn })
+            Loot.printReport(LOOT_SAMPLES, mark, stocks)
+            TownReport.print(mark, stocks)
+        end)
+    end)
     done()
 end
 

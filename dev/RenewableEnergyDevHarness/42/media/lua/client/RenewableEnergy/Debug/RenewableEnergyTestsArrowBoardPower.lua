@@ -226,7 +226,7 @@ test("renewable_energy_world_arrow_board_lamps_cut_off_and_come_back", {
 })
 
 -- While the server has the lamps lit, this game flashes them lit and dark (ArrowBoard.flashPhase);
--- switched off, they stay dark for a whole flash period.
+-- switched off, they stay dark for longer than a flashing board ever shows dark.
 test("renewable_energy_world_arrow_board_lamps_flash_for_players", {
     run = function(self)
         if not spawnTrailer(self, { repair = true }) then return end
@@ -253,7 +253,8 @@ test("renewable_energy_world_arrow_board_lamps_flash_for_players", {
         watch("lit", 2 * period, function(seen) return seen.lit > 0 and seen.dark > 0 end)
         T.onVehicle(self, trailer, "setTrailer", { switchOn = false })
         T.waitForVehicleCopy(self, trailer, function(copy) return copy.lamps == nil end, "this client's copy of the dark lamps")
-        watch("dark", period, function(seen) return seen.lit > 0 end)
+        -- A flashing board shows lit within its dark share of a period; a few frames' grace on top.
+        watch("dark", (1 - ArrowBoard.SPEC.onShare) * period + 100, function(seen) return seen.lit > 0 end)
     end,
     validate = function(self)
         local lit, dark = self.lit, self.dark
@@ -272,9 +273,7 @@ test("renewable_energy_world_arrow_board_cycle_ends_at_midnight", {
         if not trailer then return end
         -- readUntil sends its args as they are, so they carry the trailer's own.
         local function lampsArgs()
-            local args = T.vehicleArgs(trailer)
-            args.call, args.with = "runLamps", { 0, true }
-            return args
+            return T.at(trailer, { id = trailer.id, call = "runLamps", with = { 0, true } })
         end
         T.step(function() T.setTime(self, 23.5) end)
         batchOnTrailer(function()

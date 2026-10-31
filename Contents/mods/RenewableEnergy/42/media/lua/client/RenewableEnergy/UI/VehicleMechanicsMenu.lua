@@ -23,16 +23,13 @@ local VehicleJobs = require "RenewableEnergy/Gadgets/VehicleJobs"
 local Action = require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 local Format = require "RenewableEnergy/UI/Format"
 local Items = require "cf_commonlib/Items"
+local JobOptions = require "cf_commonlib/JobOptions"
 local Needs = require "cf_commonlib/Needs"
 
 local CarAlternatorMenu = {}
 
 local function jobOf(putBack)
     return putBack and VehicleJobs.PUT_BACK_ALTERNATOR or VehicleJobs.TAKE_OUT_ALTERNATOR
-end
-
-local function isWrench(item)
-    return item:hasTag(ItemTag.WRENCH) and Items.notBroken(item)
 end
 
 --- Queues `character`'s Take Out Alternator (`item` nil) or Put Back Alternator with `item` on
@@ -46,7 +43,10 @@ function CarAlternatorMenu.queue(character, vehicle, item)
     end
     local engine = CarAlternator.enginePart(vehicle)
     ISTimedActionQueue.add(ISPathFindAction:pathToVehicleArea(character, vehicle, engine:getArea()))
-    ISWorldObjectContextMenu.equip(character, character:getPrimaryHandItem(), isWrench, true)
+    local wrench = Items.workingTool(character, ItemTag.WRENCH)
+    if wrench then
+        ISWorldObjectContextMenu.equip(character, character:getPrimaryHandItem(), wrench, true)
+    end
     local hood = CarAlternator.shutHood(vehicle)
     if hood then
         -- The hood is unlocked when any door or window is (VehicleUtils.RequiredKeyNotFound).
@@ -84,8 +84,7 @@ local function addInstallOptions(mechanics, part)
     if not VehicleBattery.isBatteryPart(part) or part:getInventoryItem() then
         return
     end
-    local install = mechanics.context:getOptionFromName(getText("IGUI_Install"))
-    local subMenu = install and install.subOption and mechanics.context:getSubMenu(install.subOption)
+    local subMenu = JobOptions.subMenuOf(mechanics.context, getText("IGUI_Install"))
     if not subMenu then
         return
     end
@@ -102,9 +101,8 @@ local function addInstallOptions(mechanics, part)
     local itemMenu = ISContextMenu:getNew(subMenu)
     mechanics.context:addSubMenu(option, itemMenu)
     for _, item in ipairs(items) do
-        local itemOption = itemMenu:addOption(Format.withShare(item:getDisplayName(),
-            Format.conditionShare(item:getFullType(), item:getCondition())), character,
-            ISVehiclePartMenu.onInstallPart, part, item)
+        local itemOption = itemMenu:addOption(Format.itemCondition(item), character, ISVehiclePartMenu.onInstallPart,
+            part, item)
         itemOption.itemForTexture = item
         mechanics:doMenuTooltip(part, itemOption, "install", fullType)
     end

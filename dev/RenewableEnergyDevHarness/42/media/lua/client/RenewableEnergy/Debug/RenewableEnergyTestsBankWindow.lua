@@ -5,6 +5,7 @@ local Format = require "RenewableEnergy/UI/Format"
 local StatusRows = require "RenewableEnergy/UI/StatusRows"
 local Battery = require "RenewableEnergy/PowerBank/Battery"
 local Sprites = require "RenewableEnergy/Sprites"
+local Yardsticks = require "RenewableEnergy/Debug/RenewableEnergyYardsticks"
 
 -- Power bank tests: the status window (UI/StatusWindow.lua, UI/StatusRows.lua).
 -- Banks live on the authority (see RenewableEnergyTestsBank.lua).
@@ -12,11 +13,20 @@ local Sprites = require "RenewableEnergy/Sprites"
 local T = RenewableEnergyTest
 local test, expect, expectEqual, player = T.test, T.expect, T.expectEqual, T.player
 
+-- The watts appliances of the kinds `names` draw together, at vanilla's figures.
+local function loadW(names)
+    local watts = 0
+    for _, name in ipairs(names) do
+        watts = watts + Yardsticks.applianceWatts(name)
+    end
+    return watts
+end
+
 -- `base` and then as many `kind` appliances as a bank limited to `limitW` carries, with `over` one
 -- more. Sums as the load does, so "carries" holds at the boundary.
 local function loadUpTo(base, kind, limitW, over)
     local names = { unpack(base) }
-    while T.applianceWatts(names) + T.applianceWatts({ kind }) <= limitW do
+    while loadW(names) + Yardsticks.applianceWatts(kind) <= limitW do
         table.insert(names, kind)
     end
     if over then table.insert(names, kind) end
@@ -147,14 +157,14 @@ test("renewable_energy_bank_window_reflects_status", {
         local status = T.clientStatus(self.bank)
         if not expect(status ~= nil, "the bank sent no status") then return end
         local summary = StatusRows.summary(status)
-        local load, limit = T.applianceWatts(self.load), Specs.inverters[T.PLUG_IN_INVERTER].watts
+        local load, limit = loadW(self.load), Specs.inverters[T.PLUG_IN_INVERTER].watts
         expect(T.hasLine(summary, getText("IGUI_RenewableEnergy_Overloaded", Format.watts(load), Format.watts(limit))),
             "the window doesn't say the bank is overloaded with " .. load .. " W on " .. limit .. " W")
         expect(T.hasLine(summary, getText("IGUI_RenewableEnergy_InputSlots", inputs, Specs.freeSlots)),
             "without its controller the slots line doesn't read " .. inputs .. " inputs of " .. Specs.freeSlots)
         local left, right = StatusRows.rows(status, self.bank)
         local lights = T.rowLabelled(left, getText("IGUI_RenewableEnergy_LoadCount", getText("IGUI_RenewableEnergy_LoadLight"), 2))
-        expectEqual("the row of 2 lights", lights and lights.value, Format.watts(T.applianceWatts({ "light", "light" })))
+        expectEqual("the row of 2 lights", lights and lights.value, Format.watts(2 * Yardsticks.applianceWatts("light")))
         local charger = T.rowLabelled(left, getItemNameFromFullType(Specs.charger))
         expectEqual("the colour of a broken charger's row", charger and charger.color, "bad")
         expectEqual("a broken charger's row", charger and charger.value, getText("IGUI_RenewableEnergy_PartBroken", "0%"))
@@ -203,12 +213,7 @@ local FULL_BANK = {
     T.DEEP_CYCLE, T.DEEP_CYCLE, T.L16, T.L16, T.CAR_BATTERY, T.INVERTER_CHARGER, T.POWER_INVERTER,
     Specs.controller, Specs.controller, Specs.charger,
 }
-local FULL_BANK_SOURCES = {
-    { sprite = Sprites.flat, modules = T.factoryModules(100) },
-    { sprite = Sprites.wall.wood.S, modules = T.factoryModules(80) },
-    { sprite = Sprites.rack.wood.S, modules = T.factoryModules(100, 20) },
-    { sprite = Sprites.rack.metal.E, modules = T.factoryModules(90, 90) },
-}
+local FULL_BANK_SOURCES = { Sprites.flat, Sprites.wall.wood.S, Sprites.rack.wood.S, Sprites.rack.metal.E }
 
 -- A working bank with batteries, inverters, controllers, a charger and panels lists every one
 -- of them, and offers its switch.
@@ -220,15 +225,13 @@ test("renewable_energy_bank_window_lists_every_part", {
         self.bank = bank
         T.watch(self, bank)
         T.batch(function()
-            T.bankPart(self, bank, T.L16, { condition = 45 })
-            for _, source in ipairs(FULL_BANK_SOURCES) do
-                if not T.panel(self, source.sprite, { near = bank, modules = source.modules, connect = true }) then return end
+            for _, sprite in ipairs(FULL_BANK_SOURCES) do
+                if not T.panel(self, sprite, { near = bank, modules = T.factoryModules(100), connect = true }) then return end
             end
             T.job(self, "bank", BankJobs.TURN_ON, bank)
-            T.bankPass(self, bank, 650)
-            T.applyLoad(self, bank, { "fridge", "television", "light", "light", "light", "radio" })
         end)
-        waitForLoad(self, bank)
+        T.waitForStatus(self, bank, function(status) return #status.sources == #FULL_BANK_SOURCES end,
+            "this client's status with every panel connected")
         T.openWindow(self, self.bank)
     end,
     validate = function(self)

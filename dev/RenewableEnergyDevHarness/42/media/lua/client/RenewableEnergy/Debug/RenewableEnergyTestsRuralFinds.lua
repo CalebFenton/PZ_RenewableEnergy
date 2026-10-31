@@ -1,12 +1,10 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLibWorld"
 require "RenewableEnergy/Debug/RenewableEnergyTestLibGas"
 local DigesterJobs = require "RenewableEnergy/Biogas/DigesterJobs"
-local SourceJobs = require "RenewableEnergy/PowerBank/SourceJobs"
 local Wind = require "RenewableEnergy/Wind"
 local Squares = require "cf_commonlib/Squares"
 local Digester = require "RenewableEnergy/Biogas/Digester"
 local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
-local GasifierJobs = require "RenewableEnergy/WoodGas/GasifierJobs"
 local Sprites = require "RenewableEnergy/Sprites"
 
 -- Rural finds (World/RuralFinds.lua): wind chargers, digesters and gasifiers the world leaves by
@@ -16,8 +14,9 @@ local T = RenewableEnergyTest
 local test, expect, serverCheck = T.test, T.expect, T.serverCheck
 
 
--- Each rural find test rolls the building near the start for that find for certain, mends it
--- with the usual jobs and sees it work; rolled again, the building gets nothing more.
+-- Each rural find test rolls the building near the start for that find for certain and checks the
+-- state it is found in; rolled again, the building gets nothing more. The wind and wood gas suites
+-- mend the same objects.
 
 -- Queues the roll of the find `kind` and a wait for this client's copy of it, `isObject` telling
 -- it, with its summary when `recordKind` names a Global Object System record ("digester",
@@ -46,39 +45,19 @@ local function expectKept(self, kind)
     T.expectEqual("finds rolling the building again placed", answer.again, 0)
 end
 
--- The old wind charger is found braked with its blades broken. With blades fitted, wired to a bank
--- and its brake off, it turns in the wind.
+-- The old wind charger is found braked with its blades broken.
 test("renewable_energy_world_rural_wind_charger", {
     instant = true,
     run = function(self)
         rollFind(self, "wind", Wind.isCharger)
         T.step(function()
-            local find = self.find
-            self.found = { broken = Wind.isBroken(find.object), braked = Wind.isBraked(find.object) }
-            local bank = T.bank(self, "batteryRackWood", { T.CAR_BATTERY, T.PLUG_IN_INVERTER,
-                "RenewableEnergy.ChargeController" }, { near = find.square })
-            if not bank then return end
-            T.job(self, "source", SourceJobs.CONNECT, T.at(find), bank, "connected")
-            T.give(self, "blades", { { type = "RenewableEnergy.WoodenBlades" } })
-            -- Replacing the blades takes light to see by, and the square the character was moved to
-            -- out here lights up some frames after they arrive.
-            T.goNextTo(self, find.square)
-            T.waitFor(self, function() return not T.player():tooDarkToRead() end, "light where the character stands")
-            T.actionJob(self, "source", find, SourceJobs.REPLACE_BLADES, function() return self.items.blades[1] end)
-            T.waitFor(self, function() return not Wind.isBroken(find.object) end, "this client's copy of the new blades")
-            T.batch(function()
-                T.job(self, "source", SourceJobs.RELEASE_BRAKE, T.at(find))
-                T.bankPass(self, bank, 0, { windKph = 30, label = "mended" })
-            end)
+            self.found = { broken = Wind.isBroken(self.find.object), braked = Wind.isBraked(self.find.object) }
         end)
     end,
     validate = function(self)
         expectKept(self, "wind")
         expect(self.found.broken, "the wind charger was found with whole blades")
         expect(self.found.braked, "the wind charger was found unbraked")
-        if not T.expectOk(self.reads.connected, "connecting the wind charger") then return end
-        local turning = T.stateSource(self.reads.mended, self.find)
-        expect(turning ~= nil and turning.watts > 0, "mended, wired and unbraked in a 30 km/h wind it made nothing")
     end,
 })
 
@@ -125,36 +104,20 @@ test("renewable_energy_world_rural_digester", {
     end,
 })
 
--- The primitive gasifier is found with its ash pit full and its filter packing all tarred. Cleaned
--- out and repacked with hay, it lights and runs at its full share.
+-- The primitive gasifier is found with its ash pit full and its filter packing all tarred.
 test("renewable_energy_world_rural_gasifier", {
     instant = true,
     run = function(self)
         rollFind(self, "gasifier", Gasifier.isGasifier, "gasifier")
-        T.step(function()
-            local find = self.find
-            T.readRecord(self, find, "found")
-            T.giveMaterials(self, "shovel", GasifierJobs.materials(T.player(), GasifierJobs.CLEAN_ASH))
-            T.actionJob(self, "gasifier", find, GasifierJobs.CLEAN_ASH)
-            T.batch(function()
-                T.server(self, "ruralFindEmptyFilter", T.at(find))
-                T.fillRecord(self, find, { hopper = { { type = "Base.Plank", count = 3 } }, filter = { { type = "Base.HayTuft", count = 5 } } })
-            end)
-            T.waitForSummary(self, find, function(summary) return summary.hopperKg > 0 and summary.ash == 0 end,
-                "this client's summary of the cleaned, stocked gasifier")
-            T.lightGasifier(self, find)
-            T.readRecord(self, find, "lit")
-        end)
+        T.step(function() T.readRecord(self, self.find, "found") end)
     end,
     validate = function(self)
         expectKept(self, "gasifier")
-        local found, lit = self.reads.found, self.reads.lit
+        local found = self.reads.found
         T.expectEqual("the found gasifier's tier", found.tier, "primitive")
         T.expectEqual("the found gasifier's ash", found.ash, Gasifier.ASH_FULL)
         T.expectEqual("clean packing in the found gasifier", found.clean, 0)
         expect(found.tarry > 0, "the gasifier was found with no tarry packing")
-        expect(lit.lit, "the cleaned gasifier didn't light")
-        T.expectEqual("the cleaned, repacked gasifier's output share", Gasifier.outputShare(lit.ash, lit.clean), 1)
     end,
 })
 

@@ -15,7 +15,6 @@ local Utilities = require "RenewableEnergy/Utilities"
 local Sprites = require "RenewableEnergy/Sprites"
 local Wind = require "RenewableEnergy/Wind"
 local WindSource = require "RenewableEnergy/PowerBank/WindSource"
-local Digester = require "RenewableEnergy/Biogas/Digester"
 local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
 local DigesterSystem = require "RenewableEnergy/Biogas/DigesterSystem"
 local GasifierSystem = require "RenewableEnergy/WoodGas/GasifierSystem"
@@ -82,8 +81,6 @@ end
 
 -- Building
 
-local build = Place.entity
-
 local function randomOf(entries)
     local list = {}
     for _, value in pairs(entries) do
@@ -130,20 +127,19 @@ local LIVESTOCK = {
     barn = true, stable = true, stables = true, chickencoop = true, pigsty = true, cattleauction = true,
 }
 
---- Each find: `odds` (1 in odds per qualifying building at the default Solar Sites), `is(object)`,
---- whether an object is one, whether a building `qualifies`, how many squares out from the
---- building it stands (`reach`) on open ground that also `fits`, if given, `place(square)`, which
---- builds it worn, and the `reading`, if any, a building's roll may leave with it.
+--- Each find: `odds` (1 in odds per qualifying building at the default Solar Sites), whether a
+--- building `qualifies`, how many squares out from the building it stands (`reach`) on open ground
+--- that also `fits`, if given, `place(square)`, which builds it worn, and the `reading`, if any, a
+--- building's roll may leave with it.
 RuralFinds.FINDS = {
     wind = {
         odds = 15,
-        is = Wind.isCharger,
         qualifies = function(def) return hasRoom(def, FARM) end,
         reach = BuildingWatch.REACH,
         fits = inTheOpen,
         -- The old farm wind charger, its wooden blades long broken and its brake set.
         place = function(square)
-            local charger = build(square, randomOf(Sprites.windCharger.propeller.wood), Wind.OnCreate)
+            local charger = Place.entity(square, randomOf(Sprites.windCharger.propeller.wood), Wind.OnCreate)
             -- After the clients have the charger: the setters send its modData, which names it by
             -- its index on the square.
             WindSource.setBroken(charger, true)
@@ -153,13 +149,12 @@ RuralFinds.FINDS = {
     },
     digester = {
         odds = 20,
-        is = Digester.isDigester,
         qualifies = function(def) return hasRoom(def, LIVESTOCK) end,
         reach = 1,
         reading = RuralFinds.BIOGAS_MAGAZINE,
         -- Any drum, as the build menu takes any; bags torn, gone cold and sour.
         place = function(square)
-            return build(square, randomOf(Sprites.digester.barrel), DigesterSystem.OnCreate,
+            return Place.entity(square, randomOf(Sprites.digester.barrel), DigesterSystem.OnCreate,
                 function(thumpable)
                     local digester = DigesterSystem.instance:getLuaObjectOnSquare(square)
                     digester.holderCondition = 0
@@ -171,7 +166,6 @@ RuralFinds.FINDS = {
     },
     gasifier = {
         odds = 3,
-        is = Gasifier.isGasifier,
         -- The map's hunting shacks and raised deer stands are buildings of hunting rooms only.
         qualifies = function(def)
             local rooms = def:getRooms()
@@ -186,7 +180,7 @@ RuralFinds.FINDS = {
         reading = RuralFinds.PAMPHLET,
         -- Put away dirty: its filter packing all tarred and its ash pit full.
         place = function(square)
-            return build(square, Sprites.gasifier.primitive,
+            return Place.entity(square, Sprites.gasifier.primitive,
                 GasifierSystem.OnCreate, function(thumpable)
                     local filter = Gasifier.filterOf(thumpable)
                     for _ = 1, 100 do
@@ -320,10 +314,11 @@ BuildingWatch.watch({
 -- Story clutter
 
 -- Vanilla's barns, farm storerooms and survivalist camps dress themselves from these lists
--- (StoryClutter), refilled by StoryClutter.Init when its file loads; added through vanilla's own
--- adder (StoryTables.addItemToClutterTable), which puts each item in twice, vanilla's included.
--- An item listed n times here gets n of those adds, so is picked n times as often as an item
--- added once (RandomizedWorldBase.getBarnClutterItem picks uniformly).
+-- (StoryClutter), refilled by StoryClutter.Init each time its file loads, which is once per game
+-- the world loads; added through vanilla's own adder (StoryTables.addItemToClutterTable), which
+-- puts each item in twice, vanilla's included. An item listed n times here gets n of those adds, so
+-- is picked n times as often as an item added once (RandomizedWorldBase.getBarnClutterItem picks
+-- uniformly).
 local MAG3, MAG4 = RuralFinds.BIOGAS_MAGAZINE, "RenewableEnergy.HomesteadPowerMag4"
 RuralFinds.CLUTTER = {
     getSurvivalistCampsiteClutter = { RuralFinds.PAMPHLET, "RenewableEnergy.SolarCellCharger" },
@@ -331,38 +326,13 @@ RuralFinds.CLUTTER = {
     getFarmStorageClutter = { MAG3, MAG3, MAG4 },
 }
 
--- How many times the Java list holds `item`.
-local function countIn(list, item)
-    local count = 0
-    for i = 0, list:size() - 1 do
-        if list:get(i) == item then
-            count = count + 1
-        end
-    end
-    return count
-end
-
--- How many times each item of `items` is listed.
-local function wanted(items)
-    local counts = {}
-    for _, item in ipairs(items) do
-        counts[item] = (counts[item] or 0) + 1
-    end
-    return counts
-end
-
--- An item already in a list was added by an earlier run since the list was last refilled.
 local function addClutter()
     local base = getWorld():getRandomizedWorldBase()
     for getter, items in pairs(RuralFinds.CLUTTER) do
         local list = base[getter] and base[getter](base)
         if list then
-            for item, count in pairs(wanted(items)) do
-                if countIn(list, item) == 0 then
-                    for _ = 1, count do
-                        StoryTables.addItemToClutterTable(list, item)
-                    end
-                end
+            for _, item in ipairs(items) do
+                StoryTables.addItemToClutterTable(list, item)
             end
         else
             print("RenewableEnergy: missing story clutter list " .. getter)

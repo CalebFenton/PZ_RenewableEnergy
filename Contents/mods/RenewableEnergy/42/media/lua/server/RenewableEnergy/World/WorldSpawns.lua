@@ -132,27 +132,27 @@ WorldSpawns.BANK_STOCK = {
 -- after use.
 WorldSpawns.CRATE_WEAR = "used"
 
--- What a crate holds, by stock name: lines of { item, min, max, loot rarity option, chance }
--- (count scaled by the option; none: always the count), each line stocked at its chance (none:
--- always). Modules get a site module's condition, and batteries CRATE_WEAR's.
+-- What a crate holds, by stock name: lines of `item`, a count from `min` to `max` scaled by the
+-- loot rarity `option` (none: always the count), each line stocked at its `chance` (none: always).
+-- Modules get a site module's condition, and batteries CRATE_WEAR's.
 WorldSpawns.CRATE_STOCK = {
     -- An RV or cabin solar kit someone put away in a garage or storage unit: always panels and
     -- batteries, and usually the magazine that tells how to set them up.
     garageKit = {
-        { MODULE, 1, 2, "LRMSolarPanels" },
-        { "RenewableEnergy.DeepCycleBattery", 1, 2, "LRMBatteries" },
-        { "RenewableEnergy.ChargeController", 0, 1, "LRMMisc" },
-        { "RenewableEnergy.PowerInverter", 0, 1, "LRMMisc" },
-        { "RenewableEnergy.HomesteadPowerMag1", 1, 1, "LRMMisc", 0.8 },
-        { "Base.ElectricWire", 4, 8 },
-        { "Base.Screws", 1, 2 },
+        { item = MODULE, min = 1, max = 2, option = "LRMSolarPanels" },
+        { item = "RenewableEnergy.DeepCycleBattery", min = 1, max = 2, option = "LRMBatteries" },
+        { item = "RenewableEnergy.ChargeController", min = 0, max = 1, option = "LRMMisc" },
+        { item = "RenewableEnergy.PowerInverter", min = 0, max = 1, option = "LRMMisc" },
+        { item = "RenewableEnergy.HomesteadPowerMag1", min = 1, max = 1, option = "LRMMisc", chance = 0.8 },
+        { item = "Base.ElectricWire", min = 4, max = 8 },
+        { item = "Base.Screws", min = 1, max = 2 },
     },
     -- The substation's spares for its station battery and the lines: what the crate a world armed
     -- at the power yard before the yard lost its crate (SolarSites.KINDS) holds once its chunk loads.
     powerYard = {
-        { "RenewableEnergy.BatteryElectrolyte", 1, 3, "LRMBatteries" },
-        { "Base.ElectricWire", 6, 12 },
-        { "Base.Screws", 1, 2 },
+        { item = "RenewableEnergy.BatteryElectrolyte", min = 1, max = 3, option = "LRMBatteries" },
+        { item = "Base.ElectricWire", min = 6, max = 12 },
+        { item = "Base.Screws", min = 1, max = 2 },
     },
 }
 
@@ -176,9 +176,11 @@ function WorldSpawns.stockBank(container, stockName)
     for _ = 1, math.min(batteries, spec.maxBatteries) do
         Finds.add(container, Chance.pickWeighted(stock.batteries.types), stock.batteries.wear)
     end
-    maybeAddPart(container, stock.inverter, spec.maxInverters)
-    maybeAddPart(container, stock.controller, spec.maxControllers)
-    maybeAddPart(container, stock.charger, spec.maxChargers)
+    for kind, part in pairs(PowerBank.PARTS) do
+        if kind ~= "battery" then
+            maybeAddPart(container, stock[kind], spec[part.max])
+        end
+    end
 end
 
 --- Fills a crate as CRATE_STOCK[stockName] says.
@@ -186,29 +188,24 @@ end
 ---@param stockName string a CRATE_STOCK key
 function WorldSpawns.stockCrate(container, stockName)
     for _, line in ipairs(WorldSpawns.CRATE_STOCK[stockName]) do
-        if not line[5] or Chance.hit(line[5]) then
-            local count = Chance.between(line[2], line[3])
-            if line[4] then
-                count = Finds.scaled(count, line[4])
+        if not line.chance or Chance.hit(line.chance) then
+            local count = Chance.between(line.min, line.max)
+            if line.option then
+                count = Finds.scaled(count, line.option)
             end
             for _ = 1, count do
-                Finds.add(container, line[1], WorldSpawns.CRATE_WEAR)
+                Finds.add(container, line.item, WorldSpawns.CRATE_WEAR)
             end
         end
     end
 end
 
 --- Places a bank stocked as BANK_STOCK[stockName] says, connected and switched off, its back to a
---- wall (Place.bankFacing). Banks stand only indoors (PowerBank.canPlaceBank), so nothing is
---- placed on another square.
+--- wall (Place.bankFacing). Only where a bank may stand (PowerBank.canPlaceBank).
 ---@param square IsoGridSquare
 ---@param stockName string a BANK_STOCK key
----@return IsoGenerator?
+---@return IsoGenerator
 function WorldSpawns.placeBank(square, stockName)
-    if not PowerBank.canPlaceBank(square) then
-        print("RenewableEnergy: no bank at " .. square:getX() .. "," .. square:getY() .. "," .. square:getZ() .. ", which is not indoors")
-        return nil
-    end
     local sprite = Sprites[WorldSpawns.BANK_STOCK[stockName].sprite][Place.bankFacing(square)]
     return BankSystem.place(square, sprite, nil, function(container)
         WorldSpawns.stockBank(container, stockName)
@@ -229,19 +226,6 @@ end
 
 local function oneIn(n)
     return Chance.hit(1 / n)
-end
-
-local INDOOR_TRIES = 10
-
--- A free square of the room where a bank may stand, or nil.
-local function indoorSquare(room)
-    for _ = 1, INDOOR_TRIES do
-        local square = room:getRandomFreeSquare()
-        if square and PowerBank.canPlaceBank(square) then
-            return square
-        end
-    end
-    return nil
 end
 
 --- Lays the modules BANK_STOCK[stockName] puts beside a bank a room spawned on `square`, if its
@@ -277,8 +261,10 @@ local function onSeeNewRoom(room)
     local name = room:getName()
     local bank = WorldSpawns.BANK_ROOMS[name]
     if bank and oneIn(bank.odds * rarity) then
-        local square = indoorSquare(room)
-        if square and WorldSpawns.placeBank(square, bank.stock) then
+        -- A free square of the room (IsoRoom.getRandomFreeSquare) may still be open to the sky.
+        local square = room:getRandomFreeSquare()
+        if square and PowerBank.canPlaceBank(square) then
+            WorldSpawns.placeBank(square, bank.stock)
             WorldSpawns.layModulesBeside(square, bank.stock)
         end
     end

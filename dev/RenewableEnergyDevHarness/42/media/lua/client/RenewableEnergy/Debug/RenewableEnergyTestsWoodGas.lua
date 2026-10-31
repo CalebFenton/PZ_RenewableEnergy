@@ -2,7 +2,6 @@ require "RenewableEnergy/Debug/RenewableEnergyTestLibGas"
 local Materials = require "cf_commonlib/Materials"
 local Squares = require "cf_commonlib/Squares"
 local FireAsh = require "RenewableEnergy/WoodGas/FireAsh"
-local GasHeater = require "RenewableEnergy/Biogas/GasHeater"
 local GasKit = require "RenewableEnergy/GasLine/GasKit"
 local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
 local GasifierJobs = require "RenewableEnergy/WoodGas/GasifierJobs"
@@ -265,7 +264,7 @@ test("renewable_energy_woodgas_cold_gasifier_needs_bellows", {
         local gasifier = T.placeRecord(self, "gasifier", "primitive")
         if not gasifier then return end
         T.fillRecord(self, gasifier, { hopper = { { type = "Base.Plank", count = 2 } } })
-        T.give(self, "matches", { { type = GasHeater.FIRE_STARTER.item } })
+        T.give(self, "matches", { { type = Specs.FIRE_STARTER.item } })
         T.waitForSummary(self, gasifier, function(summary) return summary.hopperKg > 0 end, "this client's summary of the gasifier's wood")
         T.step(function()
             self.coldNeed = Materials.firstUnmet(GasifierJobs.needs(T.player(), GasifierJobs.LIGHT, T.recordSummary(gasifier)))

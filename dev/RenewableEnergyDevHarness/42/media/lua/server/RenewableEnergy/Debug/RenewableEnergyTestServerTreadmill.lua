@@ -1,7 +1,5 @@
 -- The authority's half of the treadmill tests: runs completed or started as the server's
--- character, the way the server finishes or starts a client's action. Only registers handlers, so
--- a --stay rerun loads it again (RELOAD_FILES); RenewableEnergyTestHelpers.lua says how these
--- handlers work.
+-- character, the way the server finishes or starts a client's action.
 
 require "PZHarness/ServerHandlers"
 local Kinds = require "RenewableEnergy/Debug/RenewableEnergyTestKinds"

@@ -5,7 +5,6 @@
 local Digester = require "RenewableEnergy/Biogas/Digester"
 local DigesterJobs = require "RenewableEnergy/Biogas/DigesterJobs"
 local GasHeater = require "RenewableEnergy/Biogas/GasHeater"
-local Action = require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 local Format = require "RenewableEnergy/UI/Format"
 local ObjectWindow = require "RenewableEnergy/UI/ObjectWindow"
 local DigesterWindow = require "RenewableEnergy/UI/DigesterWindow"
@@ -15,7 +14,7 @@ local DigesterMenu = {}
 
 -- The job's name, with what it has to go on as an eyeball share, as vanilla's Get Compost (45%).
 local function label(job, share)
-    local name = getText(Action.labelKey(job))
+    local name = JobOptions.jobName(DigesterJobs, job)
     return share and Format.withShare(name, share) or name
 end
 

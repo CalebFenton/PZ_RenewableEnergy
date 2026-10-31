@@ -19,8 +19,8 @@ local LONGEST_PASS = 1
 -- The last pass's world age in hours, unsaved: the first pass after loading makes up nothing.
 local clock = {}
 
-function GadgetCharging.chargeVehicles(hours)
-    local sky = Sun.skyNow()
+--- Charges every loaded vehicle's gadgets for `hours` under `sky` (Sun.skyNow).
+function GadgetCharging.chargeVehicles(hours, sky)
     -- IsoCell.getVehicles is a Set, which only an iterator walks.
     local vehicles = getCell():getVehicles():iterator()
     while vehicles:hasNext() do
@@ -37,9 +37,10 @@ function GadgetCharging.update()
     if hours <= 0 then
         return
     end
-    GadgetCharging.chargeVehicles(hours)
-    SolarCellCharger.chargeAll(hours)
-    SolarGardenLight.updateAll(hours)
+    local sky = Sun.skyNow()
+    GadgetCharging.chargeVehicles(hours, sky)
+    SolarCellCharger.chargeAll(hours, sky)
+    SolarGardenLight.updateAll(hours, sky)
 end
 
 Events.EveryTenMinutes.Add(GadgetCharging.update)

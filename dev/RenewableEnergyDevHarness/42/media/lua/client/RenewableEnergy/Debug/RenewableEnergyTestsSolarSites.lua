@@ -124,17 +124,14 @@ test("renewable_energy_world_site_rolled_once", {
     validate = function(self) T.expectNoFailures(self.reads.rolled) end,
 })
 
--- The homestead sites and the outlying towns' solar sites, each with a square of it to go to.
+-- One site of each kind, each with a square of it to go to.
 -- `farm`: its find stands by a building whose own roll could give it one (a barn, a cow barn);
 -- the prepper's gasifier stands by a house, and only hunting shacks roll gasifiers.
 local VISITED_SITES = {
     { "Farm south-east of Echo Creek", 3742, 11120, farm = true },
-    { "Farm west of Ekron", 252, 9808, farm = true },
     { "Dairy farm south of Ekron", 886, 10377, farm = true },
     { "Survivalist cabin north of Echo Creek", 3379, 9686 },
-    { "Pasture north-west of Ekron", 562, 9629 },
     { "Pasture south of Echo Creek", 3721, 11285 },
-    { "Pasture south-east of Fallas Lake", 7456, 8466 },
     { "Trailer in the woods north of March Ridge", 10345, 12405 },
 }
 

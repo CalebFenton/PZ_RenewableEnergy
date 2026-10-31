@@ -13,6 +13,7 @@ if isClient() then return end
 
 local StormChance = require "RenewableEnergy/Chance"
 local Specs = require "RenewableEnergy/Specs"
+local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local Chance = require "cf_commonlib/Chance"
 local Clock = require "cf_commonlib/Clock"
 
@@ -23,9 +24,6 @@ local PanelStorms = {}
 local MOD_DATA = "RenewableEnergy_storms"
 -- Panel modData: the world's storm hours the panel has weathered.
 local WEATHERED_KEY = "RenewableEnergy_stormHours"
--- As a bank's pass (BankSystem.longestPass): a save loaded after the clock jumped never counts
--- days of storm at once.
-local LONGEST_PASS = 24
 
 local function store()
     return ModData.getOrCreate(MOD_DATA)
@@ -53,7 +51,7 @@ end
 
 --- Brings the world's storm hours up to now. Returns the storm hours it added.
 function PanelStorms.advance()
-    local stormHours = PanelStorms.stormHours(Clock.hoursSince(store(), LONGEST_PASS))
+    local stormHours = PanelStorms.stormHours(Clock.hoursSince(store(), PowerBank.LONGEST_PASS))
     PanelStorms.add(stormHours)
     return stormHours
 end

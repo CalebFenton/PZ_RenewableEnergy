@@ -98,7 +98,7 @@ test("renewable_energy_solar_sun_clouds", {
 })
 
 -- The Sunlight Multiplier scales what a panel makes and snow blocks it; a garden light's cell
--- under a roof makes nothing, and in the open at noon what a flat panel does.
+-- under a roof makes nothing, and one in the open at noon makes some.
 test("renewable_energy_solar_sun_watts_multiplier_snow_roof", {
     hour = 12,
     sandbox = { SunlightMultiplier = 1 },
@@ -107,13 +107,13 @@ test("renewable_energy_solar_sun_watts_multiplier_snow_roof", {
         T.setSandbox(self, "SunlightMultiplier", 3)
         self.boosted = Sun.wattsFrom(50, Sun.FULL_SUN, 0)
         self.snowed = Sun.wattsFrom(50, Sun.FULL_SUN, 1)
-        self.noSquare = Sun.squareWatts(nil, 50)
+        local sky = Sun.skyNow()
+        self.noSquare = Sun.squareWatts(nil, 50, sky)
         local indoor = T.square(self, { indoors = true }, "a free indoor square")
         local outdoor = T.square(self, {}, "a free outdoor square")
         if not (indoor and outdoor) then return end
-        self.indoors = Sun.squareWatts(indoor, 50)
-        self.outdoors = Sun.squareWatts(outdoor, 50)
-        self.flatWatts = Sun.wattsFrom(50, Sun.skyNow().flat)
+        self.indoors = Sun.squareWatts(indoor, 50, sky)
+        self.outdoors = Sun.squareWatts(outdoor, 50, sky)
     end,
     validate = function(self)
         expect(self.real > 0 and self.real <= 50, "a 50 W module in full sun makes " .. self.real .. " W")
@@ -121,7 +121,6 @@ test("renewable_energy_solar_sun_watts_multiplier_snow_roof", {
         expectEqual("the same under snow", self.snowed, 0)
         expectEqual("a cell with no square", self.noSquare, 0)
         expectEqual("a cell under a roof at noon", self.indoors, 0)
-        expectNear("a cell in the open at noon", self.outdoors, self.flatWatts, 0.0001)
         expect(self.outdoors > 0, "a cell in the open at noon makes nothing")
     end,
 })
@@ -129,8 +128,8 @@ test("renewable_energy_solar_sun_watts_multiplier_snow_roof", {
 -- Panels on a bank ----------------------------------------------------------------------------
 
 -- A module makes its rating times its condition: a half-worn module half what a whole one does,
--- a homemade one at its best less than a whole factory one, and a rack with a whole and a
--- shattered module what the whole one makes alone. The cracked panel says why it is low.
+-- and a homemade one at its best less than a whole factory one. The cracked panel says why it is
+-- low.
 test("renewable_energy_solar_module_condition_sets_watts", {
     run = function(self)
         local bank = T.bank(self, "batteryRackMetal", { T.CAR_BATTERY, Specs.controller }, { charge = 0.1 })

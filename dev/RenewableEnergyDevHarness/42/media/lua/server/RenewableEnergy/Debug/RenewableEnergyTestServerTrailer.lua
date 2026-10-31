@@ -1,6 +1,5 @@
 -- The authority's half of the arrow board tests: the trailer's panels, box and frame change only
--- where the authority runs them. Only registers handlers, so a --stay rerun loads it again
--- (RELOAD_FILES); RenewableEnergyTestHelpers.lua says how these handlers work.
+-- where the authority runs them.
 
 require "PZHarness/ServerHandlers"
 require "PZHarness/ServerFixtures"
@@ -139,14 +138,20 @@ handler("setTrailer", function(_, args)
 end)
 
 -- ArrowBoard[args.call] on the trailer with the arguments `args.with`, or with the panel
--- `args.part`, as the clock, the switch action or a storm runs it. Answers what it returned, the
--- panels' rating before it, what a flat watt of panel makes in an hour now, and the trailer's
--- state.
+-- `args.part`, as the clock, the switch action or a storm runs it; the charging calls take the
+-- sky after them, as the clock's pass gives it. Answers what it returned, the panels' rating
+-- before it, what a flat watt of panel makes in an hour under that sky, and the trailer's state.
+local TAKES_SKY = { charge = true, update = true }
 handler("arrowBoardRun", function(_, args)
     local vehicle = PZHarness.vehicleAt(args)
     local watts = ArrowBoard.panelWatts(vehicle)
-    local result = ArrowBoard[args.call](vehicle, unpack(args.part and { vehicle:getPartById(args.part) } or args.with))
-    return { result = result, watts = watts, flatWh = Sun.wattsFrom(1, Sun.skyNow().flat), state = vehicleState(vehicle) }
+    local sky = Sun.skyNow()
+    local with = args.part and { vehicle:getPartById(args.part) } or args.with
+    if TAKES_SKY[args.call] then
+        with = { with[1], sky }
+    end
+    local result = ArrowBoard[args.call](vehicle, unpack(with))
+    return { result = result, watts = watts, flatWh = Sun.wattsFrom(1, sky.flat), state = vehicleState(vehicle) }
 end)
 
 -- Rolls the trailer's switch as stocking does for each trial { was, roll }: the switch at `was`

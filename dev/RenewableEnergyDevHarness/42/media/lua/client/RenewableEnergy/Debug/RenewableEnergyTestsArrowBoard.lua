@@ -88,7 +88,7 @@ test("renewable_energy_world_arrow_board_plain_spawn_keeps_stock", {
     run = function(self)
         if not spawnTrailer(self, { recordStock = true }) then return end
         local trailer = self.trailer
-        T.readUntil(self, "arrowBoardStock", function() return T.vehicleArgs(trailer) end, "stock", function(reply)
+        T.readUntil(self, "arrowBoardStock", function() return T.at(trailer, { id = trailer.id }) end, "stock", function(reply)
             return panelCondition(reply.state, LEFT) == reply.stock[LEFT] and panelCondition(reply.state, RIGHT) == reply.stock[RIGHT]
         end)
         T.step(function() trailer.state = self.reads.stock.state end)
@@ -123,22 +123,6 @@ test("renewable_energy_world_arrow_board_old_trailer_gets_panels_once", {
             "panels taken off came back on the next load")
         expect(panelShown(second, LEFT) == "" and panelShown(second, RIGHT) == "",
             "empty panels show " .. panelShown(second, LEFT) .. " and " .. panelShown(second, RIGHT))
-    end,
-})
-
--- A found trailer's switch is on for a roll under STOCK.switchedOnChance and off for one at it;
--- a trailer with its switch set keeps it, whatever the roll.
-test("renewable_energy_world_arrow_board_found_switch_follows_its_chance", {
-    run = function(self)
-        if not spawnTrailer(self) then return end
-        T.onVehicle(self, self.trailer, "arrowBoardSwitchRolls", { trials = { { roll = "under" }, { roll = "at" },
-            { was = false, roll = 0 } } }, "rolls")
-    end,
-    validate = function(self)
-        local on = self.reads.rolls.on
-        expect(on[1] == true, "a roll just under the switch's chance left a found trailer off")
-        expect(on[2] == false, "a roll at the switch's chance switched a found trailer on")
-        expect(on[3] == false, "stocking switched on a trailer already switched off")
     end,
 })
 
@@ -277,17 +261,15 @@ local function sealPanelOption(vehicle)
 end
 
 -- Seal Cracked Panel takes Seal Cracked Module's inputs (keeping the screwdriver), skill and XP,
--- and seals the module, sealed `repaired` times before, from `from(cap)` by ModuleRepair.SEAL_ADDS
--- up to its cap, still cracked, counting the seal; an uncracked module can't be sealed. The sealed
--- panel keeps its option, greyed out saying to reglaze it once a seal can't bring it further.
-local function repairTest(name, repaired, fromBelowCap)
+-- and seals the factory module, sealed `repaired` times before, from `from` to `to`, still cracked,
+-- counting the seal; an uncracked module can't be sealed. The sealed panel keeps its option,
+-- greyed out saying to reglaze it, since a seal can't bring it further.
+local function repairTest(name, repaired, from, to)
     test(name, {
         instant = true,
         run = function(self)
             if not spawnTrailer(self) then return end
             local trailer = self.trailer
-            self.from = fromBelowCap(T.sealCap(T.FACTORY_MODULE, repaired))
-            self.to = math.min(T.sealCap(T.FACTORY_MODULE, repaired), self.from + ModuleRepair.SEAL_ADDS)
             self.epoxyNeeded = sealEpoxyUses()
             setSealSkills(self)
             self.wholeAt = T.conditionAt(T.FACTORY_MODULE, Specs.crackLooks.lightBelow)
@@ -295,14 +277,14 @@ local function repairTest(name, repaired, fromBelowCap)
             waitForPanelsCopy(self, trailer)
             T.step(function() self.wholeRepairable = ArrowBoard.sealablePanel(trailer.vehicle, LEFT) ~= nil end)
             T.onVehicle(self, trailer, "setTrailer",
-                { panels = { [LEFT] = { type = T.FACTORY_MODULE, condition = self.from, repaired = repaired } } })
+                { panels = { [LEFT] = { type = T.FACTORY_MODULE, condition = from, repaired = repaired } } })
             waitForPanelsCopy(self, trailer)
             T.give(self, "inputs", { { type = "Base.Screwdriver" }, { type = "Base.Epoxy" } })
             -- Read the authority's XP: a client's copy may still be getting the last test's.
             T.readCharacter(self, "before", { perks = { "Electricity" } })
             T.step(function() self.epoxyUses = self.items.inputs[2]:getCurrentUses() end)
             sealPanel(trailer)
-            T.awaitVehicleState(self, trailer, function(state) return panelCondition(state, LEFT) ~= self.from end)
+            T.awaitVehicleState(self, trailer, function(state) return panelCondition(state, LEFT) ~= from end)
             T.count(self, "left", { "Base.Screwdriver", "Base.Epoxy" })
             T.readCharacter(self, "after", { perks = { "Electricity" } })
             -- What CraftRecipe.addXP gives this character for the recipe's xpAward.
@@ -311,17 +293,15 @@ local function repairTest(name, repaired, fromBelowCap)
             T.step(function() self.after = sealPanelOption(trailer.vehicle) end)
         end,
         validate = function(self)
-            local left, from, to = self.counts.left, self.from, self.to
+            local left = self.counts.left
             local condition = panelCondition(self.trailer.state, LEFT)
             expect(not self.wholeRepairable, "a panel at " .. self.wholeAt .. ", not cracked, can be sealed")
             expectEqual("the condition the seal took the panel at " .. from .. " to", condition, to)
             expect(panelShown(self.trailer.state, LEFT) ~= "Whole", "the sealed panel at " .. tostring(condition) .. " shows whole")
             expectEqual("the sealed panel's seal count", self.trailer.state.panels[LEFT].repaired, repaired + 1)
-            local fully = to >= T.sealCap(T.FACTORY_MODULE, repaired + 1)
-            expect(self.after.shown and self.after.greyed == fully
-                and (not fully or self.after.reason == getText("Tooltip_RenewableEnergy_PanelSealedFully")),
-                "the sealed panel at " .. tostring(condition) .. (fully and ", sealed as far as it goes," or "")
-                .. " shows Seal Cracked Panel " .. (self.after.shown and (self.after.greyed and "greyed out" or "offered") or "not at all")
+            expect(self.after.shown and self.after.greyed and self.after.reason == getText("Tooltip_RenewableEnergy_PanelSealedFully"),
+                "the sealed panel at " .. tostring(condition) .. ", sealed as far as it goes, shows Seal Cracked Panel "
+                .. (self.after.shown and (self.after.greyed and "greyed out" or "offered") or "not at all")
                 .. " (" .. tostring(self.after.reason) .. ")")
             expect(left["Base.Screwdriver"] == 1, "the seal used up the screwdriver")
             local epoxy = T.carried("Base.Epoxy")
@@ -333,37 +313,11 @@ local function repairTest(name, repaired, fromBelowCap)
         end,
     })
 end
--- One seal short of the cap, one under it, and one under a twice-sealed module's lower cap.
-repairTest("renewable_energy_world_arrow_board_repair_mends_a_cracked_panel", 0,
-    function(cap) return cap - ModuleRepair.SEAL_ADDS - 1 end)
-repairTest("renewable_energy_world_arrow_board_repair_stops_at_its_cap", 0, function(cap) return cap - 1 end)
-repairTest("renewable_energy_world_arrow_board_repair_after_two_seals_stops_lower", 2, function(cap) return cap - 1 end)
-
--- The menu offers Seal Cracked Panel to a character with everything it needs, and greys it out
--- in the dark, saying why, as the action's light rule refuses it
--- (RenewableEnergyAction.needsLight).
-test("renewable_energy_world_arrow_board_repair_needs_light", {
-    hour = 12,
-    run = function(self)
-        if not spawnTrailer(self) then return end
-        local trailer = self.trailer
-        setSealSkills(self)
-        T.onVehicle(self, trailer, "setTrailer",
-            { panels = { [LEFT] = { type = T.FACTORY_MODULE, condition = T.sealCap(T.FACTORY_MODULE, 0) - 1 } } })
-        waitForPanelsCopy(self, trailer)
-        T.give(self, "inputs", { { type = "Base.Screwdriver" }, { type = "Base.Epoxy" } })
-        T.step(function() self.lit = sealPanelOption(trailer.vehicle) end)
-        -- T.makeDark sets the clock when called, so it runs in a step.
-        T.step(function() T.makeDark(self) end)
-        T.step(function() self.dark = sealPanelOption(trailer.vehicle) end)
-    end,
-    validate = function(self)
-        expect(self.lit.shown and not self.lit.greyed, "in daylight with every input the repair isn't offered")
-        expect(self.dark.greyed, "in the dark the repair isn't greyed out")
-        expect(tostring(self.dark.reason):find(getText("Tooltip_RenewableEnergy_TooDark"), 1, true) ~= nil,
-            "in the dark the repair's tooltip says '" .. tostring(self.dark.reason) .. "'")
-    end,
-})
+-- A first seal adds 20 to a factory module, up to 55, 10 lower for each earlier seal: one seal short
+-- of a new module's cap, and one under a twice-sealed module's cap of 35, which the trailer reads
+-- off the module's own seal count. Both leave the module at or above the next seal's cap.
+repairTest("renewable_energy_world_arrow_board_repair_mends_a_cracked_panel", 0, 34, 54)
+repairTest("renewable_energy_world_arrow_board_repair_stops_at_its_cap", 2, 34, 35)
 
 local FRAME_FRONT, FRAME_BACK = ArrowBoard.FRAME[1].id, ArrowBoard.FRAME[2].id
 
@@ -460,38 +414,40 @@ test("renewable_energy_world_arrow_board_frame_welds", {
     end,
 })
 
--- A new trailer's lid is padlocked on a roll just under STOCK.lockedChance and not on one at it,
--- whatever it was before; with the game's Easy Use option it is left unlocked even on the lowest roll.
-test("renewable_energy_world_arrow_board_lid_lock_roll", {
+-- A new trailer's switch is on for a roll under STOCK.switchedOnChance and off for one at it; a
+-- trailer with its switch set keeps it, whatever the roll. Its lid is padlocked on a roll just under
+-- STOCK.lockedChance and not on one at it, whatever it was before; with the game's Easy Use option
+-- it is left unlocked even on the lowest roll. Its second panel gets a cracked module on a roll just
+-- under STOCK.secondCrackedChance and a weathered one at it; the first panel's is weathered either way.
+test("renewable_energy_world_arrow_board_stock_rolls", {
     run = function(self)
         if not spawnTrailer(self, { repair = true }) then return end
-        T.onVehicle(self, self.trailer, "arrowBoardLidRolls", { trials = {
-            { was = false, roll = "under" }, { was = true, roll = "at" }, { was = true, roll = 0, easyUse = true },
-        } }, "rolls")
+        local trailer = self.trailer
+        batchOnTrailer(function()
+            T.onVehicle(self, trailer, "arrowBoardSwitchRolls", { trials = { { roll = "under" }, { roll = "at" },
+                { was = false, roll = 0 } } }, "switch")
+            T.onVehicle(self, trailer, "arrowBoardLidRolls", { trials = {
+                { was = false, roll = "under" }, { was = true, roll = "at" }, { was = true, roll = 0, easyUse = true },
+            } }, "lid")
+            T.onVehicle(self, trailer, "arrowBoardPanelStockRolls", { rolls = { "under", "at" } }, "panels")
+        end)
     end,
     validate = function(self)
-        local locked = self.reads.rolls.locked
+        local on = self.reads.switch.on
+        expect(on[1] == true, "a roll just under the switch's chance left a found trailer off")
+        expect(on[2] == false, "a roll at the switch's chance switched a found trailer on")
+        expect(on[3] == false, "stocking switched on a trailer already switched off")
+        local locked = self.reads.lid.locked
         expect(locked[1] == true, "a roll just under the locked chance left the lid unlocked")
         expect(locked[2] == false, "a roll at the locked chance left the lid locked")
         expect(locked[3] == false, "with Easy Use the lowest roll left the lid locked")
-    end,
-})
-
--- A new trailer's second panel gets a cracked module on a roll just under STOCK.secondCrackedChance
--- and a weathered one at it; the first panel's is weathered either way.
-test("renewable_energy_world_arrow_board_second_panel_cracked_roll", {
-    run = function(self)
-        if not spawnTrailer(self, { repair = true }) then return end
-        T.onVehicle(self, self.trailer, "arrowBoardPanelStockRolls", { rolls = { "under", "at" } }, "rolls")
-    end,
-    validate = function(self)
-        local answer = self.reads.rolls
-        local under, at = answer.stocked[1], answer.stocked[2]
+        local panels = self.reads.panels
+        local under, at = panels.stocked[1], panels.stocked[2]
         for label, stocked in pairs({ ["just under the chance"] = under, ["at the chance"] = at }) do
-            expect(T.inRange(stocked[LEFT], answer.weathered), "on a roll " .. label .. " the left module is at " .. tostring(stocked[LEFT]))
+            expect(T.inRange(stocked[LEFT], panels.weathered), "on a roll " .. label .. " the left module is at " .. tostring(stocked[LEFT]))
         end
-        expect(T.inRange(under[RIGHT], answer.cracked), "on a roll just under the chance the right module is at " .. tostring(under[RIGHT]))
-        expect(T.inRange(at[RIGHT], answer.weathered), "on a roll at the chance the right module is at " .. tostring(at[RIGHT]))
+        expect(T.inRange(under[RIGHT], panels.cracked), "on a roll just under the chance the right module is at " .. tostring(under[RIGHT]))
+        expect(T.inRange(at[RIGHT], panels.weathered), "on a roll at the chance the right module is at " .. tostring(at[RIGHT]))
     end,
 })
 

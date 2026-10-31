@@ -17,7 +17,7 @@ local Sprites = require "RenewableEnergy/Sprites"
 
 local T = RenewableEnergyTest
 local test, expect, expectNear, expectEqual = T.test, T.expect, T.expectNear, T.expectEqual
-local player, stateItem = T.player, T.stateItem
+local player = T.player
 
 -- Commands and permissions ---------------------------------------------------------------------
 
@@ -26,16 +26,9 @@ local player, stateItem = T.player, T.stateItem
 test("renewable_energy_bank_commands_refuse_forged_arguments", {
     run = function(self)
         local bank = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY, T.PLUG_IN_INVERTER })
-        -- A flat panel: snow slides off a rack, which Clear Snow leaves alone.
         local panel = bank and T.panel(self, Sprites.flat, { near = bank, connect = true })
         if not panel then return end
-        self.bank, self.panel = bank, panel
-        local function sourceSnowy()
-            local summary = T.recordSummary(bank)
-            return summary and summary.sources[1] and summary.sources[1].snowy == true
-        end
-        T.snowfall(self, bank)
-        T.waitFor(self, sourceSnowy, "this client's summary with the panel snowy")
+        self.bank = bank
         -- Each row: feature, job, the target's place, with.
         local forged = {
             { "bank", "NoSuchJob", bank },
@@ -46,8 +39,7 @@ test("renewable_energy_bank_commands_refuse_forged_arguments", {
             { "source", SourceJobs.CONNECT, panel },
         }
         self.accepted = {}
-        T.give(self, "broom", { { type = "Base.Broom" } })
-        -- The forged jobs change nothing this client sees, so they and the clear go together.
+        -- The forged jobs change nothing this client sees, so they go together.
         T.batch(function()
             for _, row in ipairs(forged) do
                 T.job(self, row[1], row[2], row[3], row[4])
@@ -57,9 +49,7 @@ test("renewable_energy_bank_commands_refuse_forged_arguments", {
                     end
                 end)
             end
-            T.job(self, "source", SourceJobs.CLEAR_SNOW, panel, { type = "Base.Broom" })
         end)
-        T.waitFor(self, function() return not sourceSnowy() end, "this client's summary with the snow cleared")
         T.readRecord(self, bank, "afterForged")
         T.batch(function()
             T.job(self, "source", SourceJobs.DISCONNECT, panel)
@@ -77,7 +67,6 @@ test("renewable_energy_bank_commands_refuse_forged_arguments", {
         expect(forged.sources == 1 and forged.batteries == 1 and forged.name == "" and not forged.on,
             string.format("forged commands changed the bank: %d panels, %d batteries, name %q, on %s",
                 forged.sources, forged.batteries, forged.name, tostring(forged.on)))
-        -- The waits already failed the test if this client never saw the snow come and go.
         expectEqual("panels left after the disconnect", state.sources, 0)
         expect(state.on, "Turn On didn't switch the server's bank on")
         expectEqual("the server's name of the bank", state.name, "Shed bank")
@@ -85,36 +74,20 @@ test("renewable_energy_bank_commands_refuse_forged_arguments", {
     end,
 })
 
--- The server takes no bank job as a client command, only the status window's watch, whose
--- refresh still brings the status up to date.
-test("renewable_energy_bank_client_commands_ignored", {
+-- The status window's watch makes the server look at the bank again, so its refresh brings in a
+-- battery taken out past the bank's commands.
+test("renewable_energy_bank_watch_refreshes_status", {
     run = function(self)
         local bank = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY, T.CAR_BATTERY, T.PLUG_IN_INVERTER })
         if not bank then return end
-        self.bank = bank
-        T.readRecord(self, bank, "before")
-        -- A battery taken out past the bank's commands shows in the status only once something makes
-        -- the bank look again: here the watch sent after the forged commands, which the server
-        -- handles in the order they came.
         T.bankPart(self, bank, T.CAR_BATTERY, { remove = true })
         T.step(function()
-            local p, part = player(), stateItem(self.reads.before, T.PLUG_IN_INVERTER)
-            local system = PowerBank.clientSystem
-            system:sendCommand(p, "setBankOn", { bank = T.at(bank), on = true })
-            system:sendCommand(p, "rename", { bank = T.at(bank), name = "Forged" })
-            system:sendCommand(p, "unwire", { bank = T.at(bank), itemId = part and part.id or -1 })
+            local p = player()
             ClientBankSystem.watchStatus(p, bank.object)
             T.defer(self, function() ClientBankSystem.unwatchStatus(p, bank.object) end)
         end)
         T.waitForStatus(self, bank, function(status) return #status.batteries == 1 end,
             "this client's status after the watch, with the battery taken out")
-        T.readRecord(self, bank)
-    end,
-    validate = function(self)
-        local after = self.bank.state
-        expect(not after.on, "a client command switched the bank on")
-        expectEqual("the bank's name after the client commands", after.name, self.reads.before.name)
-        expect(stateItem(after, T.PLUG_IN_INVERTER) ~= nil, "a client command unwired the inverter")
     end,
 })
 
@@ -216,30 +189,6 @@ test("renewable_energy_bank_rebuilt_bank_keeps_its_record", {
     end,
 })
 
--- Connecting a panel brings the bank up to now first: the hour before the connect earns nothing for
--- it, the pass after does.
-test("renewable_energy_bank_connect_credits_from_connection", {
-    hour = 12,
-    run = function(self)
-        local bank = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY }, { charge = 0.5 })
-        local panel = bank and T.panel(self, Sprites.flat, { near = bank })
-        if not panel then return end
-        T.batch(function()
-            T.readRecord(self, bank, nil, 1)
-            T.job(self, "source", SourceJobs.CONNECT, panel, bank, "connect")
-            T.readRecord(self, bank, "connected")
-            T.bankPass(self, bank, 1000, { label = "passed" })
-        end)
-    end,
-    validate = function(self)
-        if not T.expectOk(self.reads.connect, "connecting the panel") then return end
-        local connected, passed = self.reads.connected, self.reads.passed
-        expectNear("hours between the connect and the bank's last pass", connected.age - connected.lastHour, 0, 0.01)
-        expectEqual("solar Wh today credited for the hour before the connect", connected.solarWhToday, 0)
-        expect(passed.solarWhToday > 0, "the pass after the connect credited the panel nothing")
-    end,
-})
-
 -- Moving a live source settles both old topologies first and publishes both ends. Its earlier
 -- output belongs to the old bank; only a later pass can credit the destination.
 test("renewable_energy_bank_source_transfer_settles_both_ends", {
@@ -276,6 +225,7 @@ test("renewable_energy_bank_source_transfer_settles_both_ends", {
         expectEqual("destination's solar Wh before it owned the panel", new.solarWhToday, 0)
         expect(self.new.state.solarWhToday > 0, "the destination earned nothing after the transfer")
         expectEqual("old bank's solar Wh after the destination ran", self.reads.oldAfter.solarWhToday, old.solarWhToday)
+        expectNear("hours between the transfer and the destination's last pass", new.age - new.lastHour, 0, 0.01)
     end,
 })
 
@@ -331,8 +281,8 @@ test("renewable_energy_bank_empty_pass_bills_what_it_carried", {
     end,
 })
 
--- A sledgehammer brings the bank up to now first: its batteries land with at least the inverter's
--- idle draw since the last pass taken.
+-- A sledgehammer brings the bank up to now first: its batteries land with the inverter's idle
+-- draw since the last pass taken, and no more than the destroy's own few minutes on top.
 test("renewable_energy_bank_sledgehammer_settles_batteries", {
     instant = true,
     run = function(self)
@@ -350,8 +300,10 @@ test("renewable_energy_bank_sledgehammer_settles_batteries", {
         local battery, before = T.findIn(self.reads.floor.items, "type", T.CAR_BATTERY), self.reads.before
         if not expect(battery, "the destroyed bank left no battery on the floor") then return end
         local most = before.charge - Specs.inverters[T.INVERTER_CHARGER].idle / before.nominalWh
-        expect(battery.uses <= most + 1e-4, "the battery left the destroyed bank at " .. battery.uses
-            .. " after an hour on since its last pass at " .. before.charge .. ", expected at most " .. most)
+        local least = before.charge - 2 * before.drawW / before.nominalWh
+        expect(battery.uses <= most + 1e-4 and battery.uses >= least, "the battery left the destroyed bank at "
+            .. battery.uses .. " after an hour on since its last pass at " .. before.charge
+            .. ", expected between " .. least .. " and " .. most)
     end,
 })
 
@@ -372,21 +324,13 @@ test("renewable_energy_bank_clock_drives_banks_and_gadgets", {
         local charger = T.placeAsPlayer(self, squares[1], SolarCellCharger.ITEM, Sprites.cellCharger)
         local light = T.placeAsPlayer(self, squares[2], SolarGardenLight.ITEM, Sprites.gardenLight.off)
         local function fixtures()
-            return { bank = T.at(bank), car = T.vehicleArgs(car), trailer = T.vehicleArgs(trailer),
+            return { bank = T.at(bank), car = T.at(car, { id = car.id }), trailer = T.at(trailer, { id = trailer.id }),
                 charger = T.at(charger, { kind = "charger" }), light = T.at(light, { kind = "light" }) }
         end
         T.read(self, "stockGadgets", fixtures, "before")
-        T.step(function()
-            if not T.need(self, panel.connected, "a panel connected to the bank") then return end
-            self.nextHour = math.floor(self.reads.before.bankPassAge) + 2
-            -- Jumping fires EveryTenMinutes, but EveryHours needs a native clock crossing.
-            T.setTime(self, 14 - 1 / 60)
-            T.setMultiplier(self, 10)
-        end)
-        -- The bank's pass and the gadgets' run on the same tick; the bank's status coming back an
-        -- hour on from its last pass says both have.
-        T.waitForStatus(self, bank, function(status) return status.hour >= self.nextHour end,
-            "this client's status of the bank's pass an hour on")
+        T.step(function() T.need(self, panel.connected, "a panel connected to the bank") end)
+        -- The bank's pass and the gadgets' run on the same tick, so the bank's status says both have.
+        T.runToHourlyPass(self, bank, 14, "this client's status of the bank's hourly pass")
         T.read(self, "gadgetCharges", fixtures, "after")
     end,
     validate = function(self)

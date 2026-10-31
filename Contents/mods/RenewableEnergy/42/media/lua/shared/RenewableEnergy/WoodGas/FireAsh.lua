@@ -5,9 +5,7 @@
 
 require "Camping/TimedActions/ISAddFuelAction"
 require "TimedActions/ISBBQAddFuel"
-local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
 local GasifierJobs = require "RenewableEnergy/WoodGas/GasifierJobs"
-local Items = require "cf_commonlib/Items"
 local Jobs = require "cf_commonlib/Jobs"
 
 local FireAsh = {}
@@ -54,11 +52,11 @@ end
 --- The authority's side of Clean Out Ash (Jobs.perform): `character` gets the fire's Wood Ash.
 FireAsh.site = Jobs.targetSite({
     [FireAsh.CLEAN_ASH] = function(character, row, fire)
-        local count = FireAsh.ashItems(fire)
-        Items.giveItems(character, Gasifier.WOOD_ASH, count)
-        local modData = fire:getModData()
-        modData[FUEL_KEY] = modData[FUEL_KEY] - count * FireAsh.MINUTES_PER_ASH
-        fire:transmitModData()
+        GasifierJobs.cleanAsh(character, fire, FireAsh.ashItems, function(_, count)
+            local modData = fire:getModData()
+            modData[FUEL_KEY] = modData[FUEL_KEY] - count * FireAsh.MINUTES_PER_ASH
+            fire:transmitModData()
+        end)
         return true
     end,
 })
@@ -68,7 +66,7 @@ FireAsh.JOBS = {
 }
 
 Jobs.define(FireAsh, {
-    subjectOf = function(fire) return FireAsh.isFire(fire) and fire or nil end, missing = "no fire",
+    subjectOf = function(fire) return FireAsh.isFire(fire) and fire or nil end, missing = "Tooltip_RenewableEnergy_NoFire",
 })
 
 local vanillaCampfireComplete = ISAddFuelAction.complete

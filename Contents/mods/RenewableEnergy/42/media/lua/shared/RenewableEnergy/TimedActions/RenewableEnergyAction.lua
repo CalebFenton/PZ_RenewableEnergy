@@ -1,6 +1,5 @@
--- Every hands-on job of fixed length the mod has, at a bank, a source, a treadmill, a garden light,
--- a vehicle, a digester, a gas heater, a gasifier, a vanilla wood fire or a generator's Gas
--- Conversion Kit (cf_commonlib's JobAction.forFeatures); the authority's complete() does the job.
+-- Every hands-on job of fixed length the mod has, by feature (cf_commonlib's
+-- JobAction.forFeatures); the authority's complete() does the job.
 -- A global, as the server finds the class by its Type (NetTimedAction.parse).
 
 require "Util/BuildingHelper"

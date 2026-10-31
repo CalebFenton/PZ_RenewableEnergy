@@ -1,6 +1,5 @@
 -- The authority's half of the car alternator tests: the hood the job needs open, and a wreck
--- scrapped where vanilla's scrap completes. Only registers handlers, so a --stay rerun loads it
--- again (RELOAD_FILES); RenewableEnergyTestHelpers.lua says how these handlers work.
+-- scrapped where vanilla's scrap completes.
 
 require "PZHarness/ServerHandlers"
 require "Vehicles/TimedActions/ISRemoveBurntVehicle"
@@ -37,17 +36,15 @@ handler("takeOutAlternatorAgain", function(player, args)
 end)
 
 -- Scraps the wreck as vanilla's blowtorch job completes it (ISRemoveBurntVehicle:complete), the
--- player's blowtorch a fresh one, rolling `args.roll` (PZHarness.Rolls.trialRoll) against the player's
--- CarAlternator.scrapChance, and answers how many car alternators it left on the wreck's square
+-- player's blowtorch a fresh one, every roll at `args.roll`, and answers how many car alternators it left on the wreck's square
 -- and whether the wreck is gone. Everything the scrap dropped goes when the test ends.
 handler("scrapWreck", function(player, args, defer)
     local vehicle = PZHarness.vehicleAt(args)
-    local chance = CarAlternator.scrapChance(player:getPerkLevel(Perks.Mechanics), player:getPerkLevel(Perks.MetalWelding))
     local square = vehicle:getSquare()
     local before = PZHarness.Fixtures.worldItems({ square })
     local action = ISRemoveBurntVehicle:new(player, vehicle)
     action.item = instanceItem("Base.BlowTorch")
-    local done = PZHarness.Rolls.with(defer, PZHarness.Rolls.trialRoll(args.roll, chance), action.complete, action)
+    local done = PZHarness.Rolls.with(defer, args.roll, action.complete, action)
     local alternators = 0
     for _, object in ipairs(PZHarness.Fixtures.newSince(before, PZHarness.Fixtures.worldItems({ square }))) do
         defer(function() PZHarness.Fixtures.removePlaced(object) end)

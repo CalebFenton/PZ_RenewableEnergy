@@ -1,7 +1,5 @@
 -- The authority's half of the gadget, vehicle and clock tests: the solar battery charger, garden
 -- light and maintainer passes, and vanilla's vehicle battery updates they are weighed against.
--- Only registers handlers, so a --stay rerun loads it again (RELOAD_FILES);
--- RenewableEnergyTestHelpers.lua says how these handlers work.
 
 require "PZHarness/ServerHandlers"
 require "PZHarness/Fixtures"
@@ -10,6 +8,7 @@ require "PZHarness/ServerRecords"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 local Kinds = require "RenewableEnergy/Debug/RenewableEnergyTestKinds"
 local Items = require "cf_commonlib/Items"
+local Sun = require "RenewableEnergy/Sun"
 local ArrowBoard = require "RenewableEnergy/ArrowBoard/Trailer"
 local Battery = require "RenewableEnergy/PowerBank/Battery"
 local GadgetCharging = require "RenewableEnergy/Gadgets/GadgetCharging"
@@ -43,25 +42,26 @@ handler("chargerState", function(_, args)
 end)
 
 -- Fills the solar battery charger at `args` (Kinds.find) with `args.count` batteries at
--- `args.uses` (full if nil) and charges it for `args.hours` at the sun of the moment, then, with
+-- `args.uses` (full if nil) and charges it for `args.hours` under the sky of the moment, then, with
 -- `args.pass`, runs the pass over every charger as long again. One call, since an empty battery
 -- leaves its container on its next update (DrainableComboItem.update). Answers the uses added, the
--- batteries after, `full` (every battery at its whole maximum, which the float can't tell) and
--- the Wh kept.
+-- batteries after, `full` (every battery at its whole maximum, which the float can't tell), the
+-- Wh kept and `flat`, the light the sky gave (Sun.skyNow).
 handler("cellCharge", function(_, args)
     local charger = Kinds.find(args)
     local container = charger:getContainer()
     for _ = 1, args.count do
         addAt(container, SolarCellCharger.BATTERY, args.uses)
     end
-    local reply = { added = SolarCellCharger.charge(charger, args.hours), after = Kinds.itemsOf(container) }
+    local sky = Sun.skyNow()
+    local reply = { added = SolarCellCharger.charge(charger, args.hours, sky), after = Kinds.itemsOf(container), flat = sky.flat }
     local items, full = container:getItems(), true
     for i = 0, items:size() - 1 do
         full = full and items:get(i):getCurrentUses() == items:get(i):getMaxUses()
     end
     reply.full, reply.storedWh = full, storedWh(charger)
     if args.pass then
-        SolarCellCharger.chargeAll(args.hours)
+        SolarCellCharger.chargeAll(args.hours, sky)
         reply.afterPass = Kinds.itemsOf(container)
     end
     return reply
@@ -73,7 +73,8 @@ end)
 -- covers only the hours the clock moves. The clock starts from its whole hour: the world age the
 -- pass measures is a float (GameTime.getWorldAgeHours), which holds a whole hour plus the test's
 -- hours exactly, and the moment the call lands a few ticks after the hour doesn't. Answers whether
--- the light is lit, its sprite and its charge in Wh.
+-- the light is lit, its sprite, its charge in Wh and `flat`, the light the sky gave the pass that
+-- moved the clock (Sun.skyNow).
 handler("gardenLightUpdate", function(_, args)
     local light = Kinds.find(args)
     local time = getGameTime()
@@ -84,18 +85,8 @@ handler("gardenLightUpdate", function(_, args)
     end
     time:setTimeOfDay(time:getTimeOfDay() + args.hours)
     GadgetCharging.update()
-    return { lit = SolarGardenLight.isLit(light), sprite = light:getTextureName(), charge = SolarGardenLight.getChargeWh(light) }
-end)
-
--- Swaps the bulb of the garden light at `args` (Kinds.find) for a new `args.bulb` in one go, so
--- that a multiplayer client gets the new bulb while its lamp is still lit, which no pair of timed
--- actions does reliably. The old bulb goes to the character. Answers whether the light is lit and
--- the bulb it holds.
-handler("gardenLightSwapBulb", function(player, args)
-    local light = Kinds.find(args)
-    need(SolarGardenLight.removeBulb(player, light) and SolarGardenLight.addBulb(player, light, instanceItem(args.bulb)),
-        "a bulb swap in the garden light on the server")
-    return { lit = SolarGardenLight.isLit(light), bulb = SolarGardenLight.getBulb(light) }
+    return { lit = SolarGardenLight.isLit(light), sprite = light:getTextureName(), charge = SolarGardenLight.getChargeWh(light),
+        flat = Sun.skyNow().flat }
 end)
 
 -- Vehicles ----------------------------------------------------------------------------------------
@@ -122,14 +113,16 @@ handler("vehicleBattery", function(_, args)
     return { state = Kinds.vehicleState(vehicle) }
 end)
 
--- `args.hours` of the maintainer on the vehicle at the sun of the moment, from a battery at
--- `args.uses`: the Wh it added, the charge after and the battery's capacity in Wh.
+-- `args.hours` of the maintainer on the vehicle under the sky of the moment, from a battery at
+-- `args.uses`: the Wh it added, the charge after, the battery's capacity in Wh and `flat`, the
+-- light the sky gave (Sun.skyNow).
 handler("maintainerCharge", function(_, args)
     local vehicle = PZHarness.vehicleAt(args)
     local _, battery = batteryOf(vehicle)
     battery:setCurrentUsesFloat(args.uses)
-    local wh = SolarMaintainer.charge(vehicle, args.hours)
-    return { wh = wh, after = battery:getCurrentUsesFloat(), capacityWh = Battery.nominalWh(battery) }
+    local sky = Sun.skyNow()
+    local wh = SolarMaintainer.charge(vehicle, args.hours, sky)
+    return { wh = wh, after = battery:getCurrentUsesFloat(), capacityWh = Battery.nominalWh(battery), flat = sky.flat }
 end)
 
 -- Marks a maintainer attached in the shape older saves hold, with the condition it went on with,
@@ -147,9 +140,20 @@ end)
 handler("chargeVehicles", function(_, args)
     local _, battery = batteryOf(PZHarness.vehicleAt(args))
     local before = battery:getCurrentUsesFloat()
-    GadgetCharging.chargeVehicles(args.hours)
+    GadgetCharging.chargeVehicles(args.hours, Sun.skyNow())
     return { before = before, after = battery:getCurrentUsesFloat() }
 end)
+
+-- Runs `update(part)` of the vehicle's battery part with its lights switched on by `switch(true)`,
+-- from a battery at `args.uses`, then switches them off: the share of a full charge it took.
+local function lightDrain(vehicle, args, switch, update)
+    local part, battery = batteryOf(vehicle)
+    battery:setCurrentUsesFloat(args.uses)
+    switch(true)
+    update(part)
+    switch(false)
+    return { drop = args.uses - battery:getCurrentUsesFloat(), type = battery:getFullType() }
+end
 
 -- Vanilla's headlight update (Vehicles.Update.Headlight) for `args.minutes` with the engine off,
 -- from a battery at `args.uses`: the share of a full charge it took.
@@ -157,12 +161,8 @@ handler("headlightDrain", function(_, args)
     local vehicle = PZHarness.vehicleAt(args)
     local headlight = vehicle:getPartById("HeadlightLeft")
     need(headlight and headlight:getInventoryItem(), "a left headlight on the vehicle on the server")
-    local _, battery = batteryOf(vehicle)
-    battery:setCurrentUsesFloat(args.uses)
-    vehicle:setHeadlightsOn(true)
-    Vehicles.Update.Headlight(vehicle, headlight, args.minutes)
-    vehicle:setHeadlightsOn(false)
-    return { drop = args.uses - battery:getCurrentUsesFloat(), type = battery:getFullType() }
+    return lightDrain(vehicle, args, function(on) vehicle:setHeadlightsOn(on) end,
+        function() Vehicles.Update.Headlight(vehicle, headlight, args.minutes) end)
 end)
 
 -- Vanilla's lightbar drain for `args.minutes` with the engine off, from a battery at `args.uses`:
@@ -171,12 +171,8 @@ end)
 handler("lightbarDrain", function(_, args)
     local vehicle = PZHarness.vehicleAt(args)
     need(vehicle:hasLightbar(), "a lightbar on the vehicle on the server")
-    local part, battery = batteryOf(vehicle)
-    battery:setCurrentUsesFloat(args.uses)
-    vehicle:setLightbarLightsMode(1)
-    Vehicles.Update.Battery(vehicle, part, args.minutes)
-    vehicle:setLightbarLightsMode(0)
-    return { drop = args.uses - battery:getCurrentUsesFloat(), type = battery:getFullType() }
+    return lightDrain(vehicle, args, function(on) vehicle:setLightbarLightsMode(on and 1 or 0) end,
+        function(part) Vehicles.Update.Battery(vehicle, part, args.minutes) end)
 end)
 
 -- Vanilla's alternator charging (Vehicles.Update.Battery) for `args.minutes` with the engine

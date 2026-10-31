@@ -73,9 +73,8 @@ function SolarGardenLight.addBulb(character, light, item)
     return true
 end
 
---- Runs every loaded light the authority has seen.
-function SolarGardenLight.updateAll(hours)
-    local sky = Sun.skyNow()
+--- Runs every loaded light the authority has seen for `hours` under `sky` (Sun.skyNow).
+function SolarGardenLight.updateAll(hours, sky)
     SolarGardenLight.eachLoaded(function(light)
         run(light, hours, sky, false)
     end)

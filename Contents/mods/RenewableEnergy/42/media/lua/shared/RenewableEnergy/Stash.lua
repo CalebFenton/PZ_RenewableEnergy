@@ -174,23 +174,14 @@ function Stash.stockedFromStart()
     return mode == Stash.MODE.MAPS_AND_STOCKED or mode == Stash.MODE.STOCKED
 end
 
---- Adds the houses to StashDescriptions, once however often it is called, unless the Stash Houses
---- option leaves them out. Returns whether the option uses them.
+--- Adds the houses to StashDescriptions, unless the Stash Houses option leaves them out.
 function Stash.register()
     if not Stash.enabled() then
-        return false
-    end
-    StashDescriptions = StashDescriptions or {}
-    local present = {}
-    for _, description in ipairs(StashDescriptions) do
-        present[description] = true
+        return
     end
     for description in pairs(Stash.descriptions) do
-        if not present[description] then
-            table.insert(StashDescriptions, description)
-        end
+        table.insert(StashDescriptions, description)
     end
-    return true
 end
 
 -- StashSystem.init reads StashDescriptions after OnInitGlobalModData (IsoWorld.init), by which

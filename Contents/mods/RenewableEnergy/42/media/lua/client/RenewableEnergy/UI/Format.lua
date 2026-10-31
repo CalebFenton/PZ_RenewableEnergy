@@ -54,16 +54,16 @@ function Format.kilograms(kg)
     return Format.number(kg, 1) .. " kg"
 end
 
--- "1.5 L" with `places` decimals.
-function Format.litres(litres, places)
-    return Format.number(litres, places) .. " L"
+-- "15 L", in whole litres.
+function Format.litres(litres)
+    return Format.number(litres, 0) .. " L"
 end
 
--- "1.25 m³" with `places` decimals. The symbol comes from a translation, which is read as UTF-8:
+-- "1.25 m³", to a hundredth. The symbol comes from a translation, which is read as UTF-8:
 -- the Lua compiler turns any non-ASCII character in a literal into "?" (Kahlua's LexState keeps
 -- each source character as one byte, then decodes the bytes as UTF-8).
-function Format.cubicMetres(m3, places)
-    return getText("IGUI_RenewableEnergy_CubicMetres", Format.number(m3, places))
+function Format.cubicMetres(m3)
+    return getText("IGUI_RenewableEnergy_CubicMetres", Format.number(m3, 2))
 end
 
 -- An item's condition as a share of its type's ConditionMax (vanilla's default when the script
@@ -87,6 +87,11 @@ end
 -- part by its condition.
 function Format.withShare(name, share)
     return getText("ContextMenu_RenewableEnergy_WithShare", name, Format.percent(share))
+end
+
+-- "Car Battery (72%)": an item by its name and condition.
+function Format.itemCondition(item)
+    return Format.withShare(item:getDisplayName(), Format.conditionShare(item:getFullType(), item:getCondition()))
 end
 
 -- Vanilla translates both forms of each unit into every language.

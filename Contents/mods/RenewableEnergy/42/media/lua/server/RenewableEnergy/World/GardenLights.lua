@@ -40,8 +40,13 @@ local function store()
     return ModData.getOrCreate(GardenLights.MOD_DATA)
 end
 
+-- A rolled house's ledger value is the number of lights it got.
+local function isRolledValue(value)
+    return type(value) == "number"
+end
+
 function GardenLights.isRolled(def)
-    return type(store()[BuildingWatch.key(def)]) == "number"
+    return isRolledValue(store()[BuildingWatch.key(def)])
 end
 
 --- Promises the house lights: when it is rolled, it gets them for certain. A house already
@@ -141,14 +146,20 @@ end
 
 -- Rolling
 
--- Places GardenLights.COUNT charged lights along the house's front, as many as find room.
--- Returns how many it placed.
-local function place(def)
+--- Sets a light out on the square as a house's lights are, charged and unlit, holding `bulb` (a
+--- SolarGardenLight.BULB_KEY value) if given, else the plain bulb every light comes with.
+function GardenLights.place(square, bulb)
+    Place.moveable(square, Sprites.gardenLight.off,
+        { [SolarGardenLight.CHARGE_KEY] = SolarGardenLight.SPEC.wh, [SolarGardenLight.BULB_KEY] = bulb })
+end
+
+-- Places GardenLights.COUNT lights along the house's front, as many as find room. Returns how many
+-- it placed.
+local function placeLights(def)
     local count = Chance.between(GardenLights.COUNT.min, GardenLights.COUNT.max)
-    local charged = { [SolarGardenLight.CHARGE_KEY] = SolarGardenLight.SPEC.wh }
     local squares = frontSquares(def, count)
     for _, square in ipairs(squares) do
-        Place.moveable(square, Sprites.gardenLight.off, charged)
+        GardenLights.place(square)
     end
     return #squares
 end
@@ -163,7 +174,7 @@ function GardenLights.roll(def)
     end
     local placed = 0
     if rolled[key] == GardenLights.PROMISED or Chance.hit(GardenLights.chanceFor(def)) then
-        placed = place(def)
+        placed = placeLights(def)
     end
     rolled[key] = placed
     return placed
@@ -172,7 +183,7 @@ end
 -- Houses, and whatever a solar site promised lights, that haven't been rolled.
 BuildingWatch.watch({
     ledger = GardenLights.MOD_DATA,
-    isRolled = function(value) return type(value) == "number" end,
+    isRolled = isRolledValue,
     wants = function(def)
         return store()[BuildingWatch.key(def)] == GardenLights.PROMISED or def:isResidential()
     end,

@@ -59,13 +59,13 @@ end
 function VehicleMenu.addVehicleOptions(playerNum, context, vehicle)
     VehicleMenu.addSealPanelOptions(playerNum, context, vehicle)
     VehicleMenu.addFrameRepairOptions(playerNum, context, vehicle)
-    if SolarMaintainer.isAttached(vehicle) then
-        return JobOptions.add(context, playerNum, VehicleJobs, VehicleJobs.DETACH_MAINTAINER, vehicle)
+    local detach = JobOptions.add(context, playerNum, VehicleJobs, VehicleJobs.DETACH_MAINTAINER, vehicle)
+    if detach then
+        return detach
     end
     local maintainer = getSpecificPlayer(playerNum):getInventory():getFirstTypeRecurse(SolarMaintainer.ITEM)
-    if maintainer and SolarMaintainer.canAttach(vehicle) then
-        return JobOptions.add(context, playerNum, VehicleJobs, VehicleJobs.ATTACH_MAINTAINER, vehicle, maintainer)
-    end
+    return maintainer and JobOptions.add(context, playerNum, VehicleJobs, VehicleJobs.ATTACH_MAINTAINER, vehicle, maintainer)
+        or nil
 end
 
 -- The vehicle under the mouse, as vanilla's own vehicle menu picks it, rather than a clicked object.

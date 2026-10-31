@@ -1,7 +1,5 @@
 -- The authority's half of the biogas tests: the stink and running a digester; the harness's record
--- kit drives the digesters' records (RenewableEnergyTestKinds). Only registers handlers, so a
--- --stay rerun loads it again (RELOAD_FILES); RenewableEnergyTestHelpers.lua says how these
--- handlers work.
+-- kit drives the digesters' records (RenewableEnergyTestKinds).
 
 require "PZHarness/ServerHandlers"
 require "PZHarness/ServerChecks"

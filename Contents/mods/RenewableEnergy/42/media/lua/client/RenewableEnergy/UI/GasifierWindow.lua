@@ -30,7 +30,7 @@ function GasifierWindow:rowsOf(summary)
     row(rows, "IGUI_RenewableEnergy_GasifierFilter", getText("IGUI_RenewableEnergy_FilterState", summary.clean, summary.tarry),
         summary.clean == 0 and "bad" or nil)
     row(rows, "IGUI_RenewableEnergy_GasifierCondensate",
-        Format.number(summary.condensate, 1) .. " / " .. Format.litres(Gasifier.CONDENSATE_MAX, 0),
+        Format.number(summary.condensate, 1) .. " / " .. Format.litres(Gasifier.CONDENSATE_MAX),
         summary.condensate >= Gasifier.CONDENSATE_MAX and "bad" or nil)
     row(rows, "IGUI_RenewableEnergy_GasifierOutput", Format.percent(summary.output), summary.output < 1 and "bad" or nil)
     if summary.wear > 1 then

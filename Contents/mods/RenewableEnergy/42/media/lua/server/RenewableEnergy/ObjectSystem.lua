@@ -23,6 +23,12 @@ function Object:tierSpec()
     return self.luaSystem.owner.TIERS[self.tier]
 end
 
+--- Its tile is in the world, just placed or its chunk loaded: notes whether it stands indoors, where
+--- its fumes fill the building.
+function Object:loaded(isoObject)
+    self.indoors = Fumes.buildingOf(isoObject:getSquare()) ~= nil
+end
+
 --- Says whether the object fills its building with fumes now (Fumes).
 function Object:setFuming(isFuming)
     local isoObject = self:getIsoObject()

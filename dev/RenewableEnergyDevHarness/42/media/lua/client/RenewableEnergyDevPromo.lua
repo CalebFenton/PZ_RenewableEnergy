@@ -8,7 +8,6 @@
 
 require "PZHarness/Fixtures"
 local Specs = require "RenewableEnergy/Specs"
-local Battery = require "RenewableEnergy/PowerBank/Battery"
 local SolarCellCharger = require "RenewableEnergy/Gadgets/SolarCellCharger"
 local Digester = require "RenewableEnergy/Biogas/Digester"
 local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
@@ -146,26 +145,6 @@ local function clearBankShot(bank, player)
     end)
 end
 
--- Places a bank and puts the parts straight into its container, as world spawns stock a bank.
-local function placeBank(square, sprite, items, charge)
-    local BankSystem = require "RenewableEnergy/PowerBank/BankSystem"
-    return BankSystem.place(square, sprite, nil, function(container)
-        for _, fullType in ipairs(items) do
-            local item = container:AddItem(fullType)
-            if Battery.isBattery(item) then
-                Battery.setCharge(item, charge)
-            end
-        end
-    end)
-end
-
--- Set out the way garden light spawns set one out, charged and unlit by day.
-local function placeGardenLight(square, bulb)
-    local Place = require "RenewableEnergy/World/Place"
-    Place.moveable(square, Sprites.gardenLight.off,
-        { [SolarGardenLight.CHARGE_KEY] = SolarGardenLight.SPEC.wh, [SolarGardenLight.BULB_KEY] = bulb })
-end
-
 local function connect(bank, source)
     doJob("source", SourceJobs.CONNECT, source, bank)
 end
@@ -233,13 +212,10 @@ end
 
 -- Gas, wind and treadmill ------------------------------------------------------------------------
 
--- A generator plugged in on `square` with `fuel` of a full tank.
+-- A new generator plugged in on `square` with `fuel` in its tank (10 is full), as a site sets one out.
 local function placeGenerator(square, fuel)
     Harness.clearGroundCover(square)
-    local generator = IsoGenerator.new(instanceItem("Base.Generator"), getCell(), square)
-    generator:setConnected(true)
-    generator:setFuel(generator:getMaxFuel() * fuel)
-    return generator
+    return require("RenewableEnergy/World/SolarSites").placeGenerator(square, 100, fuel)
 end
 
 -- A record of the record kind `kind` built on its Sprites tile `tile` on `square` by its kind's
@@ -333,7 +309,7 @@ end
 -- A generator plugged in and waiting at `layout.generator` of `place`, with a gas kit on a digester
 -- of the Sprites.digester tile `tile` at `layout.digester`. Returns the generator.
 local function placeKittedGenerator(place, layout, tile)
-    local generator = placeGenerator(Harness.at(place, layout.generator), 0.7)
+    local generator = placeGenerator(Harness.at(place, layout.generator), 7)
     fitGasKit(generator, (placeDigester(Harness.at(place, layout.digester), tile, 1)))
     return generator
 end
@@ -359,7 +335,7 @@ local function buildHomestead()
     quietNeighbourhood(home.bank, Harness.at(places.stage0, Places.STAGE0.box))
     clearArea(home, Places.OPEN, true)
     clearBankShot(home.bank, home.beside)
-    shown.homesteadBank = placeBank(home.bank, Sprites.batteryBankMetal.S, HOMESTEAD_BANK, MORNING_CHARGE)
+    shown.homesteadBank = Fixtures.placeBank(home.bank, Sprites.batteryBankMetal.S, HOMESTEAD_BANK, MORNING_CHARGE)
     placePanels(shown.homesteadBank, home, Places.HOMESTEAD.wallPanels, "wall")
     placePanels(shown.homesteadBank, home, Places.HOMESTEAD.racks, "rack", HOMESTEAD_MODULES)
     placePanels(shown.homesteadBank, home, Places.HOMESTEAD.flatPanels)
@@ -376,7 +352,8 @@ end
 local function buildStage0()
     local stage0 = places.stage0
     clearArea(stage0, Places.STAGE0.open)
-    shown.stage0Box = placeBank(Harness.at(stage0, Places.STAGE0.box), Sprites.batteryBoxWood.S, STAGE0_BOX, MORNING_CHARGE)
+    shown.stage0Box = Fixtures.placeBank(Harness.at(stage0, Places.STAGE0.box), Sprites.batteryBoxWood.S, STAGE0_BOX,
+        MORNING_CHARGE)
     placePanels(shown.stage0Box, stage0, Places.STAGE0.flatPanels)
     local charger = Harness.placeTile(Harness.at(stage0, Places.STAGE0.cellCharger), Sprites.cellCharger)
     if not charger:getContainer() then
@@ -386,7 +363,7 @@ local function buildStage0()
         local battery = charger:getContainer():AddItem(SolarCellCharger.BATTERY)
         battery:setCurrentUsesFloat(0.5)
     end
-    placeGardenLight(Harness.at(stage0, Places.STAGE0.gardenLight))
+    require("RenewableEnergy/World/GardenLights").place(Harness.at(stage0, Places.STAGE0.gardenLight))
     switchOn(shown.stage0Box)
 end
 
@@ -421,23 +398,22 @@ local FRAMING = {
     end,
 }
 
--- What the yard shots show; the bank stands indoors behind the wall, out of them.
-local function homesteadSquares()
-    return Harness.squaresAt(places.homestead, { Places.HOMESTEAD.generator, Places.HOMESTEAD.player, Places.HOMESTEAD.digester, Places.HOMESTEAD.windCharger },
-        Places.HOMESTEAD.wallPanels, Places.HOMESTEAD.racks, Places.HOMESTEAD.flatPanels)
-end
-
--- What the shot of the place `name` of LAYOUTS frames: its wind chargers and its `shot` positions.
-local function placeSquares(name)
-    local layout, shot = Places.LAYOUTS[name], {}
+-- What the shot of the place `name` frames: its layout's wind chargers and its `shot` keys, each
+-- a position or a list of them. `layout` is LAYOUTS[name] unless given.
+local function placeSquares(name, layout)
+    layout = layout or Places.LAYOUTS[name]
+    local shot = {}
     for _, key in ipairs(layout.shot) do
-        table.insert(shot, layout[key])
+        local value = layout[key]
+        if type(value[1]) == "table" then
+            for _, position in ipairs(value) do
+                table.insert(shot, position)
+            end
+        else
+            table.insert(shot, value)
+        end
     end
     return Harness.squaresAt(places[name], layout.chargers or {}, shot)
-end
-
-local function stage0Squares()
-    return Harness.squaresAt(places.stage0, { Places.STAGE0.box, Places.STAGE0.player, Places.STAGE0.cellCharger, Places.STAGE0.gardenLight }, Places.STAGE0.flatPanels)
 end
 
 
@@ -521,7 +497,7 @@ local function addWorld()
     -- A step out from the closest zoom, which leaves too little of the house around the panels.
     Harness.addGoTo(run, getPlayer(), scouts, 1)
     run:addOpaque("homestead", function()
-        return { Harness.centred("homestead", homesteadSquares(), FRAMING) }
+        return { Harness.centred("homestead", placeSquares("homestead", Places.HOMESTEAD), FRAMING) }
     end)
     -- The banner shows the whole homestead a step further out.
     run:add(function()
@@ -529,7 +505,7 @@ local function addWorld()
         return Capture.zoomSettled()
     end)
     run:addOpaque("world", function()
-        return { Harness.rightAligned("world", homesteadSquares(), FRAMING) }
+        return { Harness.rightAligned("world", placeSquares("homestead", Places.HOMESTEAD), FRAMING) }
     end)
     -- Indoors beside the bank, where the building's near walls are cut away, at the closest zoom.
     -- The wind charger goes first: its rotor, drawn two storeys tall outside the wall, would stand
@@ -548,7 +524,7 @@ local function addWorld()
     addOutfit(false)
     Harness.addGoTo(run, getPlayer(), Harness.squaresAt(places.stage0, { Places.STAGE0.scout, Places.STAGE0.player }), 0)
     run:addOpaque("stage0", function()
-        return { Harness.centred("stage0", stage0Squares(), FRAMING) }
+        return { Harness.centred("stage0", placeSquares("stage0", Places.STAGE0), FRAMING) }
     end)
 end
 
@@ -656,7 +632,7 @@ local function addGardenLights()
         removeTrees(walk)
         clearArea(walk, Places.WALK.open)
         for _, spot in ipairs(Places.WALK.lights) do
-            placeGardenLight(Harness.at(walk, spot), spot.bulb)
+            require("RenewableEnergy/World/GardenLights").place(Harness.at(walk, spot), spot.bulb)
         end
         getGameTime():setTimeOfDay(Places.WALK.hour)
         -- The lighting takes most of a second to follow the clock.
@@ -665,7 +641,7 @@ local function addGardenLights()
     run:add(function()
         -- Lit now, rather than at the next minute's pass. Their light shows while the character
         -- looks around.
-        SolarGardenLight.updateAll(0)
+        SolarGardenLight.updateAll(0, require("RenewableEnergy/Sun").skyNow())
     end)
     Harness.addGoTo(run, getPlayer(), Harness.squaresAt(walk, { Places.WALK.scout, Places.WALK.player }), 0)
     run:addOpaque("gardenlights", function()
@@ -683,7 +659,7 @@ local function buildPoster()
         return true
     end)
     clearArea(poster, Places.POSTER.open, true)
-    local posterBank = placeBank(Harness.at(poster, Places.POSTER.bank), Sprites.batteryBankMetal.S, HOMESTEAD_BANK, 1)
+    local posterBank = Fixtures.placeBank(Harness.at(poster, Places.POSTER.bank), Sprites.batteryBankMetal.S, HOMESTEAD_BANK, 1)
     placePanels(posterBank, poster, Places.POSTER.racks, "rack")
     connect(posterBank, placeWindCharger(Harness.at(poster, Places.POSTER.windCharger), Sprites.windCharger.alternator.steel[poster.frame.facing]))
     placeKittedGenerator(poster, Places.POSTER, "dome")
@@ -769,7 +745,7 @@ local function addBiogas()
         placeDigester(here("barrelOrange"), "barrel.Mov_OrangeBarrel", 0.6, { holder = "tarp" })
         placeDigester(here("insulated"), "insulated", 0.8)
         shown.digester = placeDigester(here("dome"), "dome", 0.9)
-        local generator = placeGenerator(here("generator"), 0.2)
+        local generator = placeGenerator(here("generator"), 2)
         fitGasKit(generator, shown.digester)
         generator:setActivated(true)
         return DRAW_FRAMES
@@ -796,7 +772,7 @@ local function addWoodgas()
         end
         for _, tier in ipairs({ "standard", "advanced" }) do
             local gasifier = placeGasifier(here(tier), tier, true)
-            local generator = placeGenerator(here(tier .. "Generator"), 0.2)
+            local generator = placeGenerator(here(tier .. "Generator"), 2)
             fitGasKit(generator, gasifier)
             generator:setActivated(true)
             shown[tier] = gasifier
@@ -833,7 +809,7 @@ local function addTreadmill()
     addOutfit(false)
     run:add(function()
         local here = spotsOf("gym")
-        local box = placeBank(here("box"), Sprites.batteryBoxWood.S, STAGE0_BOX, MORNING_CHARGE)
+        local box = Fixtures.placeBank(here("box"), Sprites.batteryBoxWood.S, STAGE0_BOX, MORNING_CHARGE)
         local tiles = Sprites.treadmill[layout.facing]
         Harness.placeTile(here("rear"), tiles.rear)
         shown.treadmill = Harness.placeTile(here("console"), tiles.console, { [Treadmill.WIRED_KEY] = true })

@@ -7,7 +7,6 @@ local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
 local GasifierJobs = require "RenewableEnergy/WoodGas/GasifierJobs"
 local GasifierObject = require "RenewableEnergy/WoodGas/GasifierObject"
 local Action = require "RenewableEnergy/TimedActions/RenewableEnergyAction"
-local Items = require "cf_commonlib/Items"
 local LibObjectSystem = require "cf_commonlib/ObjectSystem"
 
 -- Its OnCreate is the build menu's (scripts/RenewableEnergy/Entities.txt).
@@ -27,9 +26,9 @@ local DO = {
         return true
     end,
     [GasifierJobs.CLEAN_ASH] = function(character, record)
-        local count = Gasifier.ashItems(record)
-        Items.giveItems(character, Gasifier.WOOD_ASH, count)
-        record.ash = record.ash - count * Gasifier.ASH_PER_ITEM
+        GasifierJobs.cleanAsh(character, record, Gasifier.ashItems, function(_, count)
+            record.ash = record.ash - count * Gasifier.ASH_PER_ITEM
+        end)
         return true
     end,
     -- Into `item` as much of the condensate as it takes, or all of it onto the ground.

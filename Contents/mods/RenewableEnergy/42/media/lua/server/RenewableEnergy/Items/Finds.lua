@@ -174,12 +174,17 @@ local function isFreshPart(item)
     return Finds.isWornPart(item:getFullType()) and not Wear.hasOwnCondition(item)
 end
 
-local function readyItems(container, wearParts, sendParts)
+-- Parts are worn unless the container, or for a bag's contents the container the bag lies in
+-- (`wearParts`), is one of the mod's own.
+local function readyItems(container, sendParts, wearParts)
+    if wearParts == nil then
+        wearParts = not OWN_CONTAINER[container:getType()]
+    end
     local items = container:getItems()
     for i = 0, items:size() - 1 do
         local item = items:get(i)
         if item:IsInventoryContainer() then
-            readyItems(item:getInventory(), wearParts, sendParts)
+            readyItems(item:getInventory(), sendParts, wearParts)
         elseif item:getModule() == "RenewableEnergy" then
             if Battery.isBattery(item) and not Battery.hasCharge(item) then
                 Battery.setFoundCharge(item)
@@ -202,7 +207,7 @@ end
 --- clients with the filled items (RequestItemsForContainerPacket, LootRespawn), condition included.
 ---@param container ItemContainer
 function Finds.readyFoundItems(container)
-    readyItems(container, not OWN_CONTAINER[container:getType()], false)
+    readyItems(container, false)
 end
 
 -- Modules whose glass broke lie around where people kept junk and spares. They are added when a
@@ -277,7 +282,7 @@ local function onSeeNewRoom(room)
             for k = 0, object:getContainerCount() - 1 do
                 local container = object:getContainerByIndex(k)
                 if container:isExplored() then
-                    readyItems(container, not OWN_CONTAINER[container:getType()], true)
+                    readyItems(container, true)
                 end
             end
         end

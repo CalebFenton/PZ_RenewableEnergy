@@ -4,7 +4,6 @@
 
 local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
 local GasifierJobs = require "RenewableEnergy/WoodGas/GasifierJobs"
-local Action = require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 local ObjectWindow = require "RenewableEnergy/UI/ObjectWindow"
 local GasifierWindow = require "RenewableEnergy/UI/GasifierWindow"
 local JobOptions = require "cf_commonlib/JobOptions"
@@ -17,10 +16,10 @@ local function addDrain(menu, character, playerNum, gasifier, summary)
     local job = GasifierJobs.DRAIN
     local blocker = GasifierJobs.verdict(character, job, summary).blocker
     if blocker then
-        Needs.refuse(menu:addOption(getText(Action.labelKey(job))), blocker)
+        Needs.refuse(menu:addOption(JobOptions.jobName(GasifierJobs, job)), blocker)
         return
     end
-    local submenu = JobOptions.addSubMenu(menu, getText(Action.labelKey(job)))
+    local submenu = JobOptions.addSubMenu(menu, JobOptions.jobName(GasifierJobs, job))
     for _, item in ipairs(GasifierJobs.drainContainers(character, summary.lit)) do
         JobOptions.add(submenu, playerNum, GasifierJobs, job, gasifier, item, item:getDisplayName())
     end

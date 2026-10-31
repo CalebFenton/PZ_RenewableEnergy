@@ -149,12 +149,6 @@ function T.holdLight(self)
     T.step(function() self.items.light[1]:setActivated(true) end)
 end
 
---- The server handlers' name for a T.placeVehicle handle's vehicle. Call it once the server has
---- answered, as in a T.server args function.
-function T.vehicleArgs(vehicle)
-    return { id = vehicle.id, x = vehicle.x, y = vehicle.y, z = vehicle.z }
-end
-
 --- The battery in this client's copy of the vehicle of a T.placeVehicle handle, or nil.
 function T.vehicleBattery(vehicle)
     local part = VehicleBattery.partOf(vehicle.vehicle)
@@ -166,10 +160,8 @@ end
 --- state in it in vehicle.state, which waits on this client's copy compare against.
 function T.onVehicle(self, vehicle, name, args, label)
     local function allArgs()
-        local all = T.vehicleArgs(vehicle)
-        for key, value in pairs(type(args) == "function" and args() or args or {}) do
-            all[key] = value
-        end
+        local all = T.at(vehicle, type(args) == "function" and args() or args)
+        all.id = vehicle.id
         return all
     end
     -- Queued once the vehicle is placed, the call can go out ahead of its turn (T.server, T.batch).
@@ -215,20 +207,10 @@ function T.snowfall(self, bank, hours, label)
     T.bankPass(self, bank, 0, { hours = hours or 1, snowing = true, airC = -10, label = label })
 end
 
---- The watts appliances of the kinds `names` draw together, at vanilla's figures
---- (Yardsticks.applianceWatts).
-function T.applianceWatts(names)
-    local watts = 0
-    for _, name in ipairs(names) do
-        watts = watts + Yardsticks.applianceWatts(name)
-    end
-    return watts
-end
-
---- What a fridge adds to a bank's load. The tests' area has appliances of its own, so each test
---- reads what one fridge it places adds.
+--- What a fridge adds to a bank's load, at vanilla's figures (Yardsticks.applianceWatts). The
+--- tests' area has appliances of its own, so each test reads what one fridge it places adds.
 function T.fridgeW()
-    return T.applianceWatts({ "fridgeFreezer" })
+    return Yardsticks.applianceWatts("fridgeFreezer")
 end
 
 --- Queues replacing the measured load of `bank` with appliances of the kinds `names`, and letting
@@ -237,7 +219,7 @@ end
 function T.applyLoad(self, bank, names)
     local appliances = {}
     for i, name in ipairs(names) do
-        appliances[i] = { name = name, watts = T.applianceWatts({ name }) }
+        appliances[i] = { name = name, watts = Yardsticks.applianceWatts(name) }
     end
     T.onRecord(self, bank, "applyLoad", { appliances = appliances })
 end
@@ -276,6 +258,23 @@ function T.waitForStatus(self, bank, check, what)
         local status = T.clientStatus(bank)
         return status ~= nil and check(status)
     end, what)
+end
+
+--- Queues moving the clock to a minute before `hour` at ten times speed, so that the clock itself
+--- crosses the hour (a jump fires EveryTenMinutes, but EveryHours needs a crossing inside
+--- GameTime.update), and a wait until this client has the status of `bank`'s pass at that crossing;
+--- missing `what` if it never comes. `bank` is watched (T.watch). A pass is
+--- stamped with the world's age (Clock.now), which can lag the time of day setTime sets by most of a
+--- minute, so the time of day can't pick it out: the jump puts it about an hour past the last
+--- status, while anything else that settles the bank meanwhile counts minutes.
+function T.runToHourlyPass(self, bank, hour, what)
+    local last
+    T.step(function()
+        last = T.clientStatus(bank).hour
+        T.setTime(self, hour - 1 / 60)
+        T.setMultiplier(self, 10)
+    end)
+    T.waitForStatus(self, bank, function(status) return status.hour >= last + 0.5 end, what)
 end
 
 --- Queues watching `bank`'s status as the status window does, until the test ends, and a wait

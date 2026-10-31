@@ -16,6 +16,7 @@ local SolarMaintainer = require "RenewableEnergy/Gadgets/SolarMaintainer"
 local Sprites = require "RenewableEnergy/Sprites"
 local Treadmill = require "RenewableEnergy/PowerBank/Treadmill"
 local VehicleBattery = require "RenewableEnergy/Gadgets/VehicleBattery"
+local Wind = require "RenewableEnergy/Wind"
 
 local Kinds = {}
 local Fixtures = PZHarness.Fixtures
@@ -59,6 +60,7 @@ local FIND = {
     charger = SolarCellCharger.isCharger,
     wiredTreadmill = Treadmill.isWiredTile,
     generator = GeneratorReach.isVanillaGenerator,
+    wind = Wind.isCharger,
 }
 
 --- The object on the square at `at` ({ x, y, z }) drawn as `at.sprite`, else of the kind `at.kind`:
@@ -106,12 +108,10 @@ Kinds.RECORDS = {
         owner = function() return Digester end,
         build = buildEntity("digester", "RenewableEnergy/Biogas/DigesterSystem"),
         containers = function(object) return { hopper = object:getContainer() } end,
-        -- The air its square has now; the stink's ghosts, which only these reads use
-        -- (Stink.counted), since the game's corpse count is out of Lua's reach.
+        -- The air its square has now.
         extras = function(record, object, state)
             state.capacity = record:capacity()
             state.torn = record:isTorn()
-            state.ghosts = require("RenewableEnergy/Biogas/Stink").counted(record:key())
             state.eaten = Kinds.count(record.eaten)
             state.snapshot = #record.hopper
             if object then

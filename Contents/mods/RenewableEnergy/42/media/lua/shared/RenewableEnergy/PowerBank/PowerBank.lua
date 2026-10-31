@@ -17,6 +17,9 @@ RenewableEnergy.PowerBank = PowerBank
 PowerBank.SYSTEM_NAME = "renewable_energy_powerbank"
 -- The sendServerCommand module and command that carry a bank's status to the players watching it.
 PowerBank.COMMAND_MODULE, PowerBank.STATUS_COMMAND = "RenewableEnergyBankStatus", "status"
+-- Longer gaps than this between a bank's passes, or the storm clock's (PanelStorms), in hours (a
+-- save loaded after the clock jumped) count as this long, so no pass counts days of weather at once.
+PowerBank.LONGEST_PASS = 24
 
 -- Placed bank sprite, in any facing or fixed (Sprites.fixedTiles), to its Specs.banks row and the
 -- item it is.
@@ -101,6 +104,10 @@ function PowerBank.acceptItem(container, item)
     return false
 end
 
+-- A backup generator a failsafe can start is one plugged in within this many squares of its bank
+-- on either axis, on the bank's floor.
+PowerBank.BACKUP_REACH = 3
+
 --- The failsafe's thresholds, in percent of a bank's charge: below `start` it starts its generator,
 --- at `stop` it stops it (the FailsafeStartCharge and FailsafeStopCharge options).
 function PowerBank.failsafeRange()
@@ -160,6 +167,42 @@ end
 --- The bank the placed source `isoObject` is connected to, as { x, y, z }, or nil.
 function PowerBank.connectedBank(isoObject)
     return PowerBank.bankOfSource(isoObject:getX(), isoObject:getY(), isoObject:getZ())
+end
+
+--- How far a source may be from the bank it is connected to, { tiles, levels }: as far as a
+--- generator powers (IsoGenerator), a radius of the Generator Tile Range option in tiles and the
+--- Generator Vertical Power Range option in floors up or down.
+function PowerBank.sourceReach()
+    return { tiles = SandboxVars.GeneratorTileRange, levels = SandboxVars.GeneratorVerticalPowerRange }
+end
+
+--- Whether a source at x, y, z is within reach (PowerBank.sourceReach) of `bank`, anything with x,
+--- y and z.
+function PowerBank.inSourceReach(bank, x, y, z)
+    local reach = PowerBank.sourceReach()
+    return IsoUtils.DistanceToSquared(x, y, bank.x, bank.y) <= reach.tiles * reach.tiles
+        and math.abs(z - bank.z) <= reach.levels
+end
+
+--- Why `bank` can't take a source that takes `slots` input slots now, or nil, in this order: "no
+--- bank"; `placeRefusal(bankPosition)`, why the source can't feed that bank from where it stands;
+--- the bank not connected itself (its own Connect Bank, as a generator's); too few input slots
+--- free in this side's summary, which the authority recounts from the bank's container first.
+--- Sources already on a bank stay when it is disconnected.
+function PowerBank.sourceRefusal(bank, slots, placeRefusal)
+    local summary = PowerBank.isBank(bank) and PowerBank.currentSummary(bank)
+    if not summary then
+        return "no bank"
+    end
+    local placed = placeRefusal(Squares.positionOf(bank))
+    if placed then
+        return placed
+    elseif not bank:isConnected() then
+        return "Tooltip_RenewableEnergy_BankNotConnected"
+    elseif slots > summary.freeSlots then
+        return "Tooltip_RenewableEnergy_NoInputSlot"
+    end
+    return nil
 end
 
 GlobalObjects.declare(PowerBank, {

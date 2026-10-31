@@ -1,17 +1,12 @@
 -- The authority's half of the check that the map's solar sites make sense where they stand: what
--- the metagrid says of each spot, read without loading it. Only registers a check, so a --stay
--- rerun loads it again (RELOAD_FILES); RenewableEnergyTestHelpers.lua says how checks work.
+-- the metagrid says of each spot, read without loading it.
 
 local Sprites = require "RenewableEnergy/Sprites"
 require "PZHarness/ServerChecks"
 local GasKit = require "RenewableEnergy/GasLine/GasKit"
 local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
 local SolarSites = require "RenewableEnergy/World/SolarSites"
-local Sources = require "RenewableEnergy/PowerBank/Sources"
-
-
--- Site kinds that are an arrow board on the road and nothing else.
-local ARROW_BOARD_KINDS = { roadWorks = true, checkpoint = true }
+local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 
 -- A homestead kind's spots make sense on the map: its find and generator outdoors, its wind
 -- charger within reach of its bank in a room, its generator beside a gasifier or within a
@@ -25,7 +20,7 @@ local function expectHomesteadSpots(expect, metaGrid, site, kind)
     if kind.wind and outdoors("windCharger") then
         local at, bank = site.windCharger, site.bank
         if expect(bank ~= nil and metaGrid:getRoomAt(bank[1], bank[2], bank[3]) ~= nil, site.name .. "'s bank is in no room") then
-            expect(Sources.isInReach({ x = bank[1], y = bank[2], z = bank[3] }, at[1], at[2], at[3]),
+            expect(PowerBank.inSourceReach({ x = bank[1], y = bank[2], z = bank[3] }, at[1], at[2], at[3]),
                 site.name .. "'s wind charger is out of its bank's reach")
         end
     end
@@ -91,13 +86,14 @@ PZHarness.checkHandler("sitesPlacedSensibly", function(expect)
                 expect(site.house ~= nil and metaGrid:getRoomAt(site.house[1], site.house[2], 0) ~= nil,
                     site.name .. "'s garden lights are at no building")
             end
-            if ARROW_BOARD_KINDS[site.kind] then
-                expect(site.arrowBoard ~= nil, site.name .. " has no arrow board spot")
-            end
-            if site.arrowBoard then
+            if kind.arrowBoard then
                 local spot = site.arrowBoard
-                expect(metaGrid:getRoomAt(spot[1], spot[2], spot[3]) == nil and IsoDirections[spot[4]] ~= nil,
-                    site.name .. "'s arrow board is indoors or faces nowhere")
+                if expect(spot ~= nil, site.name .. " has no arrow board spot") then
+                    expect(metaGrid:getRoomAt(spot[1], spot[2], spot[3]) == nil and IsoDirections[spot[4]] ~= nil,
+                        site.name .. "'s arrow board is indoors or faces nowhere")
+                end
+            else
+                expect(site.arrowBoard == nil, site.name .. " has an arrow board spot its kind never places")
             end
             expectHomesteadSpots(expect, metaGrid, site, kind)
         end

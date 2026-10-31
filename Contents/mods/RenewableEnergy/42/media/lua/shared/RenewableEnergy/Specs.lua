@@ -10,8 +10,10 @@ local Specs = {}
 
 -- The tools wiring jobs take, as materials (cf_commonlib's Materials): a tag, and the item a
 -- tooltip names for it, as vanilla names the wrench its jobs take.
-local SCREWDRIVER = { tool = "SCREWDRIVER", item = "Base.Screwdriver" }
-local WRENCH = { tool = "WRENCH", item = "Base.Wrench" }
+Specs.SCREWDRIVER = { tool = "SCREWDRIVER", item = "Base.Screwdriver" }
+Specs.WRENCH = { tool = "WRENCH", item = "Base.Wrench" }
+-- Lighting a fire takes one use of a match or lighter, as a campfire does.
+Specs.FIRE_STARTER = { tool = "START_FIRE", item = "Base.Matches", useOne = true }
 
 -- Batteries by item type. wh is capacity at full condition; cyclesAt50 is how many discharges of
 -- half the new capacity use up a battery's condition (Battery.cycleWear), so one carrying such a
@@ -22,7 +24,7 @@ Specs.batteries = {
     ["Base.CarBattery2"] = { wh = 600, cyclesAt50 = 300 },
     ["Base.CarBattery3"] = { wh = 600, cyclesAt50 = 300 },
     ["RenewableEnergy.DeepCycleBattery"] = { wh = 1260, cyclesAt50 = 750 },
-    ["RenewableEnergy.L16Battery"] = { wh = 2100, cyclesAt50 = 1500, wiring = { tools = { SCREWDRIVER, WRENCH } } },
+    ["RenewableEnergy.L16Battery"] = { wh = 2100, cyclesAt50 = 1500, wiring = { tools = { Specs.SCREWDRIVER, Specs.WRENCH } } },
     -- Homemade from open glass jars and soft pipe lead: heavy for what it holds, and short-lived.
     ["RenewableEnergy.JarBattery"] = { wh = 400, cyclesAt50 = 150 },
 }
@@ -137,10 +139,10 @@ Specs.banks = {
 -- Inverters set skill/xp per type. Every part takes a screwdriver, as vanilla's battery, radio and
 -- headlights do in a car.
 Specs.wiring = {
-    battery = { seconds = 30, wire = 1, scrap = 0, tools = { SCREWDRIVER }, skill = 0, xp = 5 },
-    inverter = { seconds = 60, wire = 2, scrap = 0, tools = { SCREWDRIVER } },
-    charger = { seconds = 30, wire = 1, scrap = 0, tools = { SCREWDRIVER }, skill = 0, xp = 5 },
-    controller = { seconds = 60, wire = 2, scrap = 1, tools = { SCREWDRIVER }, skill = 3, xp = 15 },
+    battery = { seconds = 30, wire = 1, scrap = 0, tools = { Specs.SCREWDRIVER }, skill = 0, xp = 5 },
+    inverter = { seconds = 60, wire = 2, scrap = 0, tools = { Specs.SCREWDRIVER } },
+    charger = { seconds = 30, wire = 1, scrap = 0, tools = { Specs.SCREWDRIVER }, skill = 0, xp = 5 },
+    controller = { seconds = 60, wire = 2, scrap = 1, tools = { Specs.SCREWDRIVER }, skill = 3, xp = 15 },
 }
 
 -- Electricity XP for each module of a panel the first time it is ever connected to a bank.

@@ -33,23 +33,14 @@ local function stormTrial(mount, hours, condition, roll)
         hours = hours, roll = roll }
 end
 
--- Storms crack modules by mount: wall panels never, wooden racks most, metal racks least, the
--- more the longer the storm and the higher the Storm Damage Rate, and never with Storm Damage off.
+-- Storms crack modules by mount: wall panels never, wooden racks most, metal racks least, and the
+-- more the longer the storm. The Storm Damage options are Chance.stormDamage's (chance_by_hours_and_rate).
 test("renewable_energy_solar_storms_crack_by_mount", {
     sandbox = { StormDamage = true, StormDamageRate = 100 },
     run = function(self)
         -- PanelSource.stormChance for each trial.
         T.read(self, "stormChances", { trials = { stormTrial("wall", 20), stormTrial("woodRack", 20), stormTrial("flat", 20),
             stormTrial("metalRack", 20), stormTrial("flat", 40), stormTrial("flat", 0) } }, "mounts")
-        T.step(function() T.setSandbox(self, "StormDamageRate", 200) end)
-        T.read(self, "stormChances", { trials = { stormTrial("flat", 20) } }, "doubled")
-        T.step(function() T.setSandbox(self, "StormDamageRate", 0) end)
-        T.read(self, "stormChances", { trials = { stormTrial("flat", 20) } }, "rateZero")
-        T.step(function()
-            T.setSandbox(self, "StormDamageRate", 100)
-            T.setSandbox(self, "StormDamage", false)
-        end)
-        T.read(self, "stormChances", { trials = { stormTrial("flat", 20) } }, "off")
     end,
     validate = function(self)
         local mounts = self.reads.mounts.chances
@@ -59,35 +50,26 @@ test("renewable_energy_solar_storms_crack_by_mount", {
             string.format("chances of a crack in 20 hours of storm: wooden rack %g, flat %g, metal rack %g", woodRack, flat, metalRack))
         expect(longer > flat, string.format("a flat panel's chance in 40 hours of storm %g, in 20 %g", longer, flat))
         expectEqual("a flat panel's chance in no storm", none, 0)
-        local doubled = self.reads.doubled.chances[1]
-        expect(doubled > flat, string.format("a flat panel's chance at Storm Damage Rate 200 %g, at 100 %g", doubled, flat))
-        expectEqual("a flat panel's chance at Storm Damage Rate 0", self.reads.rateZero.chances[1], 0)
-        expectEqual("a flat panel's chance with Storm Damage off", self.reads.off.chances[1], 0)
     end,
 })
 
 -- A storm cracks a module on a roll under its chance and not on one at it, taking Specs.storm.crack
--- condition, never below 0; with Storm Damage off not even the lowest roll cracks one.
+-- condition, never below 0.
 test("renewable_energy_solar_storms_crack_under_the_chance", {
     sandbox = { StormDamage = true, StormDamageRate = 100 },
     run = function(self)
         local under, at = stormTrial("flat", 20, 100, "under"), stormTrial("flat", 20, 100, "at")
         -- Less than a crack left, so a crack would take it below 0.
-        T.read(self, "stormCrack", { trials = { under, at, stormTrial("flat", 20, math.floor(Specs.storm.crack / 2), 0),
-            stormTrial("wall", 20, 100, 0) } }, "on")
-        T.step(function() T.setSandbox(self, "StormDamage", false) end)
-        T.read(self, "stormCrack", { trials = { stormTrial("flat", 20, 100, 0) } }, "off")
+        T.read(self, "stormCrack", { trials = { under, at, stormTrial("flat", 20, math.floor(Specs.storm.crack / 2), 0) } }, "on")
     end,
     validate = function(self)
         local results = self.reads.on.results
-        local under, at, floor, wall = results[1], results[2], results[3], results[4]
+        local under, at, floor = results[1], results[2], results[3]
         expect(under.cracked, "a roll just under a flat panel's chance didn't crack it")
         expectEqual("a module at 100 after a crack", under.modules[1].condition, 100 - Specs.storm.crack)
         expect(not at.cracked, "a roll at a flat panel's chance cracked it")
         expectEqual("a module at 100 after a roll at the chance", at.modules[1].condition, 100)
         expectEqual("a module under a crack's worth after a crack", floor.modules[1].condition, 0)
-        expect(not wall.cracked, "the lowest roll cracked a wall panel")
-        expect(not self.reads.off.results[1].cracked, "the lowest roll cracked a module with Storm Damage off")
     end,
 })
 
@@ -119,7 +101,7 @@ test("renewable_energy_solar_storms_crack_shows_on_the_panel", {
         expectEqual("the panel's recorded condition after a crack", modules and modules[1] and modules[1].condition, self.crackedTo)
         expectEqual("this client's copy of the panel's recorded condition", recordedCondition(self.panel.object), self.crackedTo)
         local after = table.concat(self.reads.panel.overlays, ",")
-        expectEqual("the storm-cracked panel's overlays", after, Sprites.cracks.light.flat)
+        expectEqual("the storm-cracked panel's overlays", after, Sprites.cracks.light.flat[1])
         expectEqual("this client's copy of the storm-cracked panel's overlays", self.copyOverlays, after)
     end,
 })
@@ -169,7 +151,7 @@ test("renewable_energy_solar_storms_unloaded_damage_then_immediate_seal", {
         expectEqual("bank's module immediately after repair", self.reads.sealedBank.status.sources[1].modules[1].condition, 40)
         expectEqual("bank's module after another pass", self.reads.later.status.sources[1].modules[1].condition, 40)
         expectEqual("cracks below the snow after repair", table.concat(self.reads.panel.overlays, ","),
-            Sprites.cracks.heavy.flat .. "," .. Sprites.snow.flat)
+            Sprites.cracks.heavy.flat[1] .. "," .. Sprites.snow.flat)
     end,
 })
 

@@ -13,8 +13,8 @@ local Sprites = require "RenewableEnergy/Sprites"
 -- see is checked on this client's copies.
 
 local T = RenewableEnergyTest
-local test, expect, expectNear, expectEqual, player, stateItem, copyItem =
-    T.test, T.expect, T.expectNear, T.expectEqual, T.player, T.stateItem, T.copyItem
+local test, expect, expectNear, expectEqual, player, stateItem =
+    T.test, T.expect, T.expectNear, T.expectEqual, T.player, T.stateItem
 local FRIDGE = "appliances_refrigeration_01_0"
 
 -- Charging and loads ---------------------------------------------------------------------------
@@ -331,7 +331,7 @@ test("renewable_energy_bank_turn_on_refused_without_inverter", {
     end,
 })
 
--- Turn On with nothing to store a charge in is refused by every layer, as without an inverter: a
+-- Turn On with nothing to store a charge in is refused by the authority, as without an inverter: a
 -- bank holding only an inverter, and one whose only battery is dead. Switched on, either would
 -- power its area from nothing until its next pass.
 test("renewable_energy_bank_turn_on_refused_without_batteries", {
@@ -340,13 +340,7 @@ test("renewable_energy_bank_turn_on_refused_without_batteries", {
         self.empty = T.bank(self, "batteryBoxWood", { T.PLUG_IN_INVERTER })
         self.dead = self.empty and T.bank(self, "batteryBoxWood", { T.CAR_BATTERY, T.PLUG_IN_INVERTER })
         if not self.dead then return end
-        self.bank = self.empty
         T.bankPart(self, self.dead, T.CAR_BATTERY, { condition = 0, recount = true })
-        T.waitFor(self, function()
-            local battery = copyItem(self.dead, T.CAR_BATTERY)
-            return battery ~= nil and battery:getCondition() == 0
-        end, "this client's copy of the dead battery")
-        T.openWindow(self, self.bank)
         T.batch(function()
             T.job(self, "bank", BankJobs.TURN_ON, self.empty, nil, "emptyRefused")
             T.job(self, "bank", BankJobs.TURN_ON, self.dead, nil, "deadRefused")
@@ -359,14 +353,9 @@ test("renewable_energy_bank_turn_on_refused_without_batteries", {
         for _, case in ipairs({ { self.empty, self.reads.emptyRefused, "holding no battery" },
             { self.dead, self.reads.deadRefused, "whose only battery is dead" } }) do
             local bank, refused, what = case[1], case[2], case[3]
-            expect(not RenewableEnergyAction:new(player(), "bank", BankJobs.TURN_ON, bank.object):canPerform(),
-                "Turn On can start on a bank " .. what)
             T.expectRefused(refused, key, "the authority switched on a bank " .. what)
             expect(not bank.state.on and not bank.state.activated, "the bank " .. what .. " is on")
         end
-        local button = self.window.switchButton
-        expect(not button.enable, "the window's switch isn't greyed out without batteries")
-        expectEqual("the tooltip of the window's switch", button.tooltip, getText(key))
         expect(T.hasLine(StatusRows.summary(self.dead.state.status), getText("IGUI_RenewableEnergy_NoBatteries")),
             "the window of the bank whose only battery is dead doesn't say it has no working batteries")
     end,

@@ -31,11 +31,11 @@ local SolarSites = {}
 SolarSites.SYSTEM_NAME = "RenewableEnergySolarSites"
 
 -- What each kind of site puts at its spots: how many of its panel spots it uses, how many
--- modules each panel holds (a mount's full load if not given), the BANK_STOCK of its bank, and
--- whether its house gets garden lights. A homestead kind has a RuralFinds find, worn as the
--- countryside leaves one: `wind`, a wind charger wired to a bank of that BANK_STOCK; `gas`, a gas
--- source of that find piped to a generator with the Gas Conversion Kit; and `pamphlet`, a FEMA
--- pamphlet in a container of its house.
+-- modules each panel holds (a mount's full load if not given), the BANK_STOCK of its bank,
+-- whether its house gets garden lights, and whether it has an arrow board on the road. A
+-- homestead kind has a RuralFinds find, worn as the countryside leaves one: `wind`, a wind charger
+-- wired to a bank of that BANK_STOCK; `gas`, a gas source of that find piped to a generator with
+-- the Gas Conversion Kit; and `pamphlet`, a FEMA pamphlet in a container of its house.
 SolarSites.KINDS = {
     stockTank = { panels = { min = 1, max = 1 }, modules = { min = 1, max = 2 } },
     farmRoof = { panels = { min = 3, max = 4 }, bank = "farmHouse", gardenLights = true },
@@ -43,8 +43,8 @@ SolarSites.KINDS = {
     relay = { panels = { min = 2, max = 2 }, bank = "relay" },
     powerYard = { bank = "powerYard" },
     ranger = { panels = { min = 2, max = 4 }, bank = "ranger" },
-    roadWorks = {},
-    checkpoint = {},
+    roadWorks = { arrowBoard = true },
+    checkpoint = { arrowBoard = true },
     windFarm = { wind = "windFarm" },
     homestead = { gas = "digester" },
     prepper = { gas = "gasifier", pamphlet = true },
@@ -118,14 +118,14 @@ local function farEnd(spot)
     return getSquare(spot.toX, spot.toY, spot.toZ)
 end
 
--- A homestead's generator on `square`: plugged into the house, run down and nearly dry, off.
-local function placeGenerator(square)
-    local spec = SolarSites.GENERATOR
+--- A Base.Generator on `square`, plugged in and off, at `condition` with `fuel` litres in its
+--- tank: a homestead's, run down and nearly dry (GENERATOR).
+function SolarSites.placeGenerator(square, condition, fuel)
     -- On a server the new generator goes to the clients at once, and each setter after that syncs.
     local generator = IsoGenerator.new(instanceItem("Base.Generator"), square:getCell(), square)
     generator:setConnected(true)
-    generator:setCondition(Chance.between(spec.condition.min, spec.condition.max))
-    generator:setFuel(Chance.within(spec.fuel.min, spec.fuel.max))
+    generator:setCondition(condition)
+    generator:setFuel(fuel)
     return generator
 end
 
@@ -137,18 +137,26 @@ local function notFreeIndoors(square)
     end
 end
 
+-- A square of a building, whose house the garden lights and pamphlet spots fill; nil if the square
+-- is one, else why not.
+local function notInBuilding(square)
+    if not square:getBuilding() then
+        return "no building"
+    end
+end
+
 -- What a spot (its global object's modData) puts down on its square, by its `what`. A spot that
 -- `waits` is placed at a later minute once `ready(square, spot)`, if given, says all it needs is
 -- loaded: vehicles can't safely join the world while their chunk is still loading. A `line` puts
 -- things down at both its ends, the far one (`toX`, `toY`, `toZ`) maybe in another chunk, once both
 -- are loaded (placeLines). `refuses(square, spot)`, if given, says why what stands on its squares
--- now keeps it out, or nil; on open ground that is RuralFinds' rule, indoors a free floor. A mount
--- on a roof or a wall goes where the map gives it. Its `place` returns whether the game took it. A
--- refused spot is kept and retried when its chunk next loads.
+-- now keeps it out, or nil; on open ground that is RuralFinds' rule, indoors a free floor, at a
+-- house a building. A mount on a roof or a wall goes where the map gives it. Its `place` returns
+-- whether the game took it. A refused spot is kept and retried when its chunk next loads.
 local SPOTS = {
     panel = {
         refuses = function(square, spot)
-            if MOUNTS[spot.mount].kind == "rack" and not RuralFinds.canStand(square) then
+            if SolarSites.mountKind(spot.mount) == "rack" and not RuralFinds.canStand(square) then
                 return "no open ground for a rack"
             end
         end,
@@ -160,7 +168,10 @@ local SPOTS = {
     },
     bank = {
         refuses = notFreeIndoors,
-        place = function(square, spot) return WorldSpawns.placeBank(square, spot.stock) ~= nil end,
+        place = function(square, spot)
+            WorldSpawns.placeBank(square, spot.stock)
+            return true
+        end,
     },
     -- A crate a world armed at the power yard before the yard lost it (WorldSpawns.CRATE_STOCK).
     crate = {
@@ -173,11 +184,9 @@ local SPOTS = {
     -- The promise is saved with the house's garden light rolls, so it outlives a quit before the
     -- house's surroundings load, and the house's one roll keeps it.
     gardenLights = {
+        refuses = notInBuilding,
         place = function(square)
-            local building = square:getBuilding()
-            if building then
-                GardenLights.promise(building:getDef())
-            end
+            GardenLights.promise(square:getBuilding():getDef())
             return true
         end,
     },
@@ -194,17 +203,13 @@ local SPOTS = {
             return RuralFinds.refusal("wind", square) or notFreeIndoors(farEnd(spot))
         end,
         place = function(square, spot)
-            local bankSquare = farEnd(spot)
-            RuralFinds.placeAt("wind", square)
-            local bank = WorldSpawns.placeBank(bankSquare, spot.stock)
-            if bank then
-                local charger = Sources.findOn(square)
-                local why = not charger and "no charger" or Sources.connectRefusal(charger, Squares.positionOf(bank))
-                if why then
-                    print("RenewableEnergy: the wind charger at " .. square:getX() .. "," .. square:getY() .. " stays unwired: " .. why)
-                else
-                    SourceSite.connectSource(charger, bank)
-                end
+            local charger = RuralFinds.placeAt("wind", square)
+            local bank = WorldSpawns.placeBank(farEnd(spot), spot.stock)
+            local why = Sources.connectRefusal(charger, Squares.positionOf(bank))
+            if why then
+                print("RenewableEnergy: the wind charger at " .. square:getX() .. "," .. square:getY() .. " stays unwired: " .. why)
+            else
+                SourceSite.connectSource(charger, bank)
             end
             return true
         end,
@@ -223,7 +228,10 @@ local SPOTS = {
         end,
         place = function(square, spot)
             local source = RuralFinds.placeAt(spot.source, square)
-            GasLines.fit(placeGenerator(farEnd(spot)), source)
+            local spec = SolarSites.GENERATOR
+            local generator = SolarSites.placeGenerator(farEnd(spot), Chance.between(spec.condition.min, spec.condition.max),
+                Chance.within(spec.fuel.min, spec.fuel.max))
+            GasLines.fit(generator, source)
             return true
         end,
     },
@@ -234,11 +242,9 @@ local SPOTS = {
             local building = square:getBuilding()
             return building == nil or building:getDef():isFullyStreamedIn()
         end,
+        refuses = notInBuilding,
         place = function(square)
-            local building = square:getBuilding()
-            if building then
-                RuralFinds.leaveReading(building:getDef(), RuralFinds.PAMPHLET)
-            end
+            RuralFinds.leaveReading(square:getBuilding():getDef(), RuralFinds.PAMPHLET)
             return true
         end,
     },
@@ -287,7 +293,7 @@ function SolarSites.addSite(site)
     if kind.gardenLights then
         addSpot(site.house[1], site.house[2], 0, { what = "gardenLights" })
     end
-    if site.arrowBoard then
+    if kind.arrowBoard then
         local spot = site.arrowBoard
         addSpot(spot[1], spot[2], spot[3], { what = "arrowBoard", facing = spot[4] })
     end

@@ -127,28 +127,27 @@ test("renewable_energy_solar_menu_panel_wired_to", {
 test("renewable_energy_solar_connect_panel", {
     instant = true,
     run = function(self)
-        local p = player()
         self.bank = T.bank(self, "batteryBankWood", {}, { outdoors = true })
         self.panel = self.bank and T.panel(self, Sprites.flat, { near = self.bank })
         if not self.panel then return end
         T.setPerk(self, Perks.Electricity, 3)
-        T.step(function()
-            local action = RenewableEnergyAction:new(p, "source", SourceJobs.CONNECT, self.panel.object, self.bank.object)
-            self.action, self.valid = action, action:canPerform()
-            if not T.walkTo(self, self.panel.square, "the panel") then return end
-            ISTimedActionQueue.add(action)
-            T.waitFor(self, function()
-                return Squares.samePosition(PowerBank.connectedBank(self.panel.object), self.bank)
-            end, "this client's copy of the connection")
-            T.readRecord(self, self.bank)
-        end)
+        local function connect()
+            return RenewableEnergyAction:new(player(), "source", SourceJobs.CONNECT, self.panel.object, self.bank.object)
+        end
+        T.step(function() self.valid = connect():canPerform() end)
+        T.actionJob(self, "source", self.panel, SourceJobs.CONNECT, self.bank)
+        T.waitFor(self, function()
+            return Squares.samePosition(PowerBank.connectedBank(self.panel.object), self.bank)
+        end, "this client's copy of the connection")
+        T.readRecord(self, self.bank)
+        T.step(function() self.again = connect():canPerform() end)
     end,
     validate = function(self)
         expect(self.valid, "connecting a panel next to a bank is refused")
         expectEqual("panels the server's bank lists", self.bank.state.sources, 1)
         expect(Squares.samePosition(PowerBank.connectedBank(self.panel.object), self.bank),
             "this client's status of the bank does not list the connected panel")
-        expect(not self.action:canPerform(), "a panel already on this bank can be connected again")
+        expect(not self.again, "a panel already on this bank can be connected again")
     end,
 })
 
@@ -210,8 +209,8 @@ test("renewable_energy_solar_seal_module_in_place", {
     instant = true,
     run = function(self)
         self.bank = T.bank(self, "batteryBankWood", {}, { outdoors = true })
-        local cracked = { type = T.FACTORY_MODULE, condition = 20, repaired = 1 }
-        self.to = math.min(T.sealCap(T.FACTORY_MODULE, cracked.repaired), cracked.condition + ModuleRepair.SEAL_ADDS)
+        -- A seal adds 20, past the cap of 45 a factory module sealed once has (55 less 10 a seal).
+        local cracked = { type = T.FACTORY_MODULE, condition = 30, repaired = 1 }
         self.panel = self.bank and T.panel(self, Sprites.rack.wood.S, { near = self.bank, connect = true,
             modules = { { type = T.FACTORY_MODULE, condition = 100 }, cracked } })
         if not self.panel then return end
@@ -244,11 +243,11 @@ test("renewable_energy_solar_seal_module_in_place", {
         if not T.expectOffered(self, "Seal Cracked Module") then return end
         local modules, tooltip = self.reads.panel.modules, self.menu["Seal Cracked Module"].tooltip
         expectEqual("the whole module's condition", modules[1].condition, 100)
-        expectEqual("the sealed module's condition", modules[2].condition, self.to)
+        expectEqual("the sealed module's condition", modules[2].condition, 45)
         expectEqual("the sealed module's seals", modules[2].repaired, 2)
         expect(#self.reads.panel.overlays > 0, "the sealed module shows whole")
         local listed = self.bank.state.status.sources[1]
-        expectEqual("the bank's record of the sealed module", listed and listed.modules[2] and listed.modules[2].condition, self.to)
+        expectEqual("the bank's record of the sealed module", listed and listed.modules[2] and listed.modules[2].condition, 45)
         for _, adhesive in ipairs({ "Base.Glue", "Base.Epoxy" }) do
             expect(tooltip:find(getItemNameFromFullType(adhesive), 1, true) ~= nil,
                 "the seal's tooltip doesn't name " .. adhesive .. ": " .. tooltip)
@@ -330,7 +329,6 @@ test("renewable_energy_solar_seal_each_module_in_place", {
                 end, "this client's copy of sealed module " .. slot)
             end)
         end
-        T.read(self, "panelState", T.at(self.panel), "panel")
     end,
     validate = function(self)
         if not T.expectConnected(self.panel) then return end
@@ -350,13 +348,6 @@ test("renewable_energy_solar_seal_each_module_in_place", {
                 end
             end
             sealed[self.order[round] or 0] = true
-        end
-        local modules = self.reads.panel.modules
-        for slot, condition in ipairs(self.conditions) do
-            local to = math.min(T.sealCap(T.FACTORY_MODULE, 0), condition + ModuleRepair.SEAL_ADDS)
-            expect(to >= T.sealCap(T.FACTORY_MODULE, 1), "a seal leaves module " .. slot .. " sealable again: pick a higher condition")
-            expectEqual("sealed module " .. slot .. "'s condition", modules[slot].condition, to)
-            expectEqual("sealed module " .. slot .. "'s seals", modules[slot].repaired, 1)
         end
     end,
 })

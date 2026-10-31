@@ -7,10 +7,10 @@
 -- lit tile it sees a lamp of its own, in its bulb's colour (this file). A server tells its clients
 -- when a light's lamp changes, so they draw it at once.
 
-local PlaceTracker = require "RenewableEnergy/PlaceTracker"
 local Places = require "RenewableEnergy/Places"
 local Sprites = require "RenewableEnergy/Sprites"
 local Jobs = require "cf_commonlib/Jobs"
+local PlaceTracker = require "cf_commonlib/PlaceTracker"
 local Squares = require "cf_commonlib/Squares"
 
 local SolarGardenLight = {}
@@ -107,21 +107,26 @@ SolarGardenLight.ADD_BULB = "AddBulb"
 
 -- The jobs at a light, by name (cf_commonlib's Jobs), each as long as vanilla's for a lamp's bulb
 -- at the default day length (ISLightActions), and named as vanilla names them; `with` is the bulb
--- Add Light Bulb puts in. SolarGardenLightServer does them.
+-- Add Light Bulb puts in. SolarGardenLightServer does them. Whether the light has a bulb decides
+-- which one a menu offers.
 SolarGardenLight.JOBS = {
     [SolarGardenLight.REMOVE_BULB] = {
-        minutes = 1, label = "ContextMenu_RemoveLightbulb",
-        blocker = function(character, light) return not SolarGardenLight.getBulb(light) and "no bulb" or nil end,
+        minutes = 1, label = "ContextMenu_RemoveLightbulb", hideBlocked = true,
+        blocker = function(character, light)
+            return not SolarGardenLight.getBulb(light) and "Tooltip_RenewableEnergy_NoBulb" or nil
+        end,
     },
     [SolarGardenLight.ADD_BULB] = {
-        minutes = 1, label = "ContextMenu_AddLightbulb",
-        blocker = function(character, light) return SolarGardenLight.getBulb(light) and "has a bulb" or nil end,
+        minutes = 1, label = "ContextMenu_AddLightbulb", hideBlocked = true,
+        blocker = function(character, light)
+            return SolarGardenLight.getBulb(light) and "Tooltip_RenewableEnergy_HasBulb" or nil
+        end,
         with = SolarGardenLight.isBulb, withMissing = "ContextMenu_AddLightbulb_RequiresBulb",
     },
 }
 
 Jobs.define(SolarGardenLight, {
-    subjectOf = function(light) return SolarGardenLight.isLight(light) and light or nil end, missing = "no light",
+    subjectOf = function(light) return SolarGardenLight.isLight(light) and light or nil end, missing = "Tooltip_RenewableEnergy_NoGardenLight",
 })
 
 -- Drawing side
@@ -190,7 +195,9 @@ local lights = PlaceTracker.new({
     sprites = { Sprites.gardenLight.off, Sprites.gardenLight.lit },
     matches = SolarGardenLight.isLight,
     onFound = SolarGardenLight.syncLamp,
-    onLost = removeLamp,
+    onLost = function(x, y, z)
+        removeLamp(Places.key(x, y, z))
+    end,
 })
 
 --- Calls `fn(light)` for every loaded light this side has seen.

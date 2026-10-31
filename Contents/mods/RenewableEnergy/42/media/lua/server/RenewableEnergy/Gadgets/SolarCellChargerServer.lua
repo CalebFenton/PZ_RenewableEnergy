@@ -10,7 +10,7 @@ local function cellWh()
     return SolarCellCharger.BATTERY_WH
 end
 
---- Adds `hours` of the panel's output under `sky` (Sun.skyNow, now if nil) to the batteries in
+--- Adds `hours` of the panel's output under `sky` (Sun.skyNow) to the batteries in
 --- `charger`, one use at a time to the emptiest, so a set fills evenly (Battery.shift). Returns the
 --- uses it added.
 function SolarCellCharger.charge(charger, hours, sky)
@@ -27,9 +27,8 @@ function SolarCellCharger.charge(charger, hours, sky)
     return added
 end
 
---- Charges every loaded charger the authority has seen.
-function SolarCellCharger.chargeAll(hours)
-    local sky = Sun.skyNow()
+--- Charges every loaded charger the authority has seen for `hours` under `sky` (Sun.skyNow).
+function SolarCellCharger.chargeAll(hours, sky)
     SolarCellCharger.eachLoaded(function(charger)
         SolarCellCharger.charge(charger, hours, sky)
     end)

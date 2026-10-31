@@ -5,7 +5,6 @@
 
 if isClient() then return end
 
-local PlaceTracker = require "RenewableEnergy/PlaceTracker"
 local Specs = require "RenewableEnergy/Specs"
 local Sprites = require "RenewableEnergy/Sprites"
 local StormNotice = require "RenewableEnergy/StormNotice"
@@ -15,6 +14,7 @@ local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local Sources = require "RenewableEnergy/PowerBank/Sources"
 local PanelStorms = require "RenewableEnergy/PowerBank/PanelStorms"
 local Items = require "cf_commonlib/Items"
+local PlaceTracker = require "cf_commonlib/PlaceTracker"
 local Tiles = require "cf_commonlib/Tiles"
 
 local PanelSource = {}
@@ -207,20 +207,17 @@ function PanelSource.status(entry, source)
 end
 
 --- Brings the loose panel `isoObject` up to the world's storm hours (PanelStorms.weatherObject),
---- writing a crack to it. A connected panel weathers on its bank's record instead. Returns whether
---- one cracked.
+--- writing a crack to it. A connected panel weathers on its bank's record instead.
 function PanelSource.weather(isoObject)
     if PowerBank.connectedBank(isoObject) then
-        return false
+        return
     end
     local kind, _, material = Sources.kindOf(isoObject)
     local source = { kind = kind, material = material, modules = Panel.modulesOf(isoObject, kind) }
-    if not PanelStorms.weatherObject(isoObject, source) then
-        return false
+    if PanelStorms.weatherObject(isoObject, source) then
+        PanelSource.writeModules(isoObject, source.modules)
+        StormNotice.tell(StormNotice.CRACKED_MODULE, isoObject:getX(), isoObject:getY(), isoObject:getZ())
     end
-    PanelSource.writeModules(isoObject, source.modules)
-    StormNotice.tell(StormNotice.CRACKED_MODULE, isoObject:getX(), isoObject:getY(), isoObject:getZ())
-    return true
 end
 
 local function isPanel(isoObject)
@@ -240,15 +237,9 @@ end
 -- Every loaded panel, each weathered as its chunk loads or it is placed.
 local panels = PlaceTracker.new({ sprites = panelSprites(), matches = isPanel, onFound = PanelSource.weather })
 
---- Weathers every loaded loose panel (PanelSource.weather). Returns how many cracked.
+--- Weathers every loaded loose panel (PanelSource.weather).
 function PanelSource.weatherLoaded()
-    local cracked = 0
-    panels:each(function(isoObject)
-        if PanelSource.weather(isoObject) then
-            cracked = cracked + 1
-        end
-    end)
-    return cracked
+    panels:each(PanelSource.weather)
 end
 
 -- EveryTenMinutes fires at most once a tick however much game time passed, so the storm clock

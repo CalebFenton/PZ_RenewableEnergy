@@ -61,8 +61,8 @@ function DigesterWindow:rowsOf(summary)
     local rows = {}
     row(rows, "IGUI_RenewableEnergy_State", stateText(summary), (summary.sour or not summary.started) and "bad" or nil)
     row(rows, "IGUI_RenewableEnergy_DigesterTemp", Format.temperature(summary.temp), summary.temp < COLD_C and "bad" or nil)
-    row(rows, "IGUI_RenewableEnergy_DigesterGas", Format.cubicMetres(summary.gas, 2) .. " / " .. Format.cubicMetres(summary.capacity, 2))
-    row(rows, "IGUI_RenewableEnergy_DigesterMaking", getText("IGUI_RenewableEnergy_PerDay", Format.cubicMetres(summary.madePerDay, 2)))
+    row(rows, "IGUI_RenewableEnergy_DigesterGas", Format.cubicMetres(summary.gas) .. " / " .. Format.cubicMetres(summary.capacity))
+    row(rows, "IGUI_RenewableEnergy_DigesterMaking", getText("IGUI_RenewableEnergy_PerDay", Format.cubicMetres(summary.madePerDay)))
     row(rows, "IGUI_RenewableEnergy_DigesterHolder", holderText(summary), (summary.torn or summary.leaking) and "bad" or nil)
     row(rows, "IGUI_RenewableEnergy_DigesterFill", Format.percent(summary.fill))
     row(rows, "IGUI_RenewableEnergy_DigesterHopper", tostring(summary.hopper))
@@ -75,7 +75,7 @@ function DigesterWindow:rowsOf(summary)
     end
     if summary.heaterLit then
         row(rows, "IGUI_RenewableEnergy_DigesterHeater", getText("IGUI_RenewableEnergy_HeaterBurning",
-            getText("IGUI_RenewableEnergy_PerDay", Format.cubicMetres(GasHeater.m3PerHour() * 24, 2))))
+            getText("IGUI_RenewableEnergy_PerDay", Format.cubicMetres(GasHeater.m3PerHour() * 24))))
     end
     if summary.leaking then
         row(rows, "IGUI_RenewableEnergy_DigesterLeak", getText("IGUI_RenewableEnergy_DigesterLeaking"), "bad")

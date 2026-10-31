@@ -37,7 +37,7 @@ function SolarMaintainer.detach(character, vehicle)
     return true
 end
 
---- Adds `hours` of the maintainer's output under `sky` (Sun.skyNow, now if nil) to the vehicle's
+--- Adds `hours` of the maintainer's output under `sky` (Sun.skyNow) to the vehicle's
 --- battery. The panel lies flat on the dashboard or roof, so a vehicle under a roof gets no sun.
 --- Returns the watt-hours it added.
 function SolarMaintainer.charge(vehicle, hours, sky)

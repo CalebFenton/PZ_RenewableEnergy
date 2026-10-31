@@ -8,6 +8,7 @@
 -- what the authority last put in).
 
 require "TimedActions/ISTakeGenerator"
+local Specs = require "RenewableEnergy/Specs"
 local Sprites = require "RenewableEnergy/Sprites"
 local Digester = require "RenewableEnergy/Biogas/Digester"
 local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
@@ -109,6 +110,13 @@ function GasKit.sourceKind(object)
     return kind and GasKit.SOURCES[kind] and kind or nil
 end
 
+--- The record of the source at `position` (a kit state's `source`, { x, y, z, kind }) on the
+--- authority, loaded or not, or nil for none. A source has canSupply(), supply(litres), capW(),
+--- wearFactor() and afterChange(), and a piped one setPipe(side).
+function GasKit.sourceRecord(position)
+    return position and GasKit.SOURCES[position.kind].owner.recordAt(position.x, position.y, position.z)
+end
+
 --- The watts the line carries to `generator` on the authority: its source's cap, or the kit's while
 --- the source is out of reach. Nil off gas, where nothing caps what it delivers.
 function GasKit.capW(generator)
@@ -116,8 +124,7 @@ function GasKit.capW(generator)
     if not (state and state.onGas) then
         return nil
     end
-    local source = state.source
-    local record = source and GasKit.SOURCES[source.kind].owner.recordAt(source.x, source.y, source.z)
+    local record = GasKit.sourceRecord(state.source)
     return record and record:capW() or GasKit.CAP_W
 end
 
@@ -163,7 +170,6 @@ GasKit.DISCONNECT = "DisconnectLine"
 GasKit.TO_GAS = "RunOnGas"
 GasKit.TO_PETROL = "RunOnPetrol"
 
-local WRENCH = { tool = "WRENCH", item = "Base.Wrench" }
 -- The kit's fitting is spanner work at the engine, which needs light to see the fittings by; a
 -- switch-over is a turn of the valve.
 local SPANNER_ANIM, SPANNER_SOUND = "VehicleWorkOnMid", "GeneratorRepair"
@@ -197,7 +203,7 @@ GasKit.JOBS = {
         blocker = function(character, generator)
             return GasKit.hasKit(generator) and "Tooltip_RenewableEnergy_HasKit" or nil
         end,
-        materials = { { perk = "Mechanics", need = 2 }, WRENCH, { item = GasKit.ITEM, need = 1 } },
+        materials = { { perk = "Mechanics", need = 2 }, Specs.WRENCH, { item = GasKit.ITEM, need = 1 } },
         xp = { perk = "Mechanics", amount = 15 },
     },
     [GasKit.REMOVE] = {
@@ -205,7 +211,7 @@ GasKit.JOBS = {
         blocker = withKit(function(state, generator)
             return generator:isActivated() and "Tooltip_RenewableEnergy_GeneratorRunning" or nil
         end),
-        materials = { WRENCH },
+        materials = { Specs.WRENCH },
     },
     -- To the source `source`: a digester within REACH on its level, or a gasifier beside it.
     [GasKit.CONNECT] = {
@@ -219,9 +225,9 @@ GasKit.JOBS = {
         materials = function(character, generator, source)
             local kind = GasKit.sourceKind(source)
             if not kind then
-                return { WRENCH }
+                return { Specs.WRENCH }
             end
-            return { WRENCH, GasKit.SOURCES[kind].line(generator, source) }
+            return { Specs.WRENCH, GasKit.SOURCES[kind].line(generator, source) }
         end,
         xp = { perk = "Mechanics", amount = 5 },
     },

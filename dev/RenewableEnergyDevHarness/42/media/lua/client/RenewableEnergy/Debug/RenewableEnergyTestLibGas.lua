@@ -27,6 +27,30 @@ function T.buildRecord(self, kind, entity, tile, prefer)
     return handle
 end
 
+-- Stink -----------------------------------------------------------------------------------------
+
+-- How long the smell may take to settle, in real milliseconds: a server sync and then some. Only a
+-- failing test waits this long.
+T.SMELL_MS = 8000
+
+--- Stands the character in the middle of `near`, a square or a handle.
+function T.standOn(near)
+    local at = T.at(near)
+    PZHarness.Fixtures.teleportToMiddle(T.player(), at.x, at.y, at.z)
+end
+
+--- Queues reads of the authority's smell until two in a row, a server update apart, show `level`,
+--- or T.SMELL_MS pass; the last read lands in self.reads[label]. A level that settles elsewhere ends
+--- in validate's failure.
+function T.waitForAuthoritySmell(self, near, level, label)
+    local last
+    T.readUntil(self, "stinkRead", T.at(near), label, function(read)
+        local settled = read.level == last
+        last = read.level
+        return settled and read.level == level
+    end, T.SMELL_MS)
+end
+
 -- Materials -------------------------------------------------------------------------------------
 
 -- The full type a material (cf_commonlib's Materials) names, if it is an item.

@@ -3,6 +3,7 @@ local Specs = require "RenewableEnergy/Specs"
 local SolarGardenLight = require "RenewableEnergy/Gadgets/SolarGardenLight"
 local GardenLightMenu = require "RenewableEnergy/UI/GardenLightMenu"
 local Sprites = require "RenewableEnergy/Sprites"
+local Sun = require "RenewableEnergy/Sun"
 
 -- The solar garden light (Gadgets/SolarGardenLight.lua, its options in UI/GardenLightMenu.lua): it lights by
 -- night on what its cell stored by day, in the colour of its bulb. The authority runs it, so the
@@ -82,7 +83,8 @@ local function startOfMinute(self)
 end
 
 -- At night a light stays lit while its battery holds any charge: a little more than the night
--- draws leaves it lit, exactly that much puts it out. By day the cell charges it, never past full.
+-- draws leaves it lit, exactly that much puts it out. By day the cell charges it at its rating in
+-- the sky the pass ran under (`sunlit`), never past full.
 local NIGHT_HOURS = 0.5
 local SPEC = SolarGardenLight.SPEC
 local NIGHT_WH = SPEC.nightWatts * NIGHT_HOURS
@@ -92,7 +94,7 @@ local GARDEN_LIGHT_HOURS = {
     { what = "with a little more than the night draws", hour = MIDNIGHT, charge = NIGHT_WH + 0.01, hours = NIGHT_HOURS,
         lit = true, after = 0.01 },
     { what = "with just what the night draws", hour = MIDNIGHT, charge = NIGHT_WH, hours = NIGHT_HOURS, lit = false, after = 0 },
-    { what = "empty at noon", hour = NOON, charge = 0, hours = 1, lit = false, low = 0, high = SPEC.wh },
+    { what = "empty at noon", hour = NOON, charge = 0, hours = 1, lit = false, sunlit = true },
     { what = "nearly full at noon", hour = NOON, charge = SPEC.wh - 0.01, hours = 1, lit = false,
         after = SPEC.wh },
 }
@@ -119,12 +121,12 @@ test("renewable_energy_gadgets_garden_light_update", {
             expectEqual("the server's tile of a light " .. row.what, reply.sprite, sprite)
             expectEqual("this client's tile of a light " .. row.what, copy.sprite, sprite)
             expectEqual("whether this client draws the lamp of a light " .. row.what, copy.lamp, row.lit)
-            if row.after then
-                expectNear("charge of a light " .. row.what, reply.charge, row.after)
-            else
-                expect(reply.charge > row.low and reply.charge <= row.high,
-                    "a light " .. row.what .. " ended at " .. reply.charge .. " Wh")
+            local after = row.after
+            if row.sunlit then
+                expect(reply.flat > 0, "no sun for a light " .. row.what)
+                after = Sun.wattsFrom(SPEC.watts, reply.flat, 0) * row.hours
             end
+            expectNear("charge of a light " .. row.what, reply.charge, after)
         end
     end,
 })
@@ -235,49 +237,6 @@ test("renewable_energy_gadgets_garden_light_coloured_bulb", {
     end,
 })
 
--- A bulb swapped while the light stays lit still recolours this client's lamp.
-test("renewable_energy_gadgets_garden_light_bulb_swap_recolours_lamp", {
-    hour = MIDNIGHT,
-    instant = true,
-    run = function(self)
-        local light = placeGardenLight(self, LIT_WH)
-        if not light then return end
-        runLight(self, light, LIT_WH, NIGHT_HOURS)
-        T.step(function() self.litBefore = lampOn(light.square) end)
-        T.read(self, "gardenLightSwapBulb", T.at(light, { kind = "light", bulb = GREEN }), "swap")
-        T.waitFor(self, function() return lampShines(light.square, GREEN) end, "this client's lamp shining green after the swap")
-    end,
-    validate = function(self)
-        if not expect(self.litBefore, "the light never lit") then return end
-        expect(self.reads.swap.lit, "after the swap the server's light is unlit")
-        expectEqual("the server's bulb after the swap", self.reads.swap.bulb, GREEN)
-    end,
-})
-
--- Queues placing the carried garden light back on `light`'s square with the moveables action and
--- a wait until this client has it.
-local function placeCarriedLight(self, light)
-    T.step(function()
-        local p = T.player()
-        local item = T.need(self, T.carried(SolarGardenLight.ITEM), "the carried garden light")
-        if not item then return end
-        -- The tile it was picked up as, lit or not, as the moveables cursor places it.
-        local sprite = item:getWorldSprite()
-        local here = p:getCurrentSquare()
-        PZHarness.Fixtures.teleportToMiddle(p, here:getX(), here:getY(), here:getZ())
-        local props = ISMoveableSpriteProps.new(sprite)
-        if not T.need(self, props:walkToAndEquip(p, light.square, "place", sprite), "a way to place the carried garden light") then
-            return
-        end
-        ISTimedActionQueue.add(ISMoveablesAction:new(p, light.square, "place", sprite, nil,
-            props:getFaceDirectionFromSpriteName(sprite), item, nil))
-        T.waitFor(self, function() return T.objectWithSprite(light.square, sprite) ~= nil end,
-            "this client's copy of the placed garden light")
-        T.server(self, "PZHarness.trackPlaced", T.at(light, { sprite = sprite }))
-        T.step(function() light.object = T.objectWithSprite(light.square, sprite) end)
-    end)
-end
-
 -- A picked-up light takes its lamp away with it, keeps its bulb and shines its colour when placed
 -- again.
 test("renewable_energy_gadgets_garden_light_pick_up_keeps_bulb", {
@@ -295,8 +254,9 @@ test("renewable_energy_gadgets_garden_light_pick_up_keeps_bulb", {
             local item = T.carriedFirst(self, SolarGardenLight.ITEM)
             self.carriedBulb = item and item.modData[SolarGardenLight.BULB_KEY]
         end)
-        placeCarriedLight(self, light)
-        runLight(self, light, nil, NIGHT_HOURS)
+        -- As the lit tile it was picked up as, which the moveables cursor places it as.
+        local placed = T.placeAsPlayer(self, light.square, SolarGardenLight.ITEM, Sprites.gardenLight.lit, nil, true)
+        runLight(self, placed, nil, NIGHT_HOURS)
         T.waitFor(self, function() return lampShines(light.square, GREEN) end, "this client's lamp shining green placed again")
     end,
     validate = function(self)

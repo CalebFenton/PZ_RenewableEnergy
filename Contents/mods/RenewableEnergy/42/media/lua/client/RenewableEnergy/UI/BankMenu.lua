@@ -36,15 +36,6 @@ local function queueConnectAll(playerNum, bank, sources)
     end
 end
 
--- "Car Battery (72%)": a wired part, told apart from its twins by its condition.
-local function partLabel(item)
-    return Format.withShare(item:getDisplayName(), Format.conditionShare(item:getFullType(), item:getCondition()))
-end
-
-local function isPart(item)
-    return PowerBank.partKind(item:getFullType()) ~= nil
-end
-
 -- The parts in the bank's container for which `matches(fullType)` holds, in its order.
 local function wiredParts(bank, matches)
     return Tables.fromList(bank:getContainer():getItems(), function(item) return matches(item:getFullType()) end)
@@ -66,7 +57,7 @@ end
 --- battery. Returns the submenu, or the unavailable option when the character carries no part.
 function BankMenu.addWireInOptions(playerNum, menu, bank)
     local character = getSpecificPlayer(playerNum)
-    local parts = Tables.fromList(character:getInventory():getAllEvalRecurse(isPart))
+    local parts = Tables.fromList(character:getInventory():getAllEvalRecurse(BankJobs.isPart))
     if #parts == 0 then
         local option = menu:addOption(getText("ContextMenu_RenewableEnergy_WireIn"))
         Needs.refuse(option, "Tooltip_RenewableEnergy_NothingToWire")
@@ -85,7 +76,7 @@ function BankMenu.addWireInOptions(playerNum, menu, bank)
             typeOption.iconTexture = script and script:getNormalTexture()
             byType[fullType] = itemsMenu
         end
-        local option = JobOptions.add(itemsMenu, playerNum, BankJobs, BankJobs.WIRE_IN, bank, item, partLabel(item))
+        local option = JobOptions.add(itemsMenu, playerNum, BankJobs, BankJobs.WIRE_IN, bank, item, Format.itemCondition(item))
         if option then
             option.itemForTexture = item
         end
@@ -105,7 +96,7 @@ function BankMenu.addUnwireOptions(playerNum, menu, bank)
     local submenu = JobOptions.addSubMenu(menu, getText("ContextMenu_RenewableEnergy_Unwire"))
     addAllBatteries(playerNum, submenu, BankJobs.UNWIRE, bank, parts)
     for _, item in ipairs(parts) do
-        JobOptions.add(submenu, playerNum, BankJobs, BankJobs.UNWIRE, bank, item, partLabel(item))
+        JobOptions.add(submenu, playerNum, BankJobs, BankJobs.UNWIRE, bank, item, Format.itemCondition(item))
     end
     return submenu
 end
@@ -117,11 +108,8 @@ function BankMenu.addRepairOptions(playerNum, menu, bank)
     if #parts == 0 then
         return nil
     end
-    local submenu = JobOptions.addSubMenu(menu, getText("ContextMenu_RenewableEnergy_Repair"))
-    for _, item in ipairs(parts) do
-        JobOptions.add(submenu, playerNum, BankJobs, BankJobs.REPAIR, bank, item, partLabel(item))
-    end
-    return submenu
+    return JobOptions.addEach(menu, playerNum, BankJobs, BankJobs.REPAIR, bank, parts,
+        getText("ContextMenu_RenewableEnergy_Repair"), Format.itemCondition)
 end
 
 function BankMenu.addBankOptions(playerNum, context, bank)
@@ -142,11 +130,10 @@ function BankMenu.addBankOptions(playerNum, context, bank)
         JobOptions.add(menu, playerNum, BankJobs, connected and BankJobs.DISCONNECT or BankJobs.CONNECT, bank)
     end
 
-    local sources, refusal, count = SourceJobs.connectBatch(character, bank)
+    local sources, batch, count = SourceJobs.connectBatch(character, bank)
     local connect = menu:addOption(getText("ContextMenu_RenewableEnergy_ConnectSourcesInReach", count), playerNum,
         queueConnectAll, bank, sources)
-    local dark = Needs.tooDark(character, SourceJobs.needsLight(SourceJobs.CONNECT), Action.TOO_DARK)
-    Needs.refuse(connect, (count > 0 and dark) or refusal)
+    JobOptions.showVerdict(connect, character, SourceJobs, SourceJobs.CONNECT, batch)
     BankMenu.addWireInOptions(playerNum, menu, bank)
     BankMenu.addUnwireOptions(playerNum, menu, bank)
     BankMenu.addRepairOptions(playerNum, menu, bank)

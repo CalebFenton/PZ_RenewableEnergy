@@ -1,7 +1,5 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
 local Items = require "cf_commonlib/Items"
-local ModuleRepair = require "RenewableEnergy/PowerBank/ModuleRepair"
-local Wear = require "RenewableEnergy/PowerBank/Wear"
 
 local T = RenewableEnergyTest
 
@@ -73,12 +71,6 @@ end
 --- The condition at `share` of `fullType`'s ConditionMax, such as a Specs.crackLooks threshold.
 function T.conditionAt(fullType, share)
     return math.floor(share * Items.conditionMaxOf(fullType) + 0.5)
-end
-
---- The most a seal brings a `fullType` module sealed `repaired` times before to: its
---- ModuleRepair.SEAL_CAP, a Wear.REPAIR_LIMIT_STEP lower for each seal.
-function T.sealCap(fullType, repaired)
-    return ModuleRepair.SEAL_CAP[fullType] - Wear.REPAIR_LIMIT_STEP * repaired
 end
 
 return T

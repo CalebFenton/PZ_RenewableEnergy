@@ -1,6 +1,5 @@
 -- The authority's half of the bank and panel tests: fixtures only the server's bank system
--- can build, and its passes, which a multiplayer client holds only copies of. Only registers handlers, so a --stay rerun loads it again
--- (RELOAD_FILES); RenewableEnergyTestHelpers.lua says how these handlers work.
+-- can build, and its passes, which a multiplayer client holds only copies of.
 
 require "PZHarness/ServerHandlers"
 require "PZHarness/ServerFixtures"
@@ -10,6 +9,7 @@ local GeneratorReach = require "cf_commonlib/GeneratorReach"
 local Items = require "cf_commonlib/Items"
 local Squares = require "cf_commonlib/Squares"
 local Kinds = require "RenewableEnergy/Debug/RenewableEnergyTestKinds"
+local ModFixtures = require "RenewableEnergy/Debug/RenewableEnergyFixtures"
 local BankJobs = require "RenewableEnergy/PowerBank/BankJobs"
 local BankSystem = require "RenewableEnergy/PowerBank/BankSystem"
 local Battery = require "RenewableEnergy/PowerBank/Battery"
@@ -22,6 +22,7 @@ local Place = require "RenewableEnergy/World/Place"
 local Places = require "RenewableEnergy/Places"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local SourceJobs = require "RenewableEnergy/PowerBank/SourceJobs"
+local SolarSites = require "RenewableEnergy/World/SolarSites"
 local Sprites = require "RenewableEnergy/Sprites"
 local Sun = require "RenewableEnergy/Sun"
 local TreadmillSource = require "RenewableEnergy/PowerBank/TreadmillSource"
@@ -53,14 +54,7 @@ handler("placeBank", function(player, args, defer)
     local square = PZHarness.squareAt(args)
     local items = args.items or {}
     Records.track(defer, player, { kind = "bank", x = args.x, y = args.y, z = args.z })
-    local bank = BankSystem.place(square, Sprites[args.kind][args.facing or "S"], nil, function(container)
-        for _, fullType in ipairs(items) do
-            local item = container:AddItem(fullType)
-            if item and Battery.isBattery(item) then
-                Battery.setCharge(item, args.charge or 1)
-            end
-        end
-    end)
+    local bank = ModFixtures.placeBank(square, Sprites[args.kind][args.facing or "S"], items, args.charge or 1)
     need(bank:getContainer():getItems():size() == #items, "every item of " .. table.concat(items, ", ") .. " in the bank")
     if args.connected == false then
         need(RenewableEnergyAction.completeJob(player, "bank", BankJobs.DISCONNECT, bank), "the bank disconnected")
@@ -121,10 +115,7 @@ end)
 handler("placeGenerator", function(player, args, defer)
     local square = PZHarness.squareAt(args)
     PZHarness.trackSquare(defer, player, args)
-    local generator = IsoGenerator.new(instanceItem("Base.Generator"), square:getCell(), square)
-    generator:setConnected(true)
-    generator:setFuel(args.fuel or 10)
-    generator:setCondition(100)
+    local generator = SolarSites.placeGenerator(square, 100, args.fuel or 10)
     if args.failsafe then
         Fixtures.newTile(square, Sprites.failsafe)
     end

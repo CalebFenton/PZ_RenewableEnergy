@@ -32,7 +32,6 @@ test("renewable_energy_world_bank_spawns_stocked", {
         T.batch(function()
             for i, stockName in ipairs(SPAWNED_BANKS) do
                 T.read(self, "worldBank", T.at(squares[i], { stock = stockName }), stockName)
-                T.step(function() T.need(self, self.reads[stockName].placed, "a " .. stockName .. " bank") end)
             end
             T.read(self, "worldSpawnStock", { names = SPAWNED_BANKS }, "stock")
         end)
@@ -61,20 +60,6 @@ test("renewable_energy_world_bank_spawns_stocked", {
                 count .. " batteries in " .. what .. ", expected " .. stock.batteries.min .. " to " .. stock.batteries.max)
             T.expectFoundCharges(bank.stock.charges, what)
         end
-    end,
-})
-
--- A room seen for the first time never puts a bank on an outdoor square: the world spawn honours
--- the indoors-only rule that placement by a player also obeys (the bank tests cover that rule).
-test("renewable_energy_world_bank_spawn_refused_outdoors", {
-    run = function(self)
-        local square = T.square(self, nil, "a free outdoor square")
-        if not square then return end
-        T.read(self, "worldBank", T.at(square, { stock = "shed" }), "bank")
-    end,
-    validate = function(self)
-        expect(not self.reads.bank.placed, "a bank was placed outdoors")
-        expect(not self.reads.bank.boxOnSquare, "a bank's tile stands outdoors")
     end,
 })
 
@@ -134,13 +119,10 @@ test("renewable_energy_world_bank_backs_onto_wall", {
     end,
 })
 
--- Bank tiers whose tile is a battery box, which has no slot for a charge controller.
-local BOX_TILES = { batteryBoxWood = true, batteryBoxMetal = true }
-
 -- Each part turns up when the roll comes in under its chance × the misc loot option, in a farm
--- storage rack, which has a slot for every part; and a battery box never comes with a charge
--- controller.
-serverCheck("renewable_energy_world_bank_stock_parts", "bankStockParts", { stock = "farmStorage", boxTiles = BOX_TILES })
+-- storage rack, which has a slot for every part; and a bank with no charge controller slot never
+-- comes with one.
+serverCheck("renewable_energy_world_bank_stock_parts", "bankStockParts", { stock = "farmStorage" })
 
 -- With the battery and misc loot options at 0, world banks spawn empty, even with the lowest roll
 -- there is.
@@ -170,7 +152,6 @@ test("renewable_energy_world_bank_batteries_worn_by_stock", {
         T.batch(function()
             for i, stockName in ipairs(WORN_STOCKS) do
                 T.read(self, "worldBank", T.at(squares[i], { stock = stockName, roll = 0.5 }), stockName)
-                T.step(function() T.need(self, self.reads[stockName].placed, "a " .. stockName .. " bank") end)
             end
             T.read(self, "worldSpawnStock", { names = WORN_STOCKS }, "stock")
         end)

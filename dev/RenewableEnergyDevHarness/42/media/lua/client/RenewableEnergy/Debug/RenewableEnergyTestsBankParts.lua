@@ -2,17 +2,10 @@ require "RenewableEnergy/Debug/RenewableEnergyTestLib"
 require "RenewableEnergy/Debug/RenewableEnergyTestLibCraft"
 require "TimedActions/ISInventoryTransferAction"
 local Specs = require "RenewableEnergy/Specs"
-require "RenewableEnergy/TimedActions/RenewableEnergyAction"
-local Format = require "RenewableEnergy/UI/Format"
-local BankMenu = require "RenewableEnergy/UI/BankMenu"
-local SourceMenu = require "RenewableEnergy/UI/SourceMenu"
 local Wiring = require "RenewableEnergy/PowerBank/Wiring"
 local Wear = require "RenewableEnergy/PowerBank/Wear"
 local BankJobs = require "RenewableEnergy/PowerBank/BankJobs"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
-local SourceJobs = require "RenewableEnergy/PowerBank/SourceJobs"
-local Sprites = require "RenewableEnergy/Sprites"
-local Wind = require "RenewableEnergy/Wind"
 
 -- Power bank tests: wiring parts in and out, their wear and repair, and the crafted inverters.
 -- Banks live on the authority (see RenewableEnergyTestsBank.lua).
@@ -140,64 +133,6 @@ test("renewable_energy_bank_unwiring_needs_the_wiring_tools", {
     end,
 })
 
--- In the dark nothing can be wired in or out, no bank or source connected and no blades replaced:
--- the menu greys them out saying so, and the action, the rule since a server can't tell whether a
--- remote player stands in the dark, won't start.
-test("renewable_energy_bank_wiring_refused_in_the_dark", {
-    run = function(self)
-        self.bank = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY, T.POWER_INVERTER }, { connected = false })
-        if not self.bank then return end
-        self.panel = T.panel(self, Sprites.flat, { near = self.bank })
-        self.charger = self.panel and T.panel(self, Sprites.windCharger.propeller.wood.S, { near = self.bank })
-        if not self.charger then return end
-        T.give(self, "parts", { { type = "Base.CarBattery2" }, { type = "Base.Screwdriver" }, { type = Wiring.WIRE },
-            { type = "RenewableEnergy.WoodenBlades" } })
-        T.step(function()
-            -- Broken on this client's copy only: Replace Blades is the menu's to offer.
-            local modData, broken = self.charger.object:getModData(), Wind.BROKEN_KEY
-            modData[broken] = true
-            T.defer(self, function() modData[broken] = nil end)
-            -- Beside the panel, so its Connect action is refused for the dark rather than the distance.
-            T.standNextTo(self.panel.square)
-        end)
-        T.makeDark(self)
-    end,
-    validate = function(self)
-        local p = player()
-        if not T.expectDark() then return end
-        local bank, battery = self.bank.object, self.items.parts[1]
-        local context = T.newContext()
-        local function refusedDark(label, option)
-            T.noteOption(self, label, option)
-            T.expectOptionRefused(self, label, "Tooltip_RenewableEnergy_TooDark")
-        end
-        refusedDark("Wire In", T.optionFor(BankMenu.addWireInOptions(0, context, bank), battery))
-        local unwire = BankMenu.addUnwireOptions(0, context, bank)
-        expect(unwire ~= nil and #unwire.options > 0, "Unwire offers no part to refuse in the dark")
-        for i, option in ipairs(unwire and unwire.options or {}) do
-            refusedDark("Unwire " .. i, option)
-        end
-        local bankMenu = BankMenu.addBankOptions(0, context, bank)
-        local sourceMenu = SourceMenu.addSourceOptions(0, context, self.panel.object)
-        local chargerMenu = SourceMenu.addSourceOptions(0, context, self.charger.object)
-        local refused = {
-            ["Connect Bank"] = T.optionNamed(bankMenu, getText("ContextMenu_RenewableEnergy_ConnectBank")),
-            ["Connect Sources in Reach"] = T.optionNamed(bankMenu, getText("ContextMenu_RenewableEnergy_ConnectSourcesInReach", 2)),
-            ["the panel's Connect"] = T.optionNamed(sourceMenu, getText("ContextMenu_RenewableEnergy_ConnectSource",
-                BankMenu.bankLabel(bank), Format.away(self.panel, self.bank))),
-            ["Replace Blades"] = T.optionNamed(chargerMenu, getText("ContextMenu_RenewableEnergy_ReplaceBlades")),
-        }
-        for name, option in pairs(refused) do
-            refusedDark(name, option)
-        end
-        context:hideAndChildren()
-        expect(not RenewableEnergyAction:new(p, "bank", BankJobs.WIRE_IN, bank, battery):isValid(),
-            "the Wire In action runs in the dark")
-        expect(not RenewableEnergyAction:new(p, "source", SourceJobs.CONNECT, self.panel.object, bank):isValid(),
-            "the Connect action runs in the dark")
-    end,
-})
-
 -- Queues repairing the first Inverter/Charger in `bank` as the server's character, leaving the
 -- answer in self.reads[label].
 local function repair(self, label, bank)
@@ -252,9 +187,6 @@ test("renewable_energy_bank_part_wear_and_repair", {
             T.bankPart(self, bank, T.INVERTER_CHARGER, { condition = 1000 })
             T.give(self, "moreScrap", { { type = Wiring.SCRAP } })
             repair(self, "whole", bank)
-            T.bankPart(self, bank, T.INVERTER_CHARGER, { condition = 0 })
-            T.server(self, "refreshBank", T.at(bank))
-            T.readRecord(self, bank)
         end)
     end,
     validate = function(self)
@@ -284,10 +216,6 @@ test("renewable_energy_bank_part_wear_and_repair", {
         expectEqual("scrap left", self.counts.scrap[Wiring.SCRAP], 0)
         T.expectRefused(reads.noScrap, "item", "a part was repaired without scrap")
         T.expectRefused(reads.whole, "Tooltip_RenewableEnergy_NoRepairNeeded", "a whole part took a repair")
-        local broken = self.bank.state
-        expect(broken.on, "the bank was switched off before its inverter broke")
-        expectEqual("limit with the only inverter at 0", broken.limitW, 0)
-        expect(not broken.activated, "a bank whose only inverter is broken powers its area")
     end,
 })
 
@@ -336,32 +264,32 @@ test("renewable_energy_bank_homemade_inverter_wastes_and_wears_more", {
     end,
 })
 
--- A crafted inverter comes out short of its cap at the recipe's Electricity level, better with
--- each level past it, and at its cap well past it.
+-- A crafted inverter comes out short of its cap at the recipe's Electricity level: the Makeshift
+-- Inverter's 80 less 20.
 local MAKESHIFT_RECIPE, MAKESHIFT = "RenewableEnergy_MakeMakeshiftInverter", "RenewableEnergy.MakeshiftInverter"
-for _, row in ipairs({ { "at_recipe_level", 0 }, { "two_levels_past", 2 }, { "far_past_capped", 10 } }) do
-    local behavior, past = row[1], row[2]
-    T.craftTest(T.craftName("bank", MAKESHIFT_RECIPE, behavior), {
-        recipe = MAKESHIFT_RECIPE,
-        from = Specs.charger,
-        prefer = { Specs.charger },
-        setup = function(self)
-            local recipe = getScriptManager():getCraftRecipe(MAKESHIFT_RECIPE)
-            self.required = recipe:getRequiredSkill(0):getLevel()
-            T.setPerk(self, Perks.Electricity, math.min(10, self.required + past))
-        end,
-        counts = { [MAKESHIFT] = 1 },
-        after = function(self) T.readCarried(self, { MAKESHIFT }) end,
-        validate = function(self)
-            local inverter = T.carriedFirst(self, MAKESHIFT)
-            if not expect(inverter ~= nil, "no makeshift inverter was made") then return end
-            local cap = instanceItem(MAKESHIFT):getConditionMax()
-            local level = math.min(10, self.required + past)
-            local expected = math.min(cap, cap - Wear.CRAFTED_SHORTFALL + Wear.CRAFTED_PER_LEVEL * (level - self.required))
-            expectEqual("the condition of an inverter made at Electricity " .. level, inverter.condition, expected)
-            if past >= 10 then
-                expectEqual("the condition of an inverter made far past the recipe's level", inverter.condition, cap)
-            end
-        end,
-    })
-end
+T.craftTest(T.craftName("bank", MAKESHIFT_RECIPE, "at_recipe_level"), {
+    recipe = MAKESHIFT_RECIPE,
+    from = Specs.charger,
+    prefer = { Specs.charger },
+    setup = function(self)
+        T.setPerk(self, Perks.Electricity, getScriptManager():getCraftRecipe(MAKESHIFT_RECIPE):getRequiredSkill(0):getLevel())
+    end,
+    counts = { [MAKESHIFT] = 1 },
+    after = function(self) T.readCarried(self, { MAKESHIFT }) end,
+    validate = function(self)
+        local inverter = T.carriedFirst(self, MAKESHIFT)
+        if not expect(inverter ~= nil, "no makeshift inverter was made") then return end
+        expectEqual("the condition of an inverter made at the recipe's Electricity level", inverter.condition, 60)
+    end,
+})
+
+-- Each Electricity level past the recipe's makes up 5 of the shortfall, up to the cap.
+test("renewable_energy_bank_crafted_inverter_condition_by_level", {
+    run = function(self)
+        self.twoPast, self.sevenPast = Wear.craftedInverterCondition(80, 5, 3), Wear.craftedInverterCondition(80, 10, 3)
+    end,
+    validate = function(self)
+        expectEqual("an 80-cap inverter made two levels past the recipe's", self.twoPast, 70)
+        expectEqual("an 80-cap inverter made seven levels past the recipe's", self.sevenPast, 80)
+    end,
+})

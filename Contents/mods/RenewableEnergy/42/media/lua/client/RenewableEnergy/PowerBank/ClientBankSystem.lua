@@ -41,12 +41,6 @@ local function keyOf(position)
     return Places.key(position.x, position.y, position.z)
 end
 
--- This client's copy of the bank at `position`.
-local function copyAt(position)
-    local globalObject = BankSystem.instance.system:getObjectAt(position.x, position.y, position.z)
-    return globalObject and globalObject:getModData()
-end
-
 --- `player` watches the status of `bank` (single player too): the server sends it now, after a
 --- fresh look at the bank, and after every change until unwatchStatus. The status window watches
 --- while it is open. Jobs that change a bank go through RenewableEnergyAction instead; besides
@@ -72,7 +66,7 @@ function BankSystem.unwatchStatus(player, bank)
         end
     end
     watching[key] = nil
-    local copy = copyAt(position)
+    local copy = PowerBank.objectAt(position.x, position.y, position.z)
     if copy then
         copy.status = nil
     end
@@ -82,7 +76,7 @@ end
 -- message: there the status window reads the bank on the authority.
 Events.OnServerCommand.Add(function(module, command, args)
     if module ~= PowerBank.COMMAND_MODULE or command ~= PowerBank.STATUS_COMMAND then return end
-    local copy = watching[keyOf(args)] and copyAt(args)
+    local copy = watching[keyOf(args)] and PowerBank.objectAt(args.x, args.y, args.z)
     if copy then
         copy.status = args.status
     end

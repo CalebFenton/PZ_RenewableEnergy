@@ -2,25 +2,13 @@
 -- modules, batteries and PART_TYPES a thorough player finds in each town of
 -- RenewableEnergyDevTownCensus, and the yardsticks that turn them into power. Client Lua: it
 -- requires WorldSpawns, SolarSites and Finds as it runs, which a single player game, the only one
--- --loot runs, has.
---
--- A town's finds are dev/loot/census.py's counts of its container tiles, rooms and vehicle stalls,
--- each times what it holds on average, plus what WorldSpawns' OnSeeNewRoom puts in its rooms
--- (each room kind's count over its odds) and the solar sites in its bounds. Expectations come
--- from the loot tables' weights the way the game rolls them (ItemPickerJava.getActualSpawnChance),
--- so they are exact for the lists and approximate where the game picks among them: a procedural
--- container picks a list by weightChance, at most `max` per room, and lists forced by zone, tile
--- or room are left out. Car batteries in room loot are counted apart: vanilla's, and every car
--- carries one besides. World banks, garage kit crates and arrow boards' battery boxes hold the
--- mean of their own stocking functions over sampled fills (RenewableEnergyLoot's worldStocks), and
--- a container keeps the cracked modules Finds.addCrackedModules gives it the chance of, so a
--- change to either reaches the report without an edit here.
+-- --loot runs, has. It reads the mod's own spawn rules (stocking functions, Finds, the loot tables)
+-- rather than copies of their numbers, so a change to one reaches the report without an edit here.
 
 local ModuleRepair = require "RenewableEnergy/PowerBank/ModuleRepair"
 local Sun = require "RenewableEnergy/Sun"
 local Battery = require "RenewableEnergy/PowerBank/Battery"
 require "PZHarness/Loot"
-local Loot = require "RenewableEnergy/Debug/RenewableEnergyLoot"
 local Yardsticks = require "RenewableEnergy/Debug/RenewableEnergyYardsticks"
 local ArrowBoard = require "RenewableEnergy/ArrowBoard/Trailer"
 local Specs = require "RenewableEnergy/Specs"
@@ -114,10 +102,10 @@ local function mix(share, a, b)
         repaired = share * a.repaired + (1 - share) * b.repaired }
 end
 
--- What one fill of a container holds, for PZHarness.Loot.sample: its modules with their condition
--- as found and after Seal Cracked Module, its batteries with their watt-hours after wear, and each
--- of PART_TYPES by full type.
-local function findsIn(container)
+--- What one fill of a container holds, as a reader for PZHarness.Loot.sample: its modules with
+--- their condition as found and after Seal Cracked Module, its batteries with their watt-hours
+--- after wear, and each of PART_TYPES by full type.
+function TownReport.findsIn(container)
     local finds = {}
     local items = container:getItems()
     for i = 0, items:size() - 1 do
@@ -134,10 +122,10 @@ local function findsIn(container)
     return finds
 end
 
--- What `fill` puts in `container` on average over `samples` fills.
-local function meanFinds(fill, samples, container)
+-- What a container holds on average, from PZHarness.Loot.sample's result with TownReport.findsIn.
+local function meanFinds(sampled)
     local means = none()
-    for key, measured in pairs(PZLoot.sample(fill, samples, container, findsIn)) do
+    for key, measured in pairs(sampled) do
         means[key] = measured.share * measured.perContainer
     end
     return means
@@ -153,24 +141,23 @@ local function arrowBoardPanels(weathered, second)
 end
 
 -- The finds each source holds on average; banks and crates by their BANK_STOCK and CRATE_STOCK
--- names, sampled over `samples` fills.
-local function findKinds(samples)
+-- names, from `stocks` (TownReport.print).
+local function findKinds(stocks)
     local Finds = require "RenewableEnergy/Items/Finds"
     local cracked, weathered = moduleOver(Finds.CRACKED), moduleOver(Finds.WEATHERED)
-    local stocks, container = Loot.worldStocks(), PZLoot.scratchContainer(nil)
     local banks, crates = {}, {}
-    for name, fill in pairs(stocks.banks) do
-        banks[name] = meanFinds(fill, samples, container)
+    for name, sampled in pairs(stocks.banks) do
+        banks[name] = meanFinds(sampled.finds)
     end
-    for name, fill in pairs(stocks.crates) do
-        crates[name] = meanFinds(fill, samples, container)
+    for name, sampled in pairs(stocks.crates) do
+        crates[name] = meanFinds(sampled.finds)
     end
     local panels = arrowBoardPanels(weathered, mix(ArrowBoard.STOCK.secondCrackedChance, cracked, weathered))
     return {
         intact = { modules = 1, condition = 100, repaired = 100 },
         cracked = cracked,
         site = mix(Finds.SITE_CRACKED_SHARE, cracked, weathered),
-        arrowBoard = add(panels, meanFinds(stocks.arrowBoard, samples, container)),
+        arrowBoard = add(panels, meanFinds(stocks.arrowBoard.finds)),
         banks = banks,
         crates = crates,
     }
@@ -338,6 +325,34 @@ local function roomCrackedModules(roomName, containerType, container)
     return expectedHits(function() Finds.addCrackedModules(roomName, containerType, container) end)
 end
 
+-- What OnSeeNewRoom places, on average, in `rooms` rooms named `roomName`: `banks`, how many world
+-- banks (nil in a room it places none in), `bankFinds`, what they hold and the modules it lays
+-- beside them (WorldSpawns.layModulesBeside), and `crates`, what its garage kit crates hold. nil
+-- with Battery Bank Spawn off.
+local function roomSpawns(roomName, rooms, kinds)
+    local WorldSpawns = require "RenewableEnergy/World/WorldSpawns"
+    local rarity = WorldSpawns.RARITY[SandboxVars.RenewableEnergy.BatteryBankSpawn]
+    if not rarity then
+        return nil
+    end
+    local spawns = { bankFinds = none(), crates = none() }
+    local bank = WorldSpawns.BANK_ROOMS[roomName]
+    if bank then
+        spawns.banks = rooms / (bank.odds * rarity)
+        add(spawns.bankFinds, kinds.banks[bank.stock], spawns.banks)
+        local beside = WorldSpawns.BANK_STOCK[bank.stock].modules
+        if beside then
+            add(spawns.bankFinds, kinds.site,
+                spawns.banks * beside.chance * midpoint(beside) * SandboxVars.RenewableEnergy.LRMSolarPanels)
+        end
+    end
+    local crateOdds = WorldSpawns.CRATE_ROOMS[roomName]
+    if crateOdds then
+        add(spawns.crates, kinds.crates.garageKit, rooms / (crateOdds * rarity))
+    end
+    return spawns
+end
+
 -- What the rooms of a town hold: `listed`, the mod's items in room loot; `cracked`, cracked
 -- modules; `banks`, the world banks OnSeeNewRoom places, their batteries and the modules they lay
 -- beside them (WorldSpawns.layModulesBeside), `banksByRoom` how many by room name; `crates`, the
@@ -359,19 +374,19 @@ local function roomFinds(town, kinds)
             add(row.cracked, kinds.cracked, count * roomCrackedModules(roomName, containerType, container))
         end
     end
-    local rarity = WorldSpawns.RARITY[SandboxVars.RenewableEnergy.BatteryBankSpawn]
-    if rarity then
-        for roomName, bank in pairs(WorldSpawns.BANK_ROOMS) do
-            local placed = (town.rooms[roomName] or 0) / (bank.odds * rarity)
-            row.banksByRoom[roomName] = placed
-            add(row.banks, kinds.banks[bank.stock], placed)
-            local beside = WorldSpawns.BANK_STOCK[bank.stock].modules
-            if beside then
-                add(row.banks, kinds.site, placed * beside.chance * midpoint(beside) * SandboxVars.RenewableEnergy.LRMSolarPanels)
-            end
-        end
-        for roomName, odds in pairs(WorldSpawns.CRATE_ROOMS) do
-            add(row.crates, kinds.crates.garageKit, (town.rooms[roomName] or 0) / (odds * rarity))
+    local spawnRooms = {}
+    for roomName in pairs(WorldSpawns.BANK_ROOMS) do
+        spawnRooms[roomName] = true
+    end
+    for roomName in pairs(WorldSpawns.CRATE_ROOMS) do
+        spawnRooms[roomName] = true
+    end
+    for roomName in pairs(spawnRooms) do
+        local spawns = roomSpawns(roomName, town.rooms[roomName] or 0, kinds)
+        if spawns then
+            row.banksByRoom[roomName] = spawns.banks
+            add(row.banks, spawns.bankFinds)
+            add(row.crates, spawns.crates)
         end
     end
     return row
@@ -602,10 +617,11 @@ local function windByMonth()
     return months
 end
 
+-- The mean of `list`, each value through of(value) if given.
 local function mean(list, of)
     local total = 0
     for _, value in ipairs(list) do
-        total = total + of(value)
+        total = total + (of and of(value) or value)
     end
     return total / #list
 end
@@ -620,9 +636,8 @@ local function printWindYardsticks(mark)
             table.insert(year, kph)
         end
     end
-    local function kph(value) return value end
     print(string.format("%s yardstick: the game's wind, storms left out, averages %.1f km/h in July, %.1f in December, %.1f over the year",
-        mark, mean(months[7], kph), mean(months[12], kph), mean(year, kph)))
+        mark, mean(months[7]), mean(months[12]), mean(year)))
     local function dayKwh(watts) return watts * 24 / 1000 end
     for _, row in ipairs(WIND_KINDS) do
         local spec = Wind.SPEC.turbines[row[1]]
@@ -737,8 +752,6 @@ end
 -- places alike: `modules`, `batteries` (deep cycles and L-16s, a bank's car batteries too) and
 -- each of PART_TYPES by full type.
 local function roomsHold(town, roomNames, kinds)
-    local WorldSpawns = require "RenewableEnergy/World/WorldSpawns"
-    local rarity = WorldSpawns.RARITY[SandboxVars.RenewableEnergy.BatteryBankSpawn]
     local total = none()
     for _, roomName in ipairs(roomNames) do
         local rooms = town.rooms[roomName] or 0
@@ -752,18 +765,10 @@ local function roomsHold(town, roomNames, kinds)
         for _, fullType in ipairs(PART_TYPES) do
             total[fullType] = (total[fullType] or 0) + inLoot(fullType)
         end
-        local bank = rarity and WorldSpawns.BANK_ROOMS[roomName]
-        if bank then
-            local placed = rooms / (bank.odds * rarity)
-            add(total, kinds.banks[bank.stock], placed)
-            local beside = WorldSpawns.BANK_STOCK[bank.stock].modules
-            if beside then
-                add(total, kinds.site, placed * beside.chance * midpoint(beside) * SandboxVars.RenewableEnergy.LRMSolarPanels)
-            end
-        end
-        local crateOdds = rarity and WorldSpawns.CRATE_ROOMS[roomName]
-        if crateOdds then
-            add(total, kinds.crates.garageKit, rooms / (crateOdds * rarity))
+        local spawns = roomSpawns(roomName, rooms, kinds)
+        if spawns then
+            add(total, spawns.bankFinds)
+            add(total, spawns.crates)
         end
     end
     return total
@@ -798,10 +803,15 @@ local function printPerVisit(mark, map, kinds)
     end
 end
 
-local function printReport(census, samples, mark)
+--- Prints the report under `mark`, with what world banks, crates and battery boxes hold from
+--- `stocks` (RenewableEnergyLoot's sampleWorldStocks with a `finds` reader of TownReport.findsIn).
+--- The caller sets the measuring options (RenewableEnergyLoot's MEASURE_OPTIONS) and loot rarity
+--- options 1.
+function TownReport.print(mark, stocks)
+    local census = require "RenewableEnergyDevTownCensus"
     local SolarSites = require "RenewableEnergy/World/SolarSites"
     local options = SandboxVars.RenewableEnergy
-    local kinds = findKinds(samples)
+    local kinds = findKinds(stocks)
     local sites, siteBoards = {}, 0
     print(mark .. " modules a thorough player finds, as count (watts as found / after Seal Cracked Module), and batteries, as count (kWh as found)")
     print(string.format("%s Battery Bank Spawn %d, Solar Sites %d%%", mark, options.BatteryBankSpawn, options.SolarSites))
@@ -862,15 +872,6 @@ local function printReport(census, samples, mark)
         print(string.format("%s power in %s: batteries store %.1f kWh; modules as found are %.1f new ones, banking %.1f kWh a day on south racks in July, %.1f in December",
             mark, town.name, total.wh / 1000, newModules, newModules * rackWh.july / 1000, newModules * rackWh.december / 1000))
     end
-end
-
---- Prints the report under `mark`, at the default loot settings and loot rarity options 1, with
---- what world banks, crates and battery boxes hold measured over `samples` fills each.
-function TownReport.print(samples, mark)
-    local census = require "RenewableEnergyDevTownCensus"
-    PZLoot.withMeasureOptions(Loot.MEASURE_OPTIONS, function()
-        Loot.withLootRarity(1, function() printReport(census, samples, mark) end)
-    end)
 end
 
 return TownReport

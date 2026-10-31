@@ -10,7 +10,6 @@ if isClient() then return end
 local Utilities = require "RenewableEnergy/Utilities"
 local Sprites = require "RenewableEnergy/Sprites"
 local ObjectSystem = require "RenewableEnergy/ObjectSystem"
-local Fumes = require "RenewableEnergy/Fumes"
 local Digester = require "RenewableEnergy/Biogas/Digester"
 local Stink = require "RenewableEnergy/Biogas/Stink"
 local GasHeater = require "RenewableEnergy/Biogas/GasHeater"
@@ -90,12 +89,19 @@ function DigesterObject:stateToIsoObject(isoObject)
 end
 
 function DigesterObject:loaded(isoObject)
-    local square = isoObject:getSquare()
-    self.indoors = Fumes.buildingOf(square) ~= nil
-    self.inRoom = square:isInARoom()
+    ObjectSystem.Object.loaded(self, isoObject)
+    self.inRoom = isoObject:getSquare():isInARoom()
     self:snapshotHopper(isoObject:getContainer())
     self:show()
     self:sendSummary()
+end
+
+-- Puts out the lit heater beside the digester `isoObject`, if any.
+local function putOutHeater(isoObject)
+    local heater = GasHeater.litHeaterFor(isoObject)
+    if heater then
+        DigesterObject.showHeaterLit(heater, false)
+    end
 end
 
 -- Its stink goes, and the heater it fed goes out; a tile picked up or destroyed is still on its
@@ -103,9 +109,8 @@ end
 function DigesterObject:aboutToRemoveFromSystem()
     Stink.clear(self:key())
     local isoObject = self:getIsoObject()
-    local heater = isoObject and GasHeater.litHeaterFor(isoObject)
-    if heater then
-        DigesterObject.showHeaterLit(heater, false)
+    if isoObject then
+        putOutHeater(isoObject)
     end
     ObjectSystem.Object.aboutToRemoveFromSystem(self)
 end
@@ -433,10 +438,7 @@ function DigesterObject:show()
     showOverlay(isoObject, Digester.isScrubberOverlay, Digester.scrubberOverlay(self.tier, self))
     showOverlay(isoObject, Digester.isSourOverlay, self.sour and Sprites.digesterSour[self.tier] or nil)
     if not self.heaterLit then
-        local heater = GasHeater.litHeaterFor(isoObject)
-        if heater then
-            DigesterObject.showHeaterLit(heater, false)
-        end
+        putOutHeater(isoObject)
     end
 end
 

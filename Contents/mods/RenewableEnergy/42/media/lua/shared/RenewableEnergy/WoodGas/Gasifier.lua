@@ -47,12 +47,11 @@ Gasifier.WEAR_DIRTY = 3
 -- Out longer than this, a gasifier is cold, and lighting it takes bellows.
 Gasifier.COLD_HOURS = 1
 Gasifier.BELLOWS = { "Base.Bellows", "Base.LargeBellows" }
--- Clean Out Ash gives one Wood Ash per this much of the pit. Wood Ash also neutralises a digester
--- and charges its scrubber, and vanilla's wood fires leave it too (FireAsh).
+-- Clean Out Ash gives one Wood Ash per this much of the pit.
 Gasifier.ASH_PER_ITEM = 25
 Gasifier.WOOD_ASH = "RenewableEnergy.WoodAsh"
 Gasifier.TARRY = "RenewableEnergy.TarryPacking"
--- Hay and straw pack the filter, and insulate a digester's upgrade.
+-- Hay and straw, which pack the filter.
 Gasifier.HAY = { "Base.HayTuft", "Base.Straw2" }
 
 -- The filter's condensate, wood vinegar: litres per kg burned, what the filter's drain holds, and
@@ -185,20 +184,7 @@ local function isCold(lit, outSince)
     return not lit and (outSince == nil or Clock.now() - outSince > Gasifier.COLD_HOURS)
 end
 
---- The tier of a gasifier tile, or nil for any other object.
-function Gasifier.tierOf(isoObject)
-    local kind, tier = Sprites.kindOfObject(isoObject)
-    return kind == "gasifier" and tier or nil
-end
-
-function Gasifier.isGasifier(isoObject)
-    return isoObject ~= nil and Gasifier.tierOf(isoObject) ~= nil
-end
-
---- The translation key of the name of a gasifier of `tier`.
-function Gasifier.nameKey(tier)
-    return "IGUI_RenewableEnergy_Gasifier_" .. tier
-end
+Gasifier.tierOf, Gasifier.isGasifier, Gasifier.nameKey = Sprites.tiered("gasifier", "Gasifier")
 
 Gasifier.isLitOverlay = Sprites.matcher(Sprites.gasifierLit)
 Gasifier.isPipeOverlay = Sprites.matcher(Sprites.gasifierPipe)

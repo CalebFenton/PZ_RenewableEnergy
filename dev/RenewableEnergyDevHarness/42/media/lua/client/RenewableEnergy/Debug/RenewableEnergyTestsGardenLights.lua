@@ -79,6 +79,7 @@ test("renewable_energy_world_garden_light_neighbourhoods", {
 -- At 0 the Garden Lights option leaves every house without lights: the house near the start has
 -- chance 0, and rolled with the lowest roll there is it gets none, and stays rolled.
 test("renewable_energy_world_garden_lights_option_zero", {
+    sandbox = { GardenLights = 0 },
     run = function(self) T.read(self, "gardenLightsRoll", { roll = 0 }, "roll") end,
     validate = function(self)
         local answer = self.reads.roll

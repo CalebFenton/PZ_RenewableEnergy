@@ -1,13 +1,11 @@
 -- The authority's half of the world spawn tests: banks, crates and cracked modules are placed and
--- stocked only where the authority runs them. Only registers handlers, so a --stay rerun loads it
--- again (RELOAD_FILES); RenewableEnergyTestHelpers.lua says how these handlers work. The solar
--- sites' are in RenewableEnergyTestServerSolarSites.lua.
+-- stocked only where the authority runs them. The solar sites' are in
+-- RenewableEnergyTestServerSolarSites.lua.
 
 require "PZHarness/ServerHandlers"
 require "PZHarness/ServerChecks"
 require "PZHarness/Fixtures"
 require "PZHarness/Loot"
-local Sprites = require "RenewableEnergy/Sprites"
 local Specs = require "RenewableEnergy/Specs"
 local Squares = require "cf_commonlib/Squares"
 require "PZHarness/ServerFixtures"
@@ -54,35 +52,22 @@ local function stockOf(container)
 end
 
 -- WorldSpawns.placeBank with BANK_STOCK[args.stock] on the square at `args`, as a room seen for the
--- first time places one, with every Chance roll at `args.roll` if given. Answers whether it placed
--- one, its tile and stock, and whether the stock's tile, in any facing, stands on the square.
--- Removed when the test ends.
+-- first time places one, with every Chance roll at `args.roll` if given. Answers its tile and
+-- stock. Removed when the test ends.
 handler("worldBank", function(_, args, defer)
-    local square = PZHarness.squareAt(args)
     local restoreRoll = args.roll and PZHarness.Rolls.force(defer, args.roll)
-    local bank = WorldSpawns.placeBank(square, args.stock)
+    local bank = WorldSpawns.placeBank(PZHarness.squareAt(args), args.stock)
     if restoreRoll then restoreRoll() end
-    if bank then
-        defer(function() removePlaced(bank) end)
-    end
-    local kind = WorldSpawns.BANK_STOCK[args.stock].sprite
-    local onSquare = Squares.findObjectOn(square, function(object) return Sprites.kindOfObject(object) == kind end)
-    local answer = { placed = bank ~= nil, boxOnSquare = onSquare ~= nil }
-    if bank then
-        answer.sprite = bank:getTextureName()
-        answer.stock = stockOf(bank:getContainer())
-    end
-    return answer
+    defer(function() removePlaced(bank) end)
+    return { sprite = bank:getTextureName(), stock = stockOf(bank:getContainer()) }
 end)
 
 -- The loaded squares of `square` and those around it.
 local function squaresAround(square)
     local squares = {}
-    for dx = -1, 1 do
-        for dy = -1, 1 do
-            squares[#squares + 1] = getSquare(square:getX() + dx, square:getY() + dy, square:getZ())
-        end
-    end
+    Squares.eachAround(square:getX(), square:getY(), square:getZ(), 1, function(near)
+        table.insert(squares, near)
+    end)
     return squares
 end
 
@@ -184,8 +169,8 @@ end
 
 -- Every stock's parts are of their line's kind; the bank `args.stock` holds a part when the roll
 -- comes in under its chance × the misc loot option and not at it, so neither a part's chance nor
--- the option goes astray; and a battery box (a tile of `args.boxTiles`), which has no slot for a
--- charge controller, never gets one, even from a stock that lists one.
+-- the option goes astray; and a bank tier with no charge controller slot (Specs.banks
+-- maxControllers 0) never gets one, even from a stock that lists one, while the others get it.
 check("bankStockParts", function(expect, _, _, args, defer)
     for stockName, stock in pairs(WorldSpawns.BANK_STOCK) do
         for _, kind in ipairs(PARTS) do
@@ -212,19 +197,16 @@ check("bankStockParts", function(expect, _, _, args, defer)
             end
         end
     end
-    -- args.stock's batteries and a certain controller, on each box tile and on args.stock's rack.
+    -- args.stock's batteries and a certain controller, on every bank tier's tile.
     options.LRMMisc = 1
     local name = "renewableEnergyTestSlots"
     defer(function() WorldSpawns.BANK_STOCK[name] = nil end)
-    local sprites = { [stock.sprite] = false }
-    for sprite in pairs(args.boxTiles) do
-        sprites[sprite] = true
-    end
-    for sprite, isBox in pairs(sprites) do
-        WorldSpawns.BANK_STOCK[name] = { sprite = sprite, batteries = stock.batteries,
+    for _, spec in pairs(Specs.banks) do
+        WorldSpawns.BANK_STOCK[name] = { sprite = spec.sprite, batteries = stock.batteries,
             controller = { chance = 1, types = { { Specs.controller, 1 } } } }
         local controllers = bankPartsAt(container, name, 0, defer).controller
-        expect(controllers == (isBox and 0 or 1), "a " .. sprite .. " bank listing a certain controller holds " .. controllers)
+        expect(controllers == (spec.maxControllers == 0 and 0 or 1),
+            "a " .. spec.sprite .. " bank listing a certain controller holds " .. controllers)
     end
     WorldSpawns.BANK_STOCK[name] = nil
     restoreOptions()
@@ -423,7 +405,7 @@ handler("worldSpawnStock", function(_, args)
     if args.crate then
         crate = {}
         for _, line in ipairs(WorldSpawns.CRATE_STOCK[args.crate]) do
-            crate[line[1]] = { min = line[2], max = line[3] }
+            crate[line.item] = { min = line.min, max = line.max }
         end
     end
     return { banks = banks, crate = crate, cracked = Finds.CRACKED, weathered = Finds.WEATHERED,

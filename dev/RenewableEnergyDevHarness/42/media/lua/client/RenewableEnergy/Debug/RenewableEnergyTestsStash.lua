@@ -10,17 +10,15 @@ local test, expect, expectEqual, serverCheck = T.test, T.expect, T.expectEqual, 
 -- Every stash house resolves to a building and a room StashSystem can stock.
 serverCheck("renewable_energy_world_stash_houses_resolve", "stashHousesResolve")
 
--- Unless Stash Houses is at None, the stashes join the list StashSystem reads, once however often
--- the game loads.
+-- Unless Stash Houses is at None, the stashes join the list StashSystem reads.
 test("renewable_energy_world_stash_register_by_option", {
     run = function(self) T.read(self, "stashRegister", nil, "register") end,
     validate = function(self)
         local answer = self.reads.register
         local results, expected = answer.results, answer.houses
         for name, mode in pairs(Stash.MODE) do
-            local result, on = results[mode], mode ~= Stash.MODE.NONE
-            expect(result.registered == on, "Stash Houses " .. name .. (on and " did not register" or " registered"))
-            expectEqual("the stashes Stash Houses " .. name .. " listed", result.count, on and expected or 0)
+            local on = mode ~= Stash.MODE.NONE
+            expectEqual("the stashes Stash Houses " .. name .. " listed", results[mode], on and expected or 0)
         end
     end,
 })

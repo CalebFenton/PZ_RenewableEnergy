@@ -8,6 +8,7 @@ local Specs = require "RenewableEnergy/Specs"
 local Sun = require "RenewableEnergy/Sun"
 local Wear = require "RenewableEnergy/PowerBank/Wear"
 local Chance = require "cf_commonlib/Chance"
+local Items = require "cf_commonlib/Items"
 
 local Battery = {}
 
@@ -92,12 +93,10 @@ function Battery.changedVisibly(before, after)
 end
 
 -- How many whole uses `item` is from the charge `target` on the side `direction` gives (1: below
--- it, -1: above it). The game keeps a charge in uses and rounds a charge it is given to the nearest
--- (InventoryItem.setCurrentUsesFloat), and reads it back as a float a hair off it (0.1 comes back
--- as 0.09999999), so charges are compared in uses. Counted in `wholeUses`, full is the item's
--- most uses, which can lie a use under a charge of 1 (DrainableComboItem.getMaxUses).
+-- it, -1: above it), charges compared in uses (Items.usesAt). Counted in `wholeUses`, full is the
+-- item's most uses, which can lie a use under a charge of 1 (DrainableComboItem.getMaxUses).
 local function usesFrom(item, target, direction, wholeUses)
-    local targetUses = math.floor(target / item:getUseDelta() + 0.5)
+    local targetUses = Items.usesAt(item, target)
     if wholeUses then
         targetUses = math.min(targetUses, item:getMaxUses())
     end

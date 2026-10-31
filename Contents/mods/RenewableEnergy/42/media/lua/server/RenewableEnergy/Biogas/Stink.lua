@@ -206,17 +206,6 @@ Events.EveryOneMinute.Add(function()
     clearing = {}
 end)
 
---- The corpses the source `key` smells like in the chunks' counts now, all its groups together.
---- The tests' probe: the game's own count (CorpseCount) is out of Lua's reach.
-function Stink.counted(key)
-    local source = sources[key]
-    local live = 0
-    for _, group in pairs(source and source.groups or {}) do
-        live = live + group.live
-    end
-    return live
-end
-
 -- Every ghost a group in the chunk still has is counted again, even one it no longer wants
 -- (lowered while unloaded), so that settling takes that one out the proper way, which also lets
 -- the game forget it. Groups not yet given a square in it get theirs.

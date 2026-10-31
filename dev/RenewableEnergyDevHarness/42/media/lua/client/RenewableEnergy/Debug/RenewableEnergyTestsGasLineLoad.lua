@@ -103,7 +103,7 @@ test("renewable_energy_gasline_generator_stalls_on_real_load", {
         T.step(function()
             local alone = self.reads.alone.state and self.reads.alone.state.watts
             if not T.need(self, alone, "the generator's load with the fridge alone") then return end
-            local count = math.floor((GasKit.CAP_W - alone) / T.applianceWatts({ "fridgeFreezer" })) + 1
+            local count = math.floor((GasKit.CAP_W - alone) / T.fridgeW()) + 1
             local squares = T.need(self, count > 0 and T.squares(self, count, { indoors = true, near = generator.square }),
                 count .. " free indoor squares for fridges past the line's cap")
             if not squares then return end
@@ -195,8 +195,7 @@ test("renewable_energy_settlement_gas_disconnect_pays_surviving_generator", {
         local far = T.generator(self, { square = farSquare, fuel = 10, running = true })
         T.fitAndConnect(self, near, source)
         T.goNextTo(self, near.square)
-        -- Freeze only after walking: movement can reset the multiplier. Native frames still run,
-        -- but no clock-driven gas/bank settlement can repair the missing job boundary.
+        -- Freeze only after walking: movement can reset the multiplier.
         T.step(function() T.setMultiplier(self, 0) end)
         T.setGenerator(self, far, { rebuild = true })
         T.server(self, "billGenerators", {})
@@ -214,8 +213,6 @@ test("renewable_energy_settlement_gas_disconnect_pays_surviving_generator", {
         T.readGenerator(self, near, "nearShared")
         T.readGenerator(self, far, "farShared")
         T.setGenerator(self, near, { rebuild = true })
-        -- This is the real action's authority completion (Jobs.perform), not a fixture mutation.
-        -- Its before/after snapshots cannot be separated by a periodic settlement, even in MP.
         T.job(self, "kit", GasKit.DISCONNECT, near, nil, "disconnect", { via = "complete",
             reads = { generator = { name = "generatorRead", args = T.at(near) }, payer = { name = "generatorRead", args = T.at(far) } } })
         T.setGenerator(self, far, { rebuild = true })

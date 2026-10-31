@@ -21,11 +21,6 @@ local test, expect, expectNear, expectEqual = T.test, T.expect, T.expectNear, T.
 local NOON, MIDNIGHT = 12, 0
 local CAR = "Base.CarNormal"
 
--- The most a gadget rated `watts` can make in `hours`: full sun the whole time.
-local function fullSunWh(watts, hours)
-    return Sun.wattsFrom(watts, Sun.FULL_SUN, 0) * hours
-end
-
 -- Solar battery maintainer -----------------------------------------------------------------------
 
 -- Queues the job of the maintainer option on `car`'s menu and a wait until this client's copy
@@ -90,8 +85,8 @@ local WITH_MAINTAINER = {
 }
 local ROW_HOURS, ROW_START = 1, 0.5
 
--- Charges only by day with a maintainer attached, at most its rating in full sun, and the pass
--- over every vehicle gives as much. Noon reads live weather, so it is checked against bounds.
+-- Charges only by day with a maintainer attached, its rating in the sky the hour ran under, and
+-- the pass over every vehicle gives as much.
 test("renewable_energy_gadgets_maintainer_charge", {
     instant = true,
     run = function(self)
@@ -121,9 +116,12 @@ test("renewable_energy_gadgets_maintainer_charge", {
             local wh, after = reply.wh, reply.after
             if row.charges then
                 charged = reply
-                local most = fullSunWh(SolarMaintainer.WATTS, ROW_HOURS)
-                expect(wh > 0 and wh <= most and after > ROW_START,
-                    "an hour at " .. row.what .. " added " .. wh .. " Wh, expected more than 0 and at most " .. most)
+                -- The battery keeps whole uses of its capacity, a car battery's a few thousandths of a Wh.
+                local useWh = instanceItem(T.CAR_BATTERY):getUseDelta() * reply.capacityWh
+                expect(reply.flat > 0, "no sun at " .. row.what)
+                expectNear("Wh an hour at " .. row.what .. " added", wh, Sun.wattsFrom(SolarMaintainer.WATTS, reply.flat, 0) * ROW_HOURS,
+                    useWh)
+                expect(after > ROW_START, "an hour at " .. row.what .. " left the battery at " .. after)
             else
                 expect(wh == 0 and math.abs(after - ROW_START) < 0.001, "an hour at " .. row.what .. " added " .. wh .. " Wh")
             end
@@ -210,8 +208,8 @@ local CHARGER_ROWS = {
     { name = "noon", hour = NOON, uses = 0, pass = true },
 }
 
--- Charges by day only, at most its rating in full sun, in whole uses spread evenly, and the pass
--- over every charger as much again. Full cells take nothing and nothing is stored for later.
+-- Charges by day only, its rating in the sky the run had, in whole uses spread evenly, and the
+-- pass over every charger as much again. Full cells take nothing and nothing is stored for later.
 test("renewable_energy_gadgets_solar_battery_charger_charges", {
     instant = true,
     run = function(self)
@@ -227,9 +225,10 @@ test("renewable_energy_gadgets_solar_battery_charger_charges", {
         local noon, midnight, full = self.reads.noon, self.reads.midnight, self.reads.full
         local useDelta = instanceItem(SolarCellCharger.BATTERY):getUseDelta()
         local useWh = useDelta * SolarCellCharger.BATTERY_WH
-        local most = fullSunWh(SolarCellCharger.WATTS, CELL_HOURS)
-        expect(noon.added > 0 and noon.added * useWh <= most, CELL_HOURS .. " hours of noon sun added " .. noon.added
-            .. " uses of " .. useWh .. " Wh, expected more than 0 and at most " .. most .. " Wh")
+        -- What the panel made goes into the cells in whole uses, and what is short of a use is kept.
+        expect(noon.added > 0, CELL_HOURS .. " hours of noon sun added nothing")
+        expectNear("Wh " .. CELL_HOURS .. " hours of noon sun put in the cells or kept", noon.added * useWh + noon.storedWh,
+            Sun.wattsFrom(SolarCellCharger.WATTS, noon.flat, 0) * CELL_HOURS, 0.001)
         -- Each battery's uses, in the charger's order.
         local function uses(items)
             local list = {}
@@ -322,10 +321,11 @@ local function capacityRatio()
 end
 
 -- Queues the server handler `name` on a `script` vehicle each with a car battery and a deep cycle
--- battery, with `args` plus the vehicle's T.vehicleArgs, each answer read under its battery's type.
--- When `full`, also waits for the client's charge to arrive from the initially partial charge.
+-- battery, with `args` plus where the vehicle is (T.onVehicle), each answer read under its battery's type.
+-- When `full`, only the deep cycle battery's, and a wait for the client's charge to arrive from
+-- the initially partial charge.
 local function onBothBatteries(self, script, name, args, full)
-    for _, batteryType in ipairs({ T.CAR_BATTERY, VehicleBattery.ITEM }) do
+    for _, batteryType in ipairs(full and { VehicleBattery.ITEM } or { T.CAR_BATTERY, VehicleBattery.ITEM }) do
         local car = T.placeVehicle(self, script, { battery = batteryType, charge = args.uses })
         if not car then return end
         T.onVehicle(self, car, name, args, batteryType)

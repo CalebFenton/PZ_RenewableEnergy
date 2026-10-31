@@ -99,9 +99,8 @@ end
 
 --- Watts a panel rated `ratedWatts` makes in `irradiance`, under `snow` cover from 0 to 1.
 function Sun.wattsFrom(ratedWatts, irradiance, snow)
-    local watts = ratedWatts * irradiance / FULL_SUN * SYSTEM_EFFICIENCY
+    return ratedWatts * irradiance / FULL_SUN * SYSTEM_EFFICIENCY
         * SandboxVars.RenewableEnergy.SunlightMultiplier * (1 - (snow or 0))
-    return max(0, watts)
 end
 
 --- The weather the panels see now.
@@ -150,13 +149,13 @@ function Sun.skyNow()
     return { up = sun.up, flat = Sun.planeIrradiance(sun, "flat", nil, Sun.weatherNow()) }
 end
 
---- Watts a flat cell rated `ratedWatts` lying on `square` makes under `sky` (Sun.skyNow, now
---- if nil): none under a roof or for no square.
+--- Watts a flat cell rated `ratedWatts` lying on `square` makes under `sky` (Sun.skyNow): none
+--- under a roof or for no square.
 function Sun.squareWatts(square, ratedWatts, sky)
     if not (square and square:isOutside()) then
         return 0
     end
-    return Sun.wattsFrom(ratedWatts, (sky or Sun.skyNow()).flat, 0)
+    return Sun.wattsFrom(ratedWatts, sky.flat, 0)
 end
 
 --- Whether it is dark under `sky` (Sun.skyNow or Sun.positionNow, now if nil): the sun at or

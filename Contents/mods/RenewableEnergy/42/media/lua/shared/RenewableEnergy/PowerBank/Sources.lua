@@ -12,13 +12,6 @@ local Squares = require "cf_commonlib/Squares"
 
 local Sources = {}
 
---- How far a source may be from the bank it is connected to, { tiles, levels }: as far as a
---- generator powers (IsoGenerator), a radius of the Generator Tile Range option in tiles and the
---- Generator Vertical Power Range option in floors up or down.
-function Sources.reach()
-    return { tiles = SandboxVars.GeneratorTileRange, levels = SandboxVars.GeneratorVerticalPowerRange }
-end
-
 -- Each family, in the order the status window lists them: whether its sources must stand outdoors
 -- (a treadmill works under a roof); the bank status fields of its watts now and its watt-hours
 -- today, saved, where solarWhToday keeps its older name because saves hold it; and the status
@@ -60,26 +53,6 @@ function Sources.slotsOf(kind)
     return KINDS[kind].spec.slots
 end
 
---- Why a source of `kind` can't go on a bank with `freeSlots` input slots free, or nil. The
---- authority counts them from the bank's container; a client has its summary's freeSlots.
-function Sources.slotRefusal(kind, freeSlots)
-    if Sources.slotsOf(kind) > freeSlots then
-        return "Tooltip_RenewableEnergy_NoInputSlot"
-    end
-    return nil
-end
-
---- Why no source may be connected to a bank whose connected flag is `connected` (the bank's own
---- Connect Bank, as a generator's), or nil. A client passes its copy of the generator's flag,
---- which IsoGenerator.setConnected syncs; the authority its record's, nil on banks saved before
---- it was kept, all of them connected. Sources already on a bank stay when it is disconnected.
-function Sources.bankRefusal(connected)
-    if connected == false then
-        return "Tooltip_RenewableEnergy_BankNotConnected"
-    end
-    return nil
-end
-
 --- Whether snow lies on a source of `kind` until someone sweeps it off (Specs.mounts holdsSnow
 --- without shedsSnow).
 function Sources.sweepable(kind)
@@ -113,13 +86,6 @@ function Sources.squareOk(square, kind)
     return square ~= nil and (square:isOutside() or not Sources.FAMILY[KINDS[kind].family].outdoors)
 end
 
---- Whether a source at x, y, z is within reach (Sources.reach) of `bank`, anything with x, y and z.
-function Sources.isInReach(bank, x, y, z)
-    local reach = Sources.reach()
-    return IsoUtils.DistanceToSquared(x, y, bank.x, bank.y) <= reach.tiles * reach.tiles
-        and math.abs(z - bank.z) <= reach.levels
-end
-
 --- The banks, as { x, y, z }, a source of `kind` at x, y, z may be connected to.
 function Sources.banksInReach(x, y, z, kind)
     local found = {}
@@ -127,20 +93,20 @@ function Sources.banksInReach(x, y, z, kind)
         return found
     end
     PowerBank.each(function(bank)
-        if Sources.isInReach(bank, x, y, z) then
+        if PowerBank.inSourceReach(bank, x, y, z) then
             table.insert(found, { x = bank.x, y = bank.y, z = bank.z })
         end
     end)
     return found
 end
 
---- Why the source `isoObject` can't be connected to the bank at `bankPosition` ({ x, y, z }) now,
---- or nil: "out of reach" (or a square it can't work from), or "already connected" to that bank.
---- Whether the bank has the input slots is SourceJobs' to say, from counts the authority takes afresh.
+--- Why the source `isoObject` can't feed the bank at `bankPosition` ({ x, y, z }) from where it
+--- stands, or nil: "out of reach" (or a square it can't work from), or "already connected" to that
+--- bank.
 function Sources.connectRefusal(isoObject, bankPosition)
     local kind = Sources.kindOf(isoObject)
     if not (kind and Sources.squareOk(isoObject:getSquare(), kind)
-        and Sources.isInReach(bankPosition, isoObject:getX(), isoObject:getY(), isoObject:getZ())) then
+        and PowerBank.inSourceReach(bankPosition, isoObject:getX(), isoObject:getY(), isoObject:getZ())) then
         return "out of reach"
     elseif Squares.samePosition(PowerBank.connectedBank(isoObject), bankPosition) then
         return "already connected"
@@ -152,7 +118,7 @@ end
 --- (Sources.connectRefusal) and no bank has yet: one wired to another bank moves over only by its
 --- own Connect to that bank.
 function Sources.sourcesInReach(bankPosition)
-    local reach = Sources.reach()
+    local reach = PowerBank.sourceReach()
     local found = {}
     for z = bankPosition.z - reach.levels, bankPosition.z + reach.levels do
         Squares.eachAround(bankPosition.x, bankPosition.y, z, reach.tiles, function(square)

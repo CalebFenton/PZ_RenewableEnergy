@@ -6,7 +6,6 @@
 -- A global, as the server finds the class by its Type (NetTimedAction.parse).
 
 require "TimedActions/ISBaseTimedAction"
-local RenewableEnergy = require "RenewableEnergy/Utilities"
 local Sprites = require "RenewableEnergy/Sprites"
 local Treadmill = require "RenewableEnergy/PowerBank/Treadmill"
 local Clock = require "cf_commonlib/Clock"
@@ -35,10 +34,6 @@ local function isOnTreadmill(self)
         return Treadmill.isWiredTile(object)
     end
     return Treadmill.isTreadmill(object) and Treadmill.wiredHalf(object) == nil
-end
-
-local function runHours()
-    return Treadmill.SPEC.runMinutes / 60
 end
 
 function Action:units()
@@ -146,7 +141,7 @@ local function settle(self, share)
     local drew = self.drawing
     Treadmill.stopDrawing(self.object, self)
     self.drawing = nil
-    local hours = runHours() * math.max(0, math.min(1, share))
+    local hours = Treadmill.SPEC.runMinutes / 60 * math.max(0, math.min(1, share))
     if hours <= 0 or not isOnTreadmill(self) then
         return false
     end

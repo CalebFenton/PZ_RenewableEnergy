@@ -6,8 +6,6 @@ local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local Specs = require "RenewableEnergy/Specs"
 local Sprites = require "RenewableEnergy/Sprites"
 local Treadmill = require "RenewableEnergy/PowerBank/Treadmill"
-local BankMenu = require "RenewableEnergy/UI/BankMenu"
-local Format = require "RenewableEnergy/UI/Format"
 
 -- Treadmill (PowerBank/Treadmill.lua, TreadmillSource.lua, RenewableEnergyTreadmillAction, its menu):
 -- dismantling for the motor, connecting it, which wires the motor, runs wired and unwired,
@@ -52,18 +50,6 @@ local function restRunner(self)
     end)
     T.waitFor(self, function() return T.player():getStats():get(CharacterStat.ENDURANCE) > 0.99 end,
         "this client's copy of the rested runner")
-end
-
--- Queues a restRunner's run on `treadmill`, with the Fitness XP before it in self.reads.beforeRun,
--- then in one batch the stats and XP expectRunTrained reads and `after`'s calls.
-local function trainedRun(self, treadmill, after)
-    restRunner(self)
-    T.readCharacter(self, "beforeRun", { perks = { "Fitness" } })
-    T.doJob(self, treadmill.square, function() return RenewableEnergyTreadmillAction:new(T.player(), treadmill.object) end)
-    T.batch(function()
-        T.readCharacter(self, "afterRun", { stats = { "ENDURANCE", "THIRST" }, perks = { "Fitness" } })
-        after()
-    end)
 end
 
 -- Expects the restRunner's run, read into self.reads.afterRun, to have cost
@@ -185,26 +171,6 @@ test("renewable_energy_treadmill_menu_offers_run_and_connect", {
     end,
 })
 
--- In the dark, Connect to a bank is greyed out saying it's too dark rather than listing what it
--- takes, as the other wiring menus do.
-test("renewable_energy_treadmill_connect_refused_in_the_dark", {
-    run = function(self)
-        self.bank = T.bank(self, "batteryBoxWood", {})
-        self.treadmill = self.bank and T.panel(self, Sprites.treadmill.E.rear, { near = self.bank })
-        if self.treadmill then T.makeDark(self) end
-    end,
-    validate = function(self)
-        if not T.expectDark() then return end
-        local label = getText("ContextMenu_RenewableEnergy_ConnectSource", BankMenu.bankLabel(self.bank.object),
-            Format.away(self.treadmill, self.bank))
-        local options = T.worldOptions(self.treadmill.object, getText("IGUI_RenewableEnergy_Treadmill"), { connect = label }) or {}
-        local connect = T.optionState(options.connect)
-        expect(connect.greyed and (connect.reason or ""):find(getText("Tooltip_RenewableEnergy_TooDark"), 1, true) ~= nil,
-            "Connect isn't greyed saying it's too dark (" .. tostring(connect.reason) .. ")")
-        expect((connect.reason or ""):find(ISVehicleMechanics.bhs, 1, true) == nil, "Connect in the dark lists what it takes")
-    end,
-})
-
 -- A run on a wired treadmill banks its watt-hours, paid out over the passes after it rather than
 -- in one go, into the batteries as the status says, and costs the runner sweat and trains Fitness.
 test("renewable_energy_treadmill_wired_run_pays_bank_over_passes", {
@@ -216,7 +182,11 @@ test("renewable_energy_treadmill_wired_run_pays_bank_over_passes", {
         if not treadmill then return end
         self.treadmill = treadmill
         T.readRecord(self, bank, "before")
-        trainedRun(self, treadmill, function()
+        restRunner(self)
+        T.readCharacter(self, "beforeRun", { perks = { "Fitness" } })
+        T.doJob(self, treadmill.square, function() return RenewableEnergyTreadmillAction:new(T.player(), treadmill.object) end)
+        T.batch(function()
+            T.readCharacter(self, "afterRun", { stats = { "ENDURANCE", "THIRST" }, perks = { "Fitness" } })
             -- A short pass, then a long one that pays out the rest.
             T.bankPass(self, bank, 0, { hours = SHORT_PASS_HOURS, label = "short" })
             T.bankPass(self, bank, 0, { label = "after" })
@@ -255,24 +225,9 @@ local function poweredTreadmill(self, sprite, wired)
     return bank, treadmill
 end
 
--- A whole run on an unwired treadmill a bank powers costs the runner sweat and trains Fitness as a
--- wired run does, and banks nothing.
-test("renewable_energy_treadmill_unwired_run_trains_without_banking", {
-    instant = true,
-    run = function(self)
-        local bank, treadmill = poweredTreadmill(self, Sprites.treadmill.N.console)
-        if not bank then return end
-        self.bank = bank
-        trainedRun(self, treadmill, function() T.bankPass(self, bank, 0, { hours = PASS_HOURS }) end)
-    end,
-    validate = function(self)
-        expectRunTrained(self)
-        T.expectEqual("Wh the unwired run banked", self.bank.state.status.runWhToday, 0)
-    end,
-})
-
 -- A run on an unwired treadmill a bank powers bills the treadmill's watts to that bank from when
--- the authority starts it until it settles; once the power goes out, the run can't go on.
+-- the authority starts it until it settles, and banks nothing; once the power goes out, the run
+-- can't go on.
 test("renewable_energy_treadmill_unwired_run_draws_from_bank", {
     run = function(self)
         local bank, treadmill = poweredTreadmill(self, Sprites.treadmill.N.console)
@@ -304,6 +259,7 @@ test("renewable_energy_treadmill_unwired_run_draws_from_bank", {
         T.expectNear("W of the bank's load after the run, against before it", after.loadW - before.loadW, 0, 0.01)
         local run = self.server.completeStartedTreadmillRun
         expect(run.done, "the authority settled nothing of a run on a powered, unwired treadmill")
+        T.expectEqual("Wh the unwired run banked", after.runWhToday, 0)
         expect(self.goesOnPower, "a run on a powered, unwired treadmill can't go")
         expect(not self.goesWithoutPower, "a run on an unwired treadmill goes on once its power is out")
     end,

@@ -1,7 +1,5 @@
 -- The authority's half of the stash house tests: the mod's stashes, StashSystem and the corpse
--- loot that drops their maps exist only where the authority runs them. Only registers handlers,
--- so a --stay rerun loads it again (RELOAD_FILES); RenewableEnergyTestHelpers.lua says how these
--- handlers work.
+-- loot that drops their maps exist only where the authority runs them.
 
 require "PZHarness/ServerHandlers"
 require "PZHarness/ServerChecks"
@@ -9,6 +7,7 @@ require "PZHarness/Fixtures"
 local LibLoot = require "cf_commonlib/Loot"
 require "PZHarness/Rolls"
 local Kinds = require "RenewableEnergy/Debug/RenewableEnergyTestKinds"
+local Loot = require "RenewableEnergy/Debug/RenewableEnergyLoot"
 local Distributions = require "RenewableEnergy/Items/Distributions"
 -- The game's Java class zombie.core.stash.Stash, which the mod's module name would hide.
 local EngineStash = Stash
@@ -48,8 +47,8 @@ local function unregister()
     end
 end
 
--- Registers the houses at each Stash Houses option, twice, and answers by option what register
--- returned and how many of the mod's houses StashDescriptions then lists, with how many it has.
+-- Registers the houses at each Stash Houses option and answers by option how many of the mod's
+-- houses StashDescriptions then lists, with how many it has.
 handler("stashRegister", function(_, _, defer)
     local options = SandboxVars.RenewableEnergy
     local restoreOptions = saveOptions(defer, { "StashMode" }, function()
@@ -60,7 +59,6 @@ handler("stashRegister", function(_, _, defer)
     for _, mode in pairs(Stash.MODE) do
         unregister()
         options.StashMode = mode
-        local registered = Stash.register()
         Stash.register()
         local count = 0
         for _, description in ipairs(StashDescriptions) do
@@ -68,7 +66,7 @@ handler("stashRegister", function(_, _, defer)
                 count = count + 1
             end
         end
-        results[mode] = { registered = registered, count = count }
+        results[mode] = count
     end
     restoreOptions()
     return { results = results, houses = Kinds.count(Stash.descriptions) }
@@ -201,22 +199,11 @@ handler("stashKnownOnStart", function(_, _, defer)
     return { houses = houses }
 end)
 
--- The stash maps' rows of the mod's loot entries (LootEntries.lua).
-local function stashMapRows()
-    local rows = {}
-    for _, spec in ipairs(Distributions.items) do
-        if spec.stashMap then
-            table.insert(rows, spec)
-        end
-    end
-    return rows
-end
-
 -- The prepper's map drops from survivalist and bandit corpses, whichever outfit variant they wear,
 -- and every loot list a map names exists.
 check("prepperMapTargets", function(expect)
     local lists = {}
-    for _, spec in ipairs(stashMapRows()) do
+    for _, spec in ipairs(Loot.rows(true)) do
         lists[spec.fullType] = {}
         for _, entry in ipairs(spec.entries) do
             expect(LibLoot.resolveItemList(entry[2]) ~= nil, spec.fullType .. ": no loot list " .. entry[2])
@@ -245,7 +232,7 @@ handler("stashMapsInCorpseLoot", function(_, _, defer)
         options.StashMode = mode
         D.apply()
         D.apply()
-        for _, spec in ipairs(stashMapRows()) do
+        for _, spec in ipairs(Loot.rows(true)) do
             for _, entry in ipairs(spec.entries) do
                 local count, weight = countPairs(LibLoot.resolveItemList(entry[2]), spec.fullType)
                 table.insert(found, {

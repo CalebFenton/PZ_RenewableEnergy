@@ -2,7 +2,6 @@
 -- Generator greyed out while a kit is fitted (GasKit refuses the action itself).
 
 local GasKit = require "RenewableEnergy/GasLine/GasKit"
-local Action = require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 local GeneratorReach = require "cf_commonlib/GeneratorReach"
 local JobOptions = require "cf_commonlib/JobOptions"
 local Needs = require "cf_commonlib/Needs"
@@ -27,7 +26,7 @@ function GasKitMenu.addOptions(playerNum, menu, generator)
         JobOptions.add(menu, playerNum, GasKit, GasKit.DISCONNECT, generator)
     else
         local sources = GasKit.sourcesNear(generator)
-        local label = getText(Action.labelKey(GasKit.CONNECT))
+        local label = JobOptions.jobName(GasKit, GasKit.CONNECT)
         if #sources == 0 then
             Needs.refuse(menu:addOption(label), "Tooltip_RenewableEnergy_NoDigesterInReach", GasKit.REACH)
         else

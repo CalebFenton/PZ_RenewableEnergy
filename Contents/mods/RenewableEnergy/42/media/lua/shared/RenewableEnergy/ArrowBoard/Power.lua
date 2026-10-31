@@ -16,6 +16,7 @@ local Battery = require "RenewableEnergy/PowerBank/Battery"
 local VehicleBattery = require "RenewableEnergy/Gadgets/VehicleBattery"
 local ArrowBoard = require "RenewableEnergy/ArrowBoard/Trailer"
 local Chance = require "cf_commonlib/Chance"
+local Items = require "cf_commonlib/Items"
 local VehicleParts = require "cf_commonlib/VehicleParts"
 
 -- The lamps draw what vanilla's lightbar takes from a vehicle battery with the engine off
@@ -50,11 +51,6 @@ local function holdsCharge(item)
     return Battery.nominalWh(item) > 0
 end
 
--- `charge` in whole uses of the battery: a charge is kept in uses and read back a hair off.
-local function usesAt(battery, charge)
-    return math.floor(charge / battery:getUseDelta() + 0.5)
-end
-
 -- Moves up to `wh` into or out of the batteries in the box, toward `target`: 1 to charge them,
 -- the controller's cutoff to drain them (Battery.shift). Authority only. Returns the watt-hours
 -- moved.
@@ -70,7 +66,7 @@ local function fullestOver(container, charge)
     for i = 0, items:size() - 1 do
         local item = items:get(i)
         if holdsCharge(item) then
-            local over = item:getCurrentUses() - usesAt(item, charge)
+            local over = item:getCurrentUses() - Items.usesAt(item, charge)
             most = most and math.max(most, over) or over
         end
     end
@@ -79,7 +75,7 @@ end
 
 -- Charging
 
---- Adds `hours` of its panels' output under `sky` (Sun.skyNow, now if nil) to the batteries in
+--- Adds `hours` of its panels' output under `sky` (Sun.skyNow) to the batteries in
 --- its battery box, the emptiest first, so that a mixed set fills evenly. The panels count as
 --- flat, since the trailer may face any way, and make nothing under a roof. Authority only.
 --- Returns the watt-hours stored.
@@ -202,7 +198,7 @@ function ArrowBoard.setSwitch(vehicle, on)
     return true
 end
 
---- The charge pass for one loaded vehicle under `sky` (Sun.skyNow, now if nil): if it is an
+--- The charge pass for one loaded vehicle under `sky` (Sun.skyNow): if it is an
 --- arrow board, storms may crack its panels, its panels show what they hold, they charge its box
 --- and its lamps draw from it. Authority only. Returns the watt-hours its panels stored.
 function ArrowBoard.update(vehicle, hours, sky)
@@ -210,7 +206,6 @@ function ArrowBoard.update(vehicle, hours, sky)
         return 0
     end
     local PanelStorms = require "RenewableEnergy/PowerBank/PanelStorms"
-    sky = sky or Sun.skyNow()
     ArrowBoard.stormCrack(vehicle, PanelStorms.stormHours(hours))
     ArrowBoard.showPanels(vehicle)
     local stored = ArrowBoard.charge(vehicle, hours, sky)

@@ -148,7 +148,6 @@ end
 --- take, Wind.crowding; nil for none): zero below cut-in, rising with the cube of the speed to its
 --- rated watts (Wind.ratedWatts) at rated speed and flat above; furled, its furled share.
 function Wind.watts(spec, kph, z, shelter, crowding)
-    local wind = SPEC
     if kph <= spec.cutInKph then
         return 0
     end
@@ -156,19 +155,18 @@ function Wind.watts(spec, kph, z, shelter, crowding)
     if Wind.furled(spec, kph) then
         share = spec.furledShare
     end
-    local height = 1 + wind.heightBonusPerLevel * math.min(math.max(z, 0), wind.maxBonusLevel)
-    return Wind.ratedWatts(spec) * share * height * (1 - wind.shelterLoss * shelter) * (1 - (crowding or 0))
+    local height = 1 + SPEC.heightBonusPerLevel * math.min(math.max(z, 0), SPEC.maxBonusLevel)
+    return Wind.ratedWatts(spec) * share * height * (1 - SPEC.shelterLoss * shelter) * (1 - (crowding or 0))
 end
 
---- The share of its wind a charger loses to another whose rotor turns on its level `distance`
---- squares away: Wind.SPEC.crowdLoss beside it, falling by a step each square out to none past
---- crowdRadius.
-function Wind.crowdShare(distance)
-    local wind = SPEC
-    if distance > wind.crowdRadius then
+-- The share of its wind a charger loses to another whose rotor turns on its level `distance`
+-- squares away: Wind.SPEC.crowdLoss beside it, falling by a step each square out to none past
+-- crowdRadius.
+local function crowdShare(distance)
+    if distance > SPEC.crowdRadius then
         return 0
     end
-    return wind.crowdLoss * (wind.crowdRadius + 1 - math.max(distance, 1)) / wind.crowdRadius
+    return SPEC.crowdLoss * (SPEC.crowdRadius + 1 - math.max(distance, 1)) / SPEC.crowdRadius
 end
 
 --- The share of its wind a charger loses to neighbours at `distances` (a list of squares away):
@@ -176,7 +174,7 @@ end
 function Wind.crowding(distances)
     local left = 1
     for _, distance in ipairs(distances) do
-        left = left * (1 - Wind.crowdShare(distance))
+        left = left * (1 - crowdShare(distance))
     end
     return 1 - left
 end
@@ -206,7 +204,7 @@ end
 function Wind.setBladesTile(isoObject, material)
     local kind, facing = chargerKind(isoObject)
     local tile = Sprites.windTileOf(kind, facing, material)
-    if not tile or tile == isoObject:getSprite():getName() then
+    if not tile or tile == Sprites.nameOf(isoObject) then
         return false
     end
     Tiles.setEntityTile(isoObject, tile)

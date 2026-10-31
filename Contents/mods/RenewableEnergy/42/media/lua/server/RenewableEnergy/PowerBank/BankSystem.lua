@@ -39,9 +39,6 @@ local EVERY_TEN_MINUTES = 1
 -- A pass integrates the sun in steps this long (hours), so an hourly pass still follows
 -- the sun's curve.
 local SUN_STEP = 1 / 6
--- Longer gaps than this between passes (a save loaded after the clock jumped) count as
--- this long, so one pass never swings the charge by days of sun (Bank:catchUp).
-BankSystem.longestPass = 24
 
 local deriveInitSystem, deriveInitLuaObjects = BankSystem.initSystem, BankSystem.initLuaObjects
 
@@ -193,19 +190,16 @@ end
 -- bank look at its container again and sends its status to everyone watching it.
 local REFRESH_MS = 1000
 
---- The bank at `position`, or nil, also when `position` isn't a { x, y, z } place.
+--- The bank at `position`, or nil, also when `position` isn't a { x, y, z } place, as a client's
+--- command may send.
 function BankSystem.bankAt(position)
-    local system = PowerBank.serverSystem
-    if not (system and Squares.isPosition(position)) then
-        return nil
-    end
-    return system:getLuaObjectAt(position.x, position.y, position.z)
+    return Squares.isPosition(position) and PowerBank.recordAt(position.x, position.y, position.z) or nil
 end
 
 --- The bank the source at x, y, z feeds, or nil.
 function BankSystem.bankOfSourceAt(x, y, z)
     local found = PowerBank.bankOfSource(x, y, z)
-    return found and BankSystem.bankAt(found) or nil
+    return found and PowerBank.recordAt(found.x, found.y, found.z)
 end
 
 local function mayRefresh(bank, player)

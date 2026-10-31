@@ -20,8 +20,6 @@ local PanelSource = require "RenewableEnergy/PowerBank/PanelSource"
 local WindSource = require "RenewableEnergy/PowerBank/WindSource"
 local TreadmillSource = require "RenewableEnergy/PowerBank/TreadmillSource"
 local Items = require "cf_commonlib/Items"
-local Jobs = require "cf_commonlib/Jobs"
-local Squares = require "cf_commonlib/Squares"
 local Action = require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 
 local SourceSite = {}
@@ -88,7 +86,7 @@ SourceSite.source = {
     open = function(object, with)
         local place = {}
         if PowerBank.isBank(with) then
-            local target = BankSystem.bankAt(Squares.positionOf(with))
+            local target = PowerBank.recordOf(with)
             place.target = target
             if target then
                 target:catchUp()
@@ -135,9 +133,6 @@ end
 -- What each job at a treadmill's tile does to it and the banks it touches.
 local TREADMILL = {
     [Treadmill.CONNECT] = function(character, place, row, tile)
-        if not place.target then
-            return false
-        end
         TreadmillSource.wire(tile, character)
         place.target:addSource(tile, character)
         return true

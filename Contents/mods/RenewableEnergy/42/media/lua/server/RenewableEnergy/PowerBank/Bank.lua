@@ -195,9 +195,7 @@ function Bank:removeSource(x, y, z)
     local _, index = self:findSource(x, y, z)
     if index then
         dropSource(self, index)
-        return true
     end
-    return false
 end
 
 --- Every source's output over the pass, as watts by family name. A source whose square is
@@ -216,7 +214,7 @@ function Bank:updateSources(hours, context)
         local square = getSquare(source.x, source.y, source.z)
         local object = Sources.findOn(square)
         if square and not (object and Sources.squareOk(square, source.kind)
-            and Sources.isInReach(self, source.x, source.y, source.z)) then
+            and PowerBank.inSourceReach(self, source.x, source.y, source.z)) then
             dropSource(self, i)
         else
             local size = Sources.slotsOf(source.kind)
@@ -388,10 +386,10 @@ function Bank:drawW()
     return self:inverterDrawW()
 end
 
---- Brings the bank up to now: the hours since its last pass, at most its system's longestPass, in
+--- Brings the bank up to now: the hours since its last pass, at most PowerBank.LONGEST_PASS, in
 --- the pass context `contextFor(hours)` gives (default: its system's passContext). Settles nothing.
 function Bank:catchUp(contextFor)
-    local hours = Clock.hoursSince(self, self.luaSystem.longestPass)
+    local hours = Clock.hoursSince(self, PowerBank.LONGEST_PASS)
     if hours > 0 then
         self:advance(hours, (contextFor or self.luaSystem.passContext)(hours))
     end

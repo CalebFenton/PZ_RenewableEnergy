@@ -371,10 +371,16 @@ return {
     },
     cracks = {
         heavy = {
-            flat = "renewable_energy_01_115",
+            flat = { "renewable_energy_01_115" },
             wall = {
-                metal = { S = "renewable_energy_01_116", E = "renewable_energy_01_117" },
-                wood = { S = "renewable_energy_01_118", E = "renewable_energy_01_119" },
+                metal = {
+                    S = { "renewable_energy_01_116" },
+                    E = { "renewable_energy_01_117" },
+                },
+                wood = {
+                    S = { "renewable_energy_01_118" },
+                    E = { "renewable_energy_01_119" },
+                },
             },
             rack = {
                 metal = {
@@ -392,10 +398,16 @@ return {
             },
         },
         light = {
-            flat = "renewable_energy_01_376",
+            flat = { "renewable_energy_01_376" },
             wall = {
-                metal = { S = "renewable_energy_01_377", E = "renewable_energy_01_378" },
-                wood = { S = "renewable_energy_01_379", E = "renewable_energy_01_380" },
+                metal = {
+                    S = { "renewable_energy_01_377" },
+                    E = { "renewable_energy_01_378" },
+                },
+                wood = {
+                    S = { "renewable_energy_01_379" },
+                    E = { "renewable_energy_01_380" },
+                },
             },
             rack = {
                 metal = {

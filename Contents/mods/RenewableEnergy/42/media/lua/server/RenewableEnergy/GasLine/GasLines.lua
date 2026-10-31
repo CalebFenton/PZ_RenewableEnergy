@@ -21,6 +21,7 @@ local Clock = require "cf_commonlib/Clock"
 local GeneratorReach = require "cf_commonlib/GeneratorReach"
 local Items = require "cf_commonlib/Items"
 local Squares = require "cf_commonlib/Squares"
+local Tables = require "cf_commonlib/Tables"
 local Tiles = require "cf_commonlib/Tiles"
 
 local GasLines = {}
@@ -39,13 +40,6 @@ local function generatorAt(position)
     return square and Squares.findObjectOn(square, GeneratorReach.isVanillaGenerator)
 end
 
--- The record of the source at `position` ({ x, y, z, kind }), loaded or not. A source has
--- canSupply(), supply(litres), capW(), wearFactor() and afterChange(), and a piped one
--- (GasKit.SOURCES) setPipe(side).
-local function recordAt(position)
-    return position and GasKit.SOURCES[position.kind].owner.recordAt(position.x, position.y, position.z)
-end
-
 local function isPiped(position)
     return position ~= nil and GasKit.SOURCES[position.kind].piped == true
 end
@@ -55,7 +49,7 @@ local isGeneratorPipeOverlay = Sprites.matcher(Sprites.gasifierPipeGen)
 
 -- Takes the pipe off the piped source at `position`: its half of it.
 local function unpipeSource(position)
-    local record = isPiped(position) and recordAt(position)
+    local record = isPiped(position) and GasKit.sourceRecord(position)
     if record then
         record:setPipe(nil)
     end
@@ -187,7 +181,7 @@ end
 --- vanilla for fuel while on gas, it ran those hours on gas: the source pays for them and it starts
 --- again. A line whose source is gone is lost with it, on petrol too: nothing comes back from it.
 function GasLines.run(generator, state, hours)
-    local record = recordAt(state.source)
+    local record = GasKit.sourceRecord(state.source)
     if state.source and not record then
         cutLine(generator, state)
     end
@@ -204,6 +198,8 @@ function GasLines.run(generator, state, hours)
         hasGas = record:supply(litres)
         record:afterChange()
     end
+    -- Read after the supply, whose burn can choke a gasifier's output.
+    local cap = record and record:capW() or GasKit.CAP_W
     if ranDry and hasGas then
         Fumes.setRunning(generator, true)
     end
@@ -214,7 +210,7 @@ function GasLines.run(generator, state, hours)
     if generator:isActivated() and state.onGas then
         local watts = Payers.deliveredW(generator)
         state.watts = watts
-        if watts > GasKit.capW(generator) then
+        if watts > cap then
             Fumes.setRunning(generator, false)
             state.stalled = true
         elseif record then
@@ -223,7 +219,7 @@ function GasLines.run(generator, state, hours)
     elseif state.stalled and hasGas and not generator:isActivated() then
         local watts = Payers.deliveredW(generator)
         state.watts = watts
-        if watts <= record:capW() then
+        if watts <= cap then
             Fumes.setRunning(generator, true)
             state.stalled = false
         end
@@ -271,14 +267,24 @@ local function settleLegacyList()
     end
 end
 
+-- What the clients read of a kit state: the generator info window's gas line and tank, and the
+-- kit's menu. The rest is the authority's bookkeeping, saved but never sent on its own.
+local function shownOf(state)
+    return { state.mode, state.onGas, state.tank, state.stalled, state.outOfGas, state.source }
+end
+
 --- Runs every kitted generator whose chunk is loaded (Payers.eachGenerator); an unloaded one waits.
+--- Sends the state of each whose clients' reading the pass changed.
 function GasLines.updateAll()
     settleLegacyList()
     Payers.eachGenerator(function(generator)
         local state = GasKit.stateOf(generator)
         if state then
+            local shown = shownOf(state)
             catchUp(generator, state)
-            generator:transmitModData()
+            if not Tables.sameValue(shown, shownOf(state)) then
+                generator:transmitModData()
+            end
         end
     end)
 end

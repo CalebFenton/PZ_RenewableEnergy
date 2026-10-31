@@ -210,7 +210,7 @@ local STAGE_1, STAGE_2 = 50, 20
 -- The frame's front and back, and the battery box lid.
 local BODY_PARTS = { "EngineDoor", "TruckBed", "TrunkDoor" }
 local BLOOD_SIDES = { "Front", "Rear", "Left", "Right" }
--- Indices into ArrowBoard.PANELS, which the server folder defines only after this file loads.
+-- The arrow board's two panels, as indices into ArrowBoard.PANELS.
 local LEFT, RIGHT = 1, 2
 
 local function setBlood(vehicle, sides)

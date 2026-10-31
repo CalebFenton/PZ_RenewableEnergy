@@ -1,6 +1,5 @@
 -- The authority's half of the rural find tests (RenewableEnergy.RuralFinds): buildings are rolled
--- for finds only where the authority runs them. Only registers handlers, so a --stay rerun loads it
--- again (RELOAD_FILES); RenewableEnergyTestHelpers.lua says how these handlers work.
+-- for finds only where the authority runs them.
 
 require "PZHarness/ServerHandlers"
 require "PZHarness/ServerChecks"
@@ -10,7 +9,6 @@ require "PZHarness/ServerRecords"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 local Kinds = require "RenewableEnergy/Debug/RenewableEnergyTestKinds"
 local BuildingWatch = require "RenewableEnergy/World/BuildingWatch"
-local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
 local RuralFinds = require "RenewableEnergy/World/RuralFinds"
 
 local handler, need = PZHarness.serverHandler, PZHarness.need
@@ -20,7 +18,6 @@ local handler, need = PZHarness.serverHandler, PZHarness.need
 -- the digester's magazine).
 local function forgetRoll(def, defer)
     local before = {}
-    local store, key = Helpers.keepBuildingRoll(RuralFinds.MOD_DATA, def, defer)
     for _, fullType in ipairs({ RuralFinds.PAMPHLET, RuralFinds.BIOGAS_MAGAZINE }) do
         before[fullType] = Helpers.readingIn(def, fullType)
     end
@@ -29,7 +26,7 @@ local function forgetRoll(def, defer)
             Helpers.takeReadingSince(def, fullType, held)
         end
     end)
-    store[key] = nil
+    Helpers.forgetBuildingRoll(RuralFinds.MOD_DATA, def, defer)
 end
 
 -- Where each placed find stands and how far out from the building `def`; each is taken away when
@@ -71,7 +68,7 @@ handler("ruralFindAt", function(_, args, testDefer)
     end
     local standing, reach = {}, {}
     for kind, find in pairs(RuralFinds.FINDS) do
-        standing[kind], reach[kind] = Helpers.findsAround(def, find.is), find.reach
+        standing[kind], reach[kind] = Helpers.findsAround(def, kind), find.reach
     end
     local undo = {}
     local function defer(fn) table.insert(undo, fn) end
@@ -112,13 +109,6 @@ handler("ruralFindsRoll", function(player, args, defer)
     end)
     return { chances = chances, found = found, placed = Kinds.count(found), kept = Helpers.buildingRoll(RuralFinds.MOD_DATA, def),
         again = Kinds.count(again) }
-end)
-
--- Empties the gasifier's filter at x, y, z, as a player taking out the spent packing would.
-handler("ruralFindEmptyFilter", function(_, args)
-    local _, object = PZHarness.Records.at({ kind = "gasifier", x = args.x, y = args.y, z = args.z })
-    Helpers.emptyContainer(Gasifier.filterOf(object))
-    return {}
 end)
 
 -- How many times the Java list holds `item`.

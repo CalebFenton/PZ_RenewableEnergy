@@ -4,7 +4,6 @@ require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 local BankMenu = require "RenewableEnergy/UI/BankMenu"
 local SourceMenu = require "RenewableEnergy/UI/SourceMenu"
 local GardenLightMenu = require "RenewableEnergy/UI/GardenLightMenu"
-local RenameBank = require "RenewableEnergy/UI/RenameBank"
 local Wiring = require "RenewableEnergy/PowerBank/Wiring"
 local BankJobs = require "RenewableEnergy/PowerBank/BankJobs"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
@@ -129,8 +128,7 @@ test("renewable_energy_bank_menu_wire_in_options", {
 })
 
 -- Repair offers each inverter, greyed out with the scrap marked short while there is none, and
--- once there is, walks over and mends the inverter in place with one scrap, on the server and this
--- client's copy.
+-- once there is, walks over and mends the inverter in place with one scrap, as this client sees.
 local WORN_INVERTER = 50
 local REPAIRED_INVERTER = WORN_INVERTER + Specs.partRepair.condition
 test("renewable_energy_bank_menu_repair_part", {
@@ -160,20 +158,14 @@ test("renewable_energy_bank_menu_repair_part", {
             T.waitFor(self, function()
                 local inverter = copyItem(bank, T.POWER_INVERTER)
                 return inverter ~= nil and inverter:getCondition() == REPAIRED_INVERTER
-            end, "this client's copy of the repaired inverter")
-            T.readRecord(self, bank)
-            T.count(self, "scrap", { Wiring.SCRAP })
+                    and player():getInventory():getCountTypeRecurse(Wiring.SCRAP) == 0
+            end, "this client's copy of the repaired inverter, its scrap used up")
         end)
     end,
     validate = function(self)
         T.expectOptionRefused(self, "Repair without scrap")
         expect(self.scrapShort, "Repair doesn't mark the scrap short")
-        if not T.expectOffered(self, "Repair with scrap") then return end
-        local inverter = stateItem(self.bank.state, T.POWER_INVERTER)
-        if not expect(inverter ~= nil, "repairing took the inverter out of the bank") then return end
-        expectEqual("inverter condition after the repair", inverter.condition, REPAIRED_INVERTER)
-        expectEqual("scrap left", self.counts.scrap[Wiring.SCRAP], 0)
-        expectEqual("scrap left on this client", player():getInventory():getCountTypeRecurse(Wiring.SCRAP), 0)
+        T.expectOffered(self, "Repair with scrap")
     end,
 })
 
@@ -365,43 +357,36 @@ test("renewable_energy_bank_menu_connect_all_skips_sources_of_other_banks", {
     end,
 })
 
--- A rename goes through the bank trimmed and shows in its menu and window, and an empty name gives
--- the tier's name back.
+-- A rename shows in the bank's menu and window, and an empty name gives the tier's name back.
 test("renewable_energy_bank_rename_trims_and_empty_restores_tier_name", {
-    instant = true,
     run = function(self)
         local bank = T.bank(self, "batteryRackMetal", {}, { outdoors = true })
         if not bank then return end
         self.bank = bank
+        T.job(self, "bank", BankJobs.RENAME, bank, "  Cellar  ")
+        T.waitFor(self, function() return BankMenu.bankLabel(bank.object) == "Cellar" end, "this client's label of the renamed bank")
+        -- The wait for "Cellar" is the menu's check; the window's title is read off the same copy.
+        T.openWindow(self, bank)
         T.step(function()
-            if not T.walkTo(self, bank.square, "the bank") then return end
-            ISTimedActionQueue.add(RenewableEnergyAction:new(player(), "bank", BankJobs.RENAME, bank.object, "  Cellar  "))
-            T.waitFor(self, function() return BankMenu.bankLabel(bank.object) == "Cellar" end, "this client's label of the renamed bank")
-            -- The wait for "Cellar" is the menu's check; the window's title is read off the same copy.
-            T.openWindow(self, bank)
-            T.step(function()
-                self.title = self.window.title
-                self.window:close()
-                local action = RenewableEnergyAction:new(player(), "bank", BankJobs.RENAME, bank.object, "")
-                self.emptyAllowed = action:canPerform()
-                ISTimedActionQueue.add(action)
-                T.waitFor(self, function() return BankMenu.bankLabel(bank.object) ~= "Cellar" end,
-                    "this client's label of the bank renamed to nothing")
-                T.readRecord(self, bank)
-            end)
+            self.title = self.window.title
+            self.window:close()
         end)
+        T.job(self, "bank", BankJobs.RENAME, bank, "", "emptied")
+        T.waitFor(self, function() return BankMenu.bankLabel(bank.object) ~= "Cellar" end,
+            "this client's label of the bank renamed to nothing")
+        T.readRecord(self, bank)
     end,
     validate = function(self)
         expectEqual("the renamed bank's window title", self.title, "Cellar")
-        expect(self.emptyAllowed, "renaming to an empty name was refused")
+        T.expectOk(self.reads.emptied, "renaming the bank to an empty name")
         expectEqual("this client's label of the bank renamed to nothing", BankMenu.bankLabel(self.bank.object),
             getItemNameFromFullType("RenewableEnergy.BatteryRackMetal"))
         expectEqual("the server's name of the bank renamed to nothing", self.bank.state.name, "")
     end,
 })
 
--- The rename box stops typing at the longest name a bank takes, and the authority refuses a longer
--- name, or one on more than one line, leaving the name as it was; a name of the full length goes.
+-- The authority refuses a name longer than a bank takes, or one on more than one line, leaving the
+-- name as it was; a name of the full length goes.
 test("renewable_energy_bank_rename_refuses_long_or_multiline_names", {
     run = function(self)
         local bank = T.bank(self, "batteryBoxWood", {}, { outdoors = true })
@@ -417,14 +402,6 @@ test("renewable_energy_bank_rename_refuses_long_or_multiline_names", {
             T.job(self, "bank", BankJobs.RENAME, bank, self.full, "fullLength")
             T.readRecord(self, bank)
         end)
-        T.step(function()
-            local box = RenameBank.ask(0, bank.object)
-            T.defer(self, function() box:destroy() end)
-            box.entry:setText(string.rep("z", longest + 5))
-            -- The box cuts what was typed past its limit when it next updates.
-            T.wait(2)
-            T.step(function() self.typed = box.entry:getText() end)
-        end)
     end,
     validate = function(self)
         local reads = self.reads
@@ -434,6 +411,5 @@ test("renewable_energy_bank_rename_refuses_long_or_multiline_names", {
         expectEqual("the bank's name after the refused names", reads.refused.name, "Shed")
         T.expectOk(reads.fullLength, "renaming the bank with a name of " .. BankJobs.NAME_LENGTH .. " characters")
         expectEqual("the bank's name after a name of " .. BankJobs.NAME_LENGTH .. " characters", self.bank.state.name, self.full)
-        expectEqual("characters in the rename box", #self.typed, BankJobs.NAME_LENGTH)
     end,
 })

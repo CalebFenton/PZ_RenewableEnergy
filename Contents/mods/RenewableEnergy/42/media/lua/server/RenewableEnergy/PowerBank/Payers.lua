@@ -19,7 +19,6 @@
 
 if isClient() then return end
 
-local PlaceTracker = require "RenewableEnergy/PlaceTracker"
 local Places = require "RenewableEnergy/Places"
 local Sprites = require "RenewableEnergy/Sprites"
 local Specs = require "RenewableEnergy/Specs"
@@ -28,6 +27,7 @@ local Treadmill = require "RenewableEnergy/PowerBank/Treadmill"
 local Loads = require "RenewableEnergy/PowerBank/Loads"
 local GasKit = require "RenewableEnergy/GasLine/GasKit"
 local GeneratorReach = require "cf_commonlib/GeneratorReach"
+local PlaceTracker = require "cf_commonlib/PlaceTracker"
 local Squares = require "cf_commonlib/Squares"
 local Telemetry = require "cf_commonlib/Telemetry"
 

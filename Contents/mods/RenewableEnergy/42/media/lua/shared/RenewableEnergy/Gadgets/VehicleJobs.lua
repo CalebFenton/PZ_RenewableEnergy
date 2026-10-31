@@ -3,6 +3,7 @@
 -- character and what refuses it (cf_commonlib's Jobs); VehicleJobsServer does them.
 -- A job at a vehicle reaches at waist height, from the area of the part it works on.
 
+local Specs = require "RenewableEnergy/Specs"
 local ModuleRepair = require "RenewableEnergy/PowerBank/ModuleRepair"
 local ArrowBoard = require "RenewableEnergy/ArrowBoard/Power"
 local SolarMaintainer = require "RenewableEnergy/Gadgets/SolarMaintainer"
@@ -44,15 +45,16 @@ end
 -- The arrow board's switch set to `on`.
 local function boardJob(on)
     return {
-        on = on, minutes = 0.5, position = "Mid", doneSound = "LightSwitch", area = atBox,
-        blocker = function(character, vehicle) return not ArrowBoard.canSwitch(vehicle, on) and "can't switch" or nil end,
+        on = on, minutes = 0.5, position = "Mid", doneSound = "LightSwitch", area = atBox, hideBlocked = true,
+        blocker = function(character, vehicle)
+            return not ArrowBoard.canSwitch(vehicle, on) and "Tooltip_RenewableEnergy_CantSwitchLamps" or nil
+        end,
     }
 end
 
 -- An alternator hangs on two bolts and a belt tensioner: a wrench, and a little more skill than
 -- the battery's screwdriver.
 local SKILL = { perk = "Mechanics", need = 2 }
-local WRENCH = { tool = "WRENCH", item = "Base.Wrench" }
 
 -- Take Out and Put Back Alternator (CarAlternator), worked as vanilla works on an
 -- engine-bay part (ISUninstallVehiclePart). A shut hood isn't the menu's blocker, as the menu
@@ -66,7 +68,7 @@ local function alternatorJob(putBack)
             return CarAlternator.blocker(character, vehicle, putBack)
                 or not CarAlternator.hoodOpen(vehicle) and "Tooltip_RenewableEnergy_HoodShut" or nil
         end,
-        materials = putBack and { SKILL, WRENCH, { item = CarAlternator.ITEM, need = 1, keep = true } } or { SKILL, WRENCH },
+        materials = putBack and { SKILL, Specs.WRENCH, { item = CarAlternator.ITEM, need = 1, keep = true } } or { SKILL, Specs.WRENCH },
     }
 end
 
@@ -74,13 +76,17 @@ end
 -- works with, or the panel part Seal Cracked Panel seals.
 VehicleJobs.JOBS = {
     [VehicleJobs.ATTACH_MAINTAINER] = {
-        minutes = 1, position = "Mid", sound = "GeneratorConnect", area = atBattery,
-        blocker = function(character, vehicle) return not SolarMaintainer.canAttach(vehicle) and "can't attach" or nil end,
+        minutes = 1, position = "Mid", sound = "GeneratorConnect", area = atBattery, hideBlocked = true,
+        blocker = function(character, vehicle)
+            return not SolarMaintainer.canAttach(vehicle) and "Tooltip_RenewableEnergy_CantAttachMaintainer" or nil
+        end,
         with = Items.ofType(SolarMaintainer.ITEM), withMissing = "Tooltip_RenewableEnergy_NeedsMaintainer",
     },
     [VehicleJobs.DETACH_MAINTAINER] = {
-        minutes = 1, position = "Mid", area = atBattery,
-        blocker = function(character, vehicle) return not SolarMaintainer.isAttached(vehicle) and "not attached" or nil end,
+        minutes = 1, position = "Mid", area = atBattery, hideBlocked = true,
+        blocker = function(character, vehicle)
+            return not SolarMaintainer.isAttached(vehicle) and "Tooltip_RenewableEnergy_NoMaintainerAttached" or nil
+        end,
     },
     [VehicleJobs.TAKE_OUT_ALTERNATOR] = alternatorJob(false),
     [VehicleJobs.PUT_BACK_ALTERNATOR] = alternatorJob(true),
@@ -90,11 +96,11 @@ VehicleJobs.JOBS = {
     -- waist height (ISUninstallVehiclePart), ending in the sound of a lock giving way, as when a
     -- character forces a locked window (OpenWindowState).
     [VehicleJobs.CUT_PADLOCK] = {
-        units = 100, anim = "VehicleWorkOnMid", doneSound = "BreakLockOnWindow", wield = true,
+        units = 100, anim = "VehicleWorkOnMid", doneSound = "BreakLockOnWindow", wield = true, hideBlocked = true,
         area = function(vehicle) return areaOf(vehicle, ArrowBoard.LID) end,
         blocker = function(character, vehicle)
             local lid = ArrowBoard.isTrailer(vehicle) and vehicle:getPartById(ArrowBoard.LID)
-            return not (lid and ArrowBoard.isPadlocked(lid)) and "not padlocked" or nil
+            return not (lid and ArrowBoard.isPadlocked(lid)) and "Tooltip_RenewableEnergy_NotPadlocked" or nil
         end,
         with = VehicleJobs.isBoltCutters, withMissing = "Tooltip_RenewableEnergy_NeedsBoltCutters",
     },
@@ -105,7 +111,7 @@ VehicleJobs.JOBS = {
 }
 
 Jobs.define(VehicleJobs, {
-    subjectOf = function(vehicle) return instanceof(vehicle, "BaseVehicle") and vehicle or nil end, missing = "no vehicle",
+    subjectOf = function(vehicle) return instanceof(vehicle, "BaseVehicle") and vehicle or nil end, missing = "Tooltip_RenewableEnergy_NoVehicle",
 })
 
 return VehicleJobs

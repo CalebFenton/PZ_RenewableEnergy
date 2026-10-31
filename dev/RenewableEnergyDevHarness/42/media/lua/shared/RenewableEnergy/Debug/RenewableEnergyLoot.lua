@@ -71,6 +71,19 @@ function Loot.withLootRarity(lrm, fn)
     end)
 end
 
+--- The rows of the mod's loot entries (Distributions.items) that drop stash maps when
+--- `stashMaps`, else the others, which the loot rarity options scale.
+function Loot.rows(stashMaps)
+    local Distributions = require "RenewableEnergy/Items/Distributions"
+    local rows = {}
+    for _, spec in ipairs(Distributions.items) do
+        if not spec.stashMap == not stashMaps then
+            table.insert(rows, spec)
+        end
+    end
+    return rows
+end
+
 -- The references in Distributions.items with junk lists folded into their own,
 -- each with the set of item types it lists: { { reference = ..., items = { [fullType] = true } } }.
 local function lootTargets()
@@ -179,24 +192,51 @@ local function sortedKeys(t)
     return keys
 end
 
---- How WorldSpawns and the arrow board stock the containers they place, each as fill(container).
-function Loot.worldStocks()
+--- What WorldSpawns and the arrow board stock the containers they place with, over `samples` fills
+--- of each that every reader of `readers` (name -> read(container), as PZHarness.Loot.sample takes)
+--- reads: `banks` and `crates` by BANK_STOCK and CRATE_STOCK name, and `arrowBoard`, each as reader
+--- name -> PZHarness.Loot.sample's result. The stocks read only the loot rarity options, so the
+--- caller sets those.
+function Loot.sampleWorldStocks(samples, readers)
     local WorldSpawns = require "RenewableEnergy/World/WorldSpawns"
-    local stocks = { banks = {}, crates = {} }
+    local container = PZLoot.scratchContainer(nil)
+    -- One fill feeds every reader, its keys tagged "<reader name> <key>".
+    local function readAll(filled)
+        local tagged = {}
+        for name, read in pairs(readers) do
+            for key, count in pairs(read(filled)) do
+                tagged[name .. " " .. key] = count
+            end
+        end
+        return tagged
+    end
+    local function sample(fill)
+        local byReader = {}
+        for name in pairs(readers) do
+            byReader[name] = {}
+        end
+        for tagged, measured in pairs(PZLoot.sample(fill, samples, container, readAll)) do
+            local name, key = tagged:match("^(%S+) (.+)$")
+            byReader[name][key] = measured
+        end
+        return byReader
+    end
+    local stocks = { banks = {}, crates = {}, arrowBoard = sample(ArrowBoard.stockBatteryBox) }
     for name in pairs(WorldSpawns.BANK_STOCK) do
-        stocks.banks[name] = function(container) WorldSpawns.stockBank(container, name) end
+        stocks.banks[name] = sample(function(filled) WorldSpawns.stockBank(filled, name) end)
     end
     for name in pairs(WorldSpawns.CRATE_STOCK) do
-        stocks.crates[name] = function(container) WorldSpawns.stockCrate(container, name) end
+        stocks.crates[name] = sample(function(filled) WorldSpawns.stockCrate(filled, name) end)
     end
-    stocks.arrowBoard = ArrowBoard.stockBatteryBox
     return stocks
 end
 
--- Prints under `mark` how often `fill` put each item in `container` over `samples` fills, as
--- `count` counts them, listing the `expected` items even when none came.
-local function printMeasured(mark, reference, samples, fill, container, expected, count)
-    local items = fill and PZLoot.sample(fill, samples, container, count) or {}
+-- Prints under `mark` how often each item came over `samples` fills, `items` being
+-- PZHarness.Loot.sample's result or nil where nothing was filled, listing the `expected` items even
+-- when none came.
+local function printMeasured(mark, reference, samples, items, expected)
+    local filled = items ~= nil
+    items = items or {}
     local fullTypes = sortedKeys(expected)
     for fullType in pairs(items) do
         if not expected[fullType] then
@@ -214,51 +254,49 @@ local function printMeasured(mark, reference, samples, fill, container, expected
         -- Drops the module, so vanilla items the world entries count read the same way.
         table.insert(parts, (string.gsub(fullType, "^[^.]+%.", "")) .. " " .. text)
     end
-    print(string.format("%s %s [%d samples]: %s", mark, reference, fill and samples or 0,
+    print(string.format("%s %s [%d samples]: %s", mark, reference, filled and samples or 0,
         #parts > 0 and table.concat(parts, "; ") or "nothing"))
 end
 
 --- Prints under `mark` how often the mod's items spawn in every list the mod adds to, the stash
---- crate and the room containers that pick the mod's own lists, and what world banks and crates
---- are stocked with, vanilla items included, each over `samples` fills at the default loot rarity
---- options.
-function Loot.printReport(samples, mark)
-    PZLoot.withMeasureOptions(Loot.MEASURE_OPTIONS, function()
-        local targets = lootTargets()
-        table.insert(targets, { reference = STASH_CRATE, items = {} })
-        local function build()
-            local containers, lists = roomContainersModOnly()
-            for key, lootTable in pairs(modOnlyTables(targets)) do
-                containers[key] = lootTable
-            end
-            return containers, lists
+--- crate and the room containers that pick the mod's own lists, each over `samples` fills, and
+--- what world banks and crates are stocked with, vanilla items included, from `stocks`
+--- (Loot.sampleWorldStocks with an `items` reader of PZHarness.Loot.countItems). The caller sets
+--- the measuring options (MEASURE_OPTIONS) and loot rarity options 1.
+function Loot.printReport(samples, mark, stocks)
+    local targets = lootTargets()
+    table.insert(targets, { reference = STASH_CRATE, items = {} })
+    local function build()
+        local containers, lists = roomContainersModOnly()
+        for key, lootTable in pairs(modOnlyTables(targets)) do
+            containers[key] = lootTable
         end
-        withLoot(1, build, function(parsed)
-            print(string.format("%s settings: Other loot %.2f, Recipe Resources %.2f, loot rarity options 1, no zombie density bonus",
-                mark, ItemPickerJava.getLootModifierFromType("Other"), ItemPickerJava.getLootModifierFromType("RecipeResource")))
-            local container = PZLoot.scratchContainer(nil)
-            for i, target in ipairs(targets) do
-                local list = parsed["t" .. i]
-                printMeasured(mark, target.reference, samples, list and PZLoot.rollFill(list), container, target.items,
-                    countModItems)
-            end
-            local square = PZLoot.squareOutsideRooms(getPlayer())
-            local roomContainer = PZLoot.scratchContainer(square)
-            for i, spec in ipairs(ROOM_CONTAINERS) do
-                local list = square and parsed["r" .. i]
-                printMeasured(mark, spec.room .. "." .. spec.container, samples, list and PZLoot.rollFill(list), roomContainer,
-                    {}, countModItems)
-            end
-            local stocks = Loot.worldStocks()
-            for _, name in ipairs(sortedKeys(stocks.banks)) do
-                printMeasured(mark, "world:bank." .. name, samples, stocks.banks[name], container, {}, PZLoot.countItems)
-            end
-            for _, name in ipairs(sortedKeys(stocks.crates)) do
-                printMeasured(mark, "world:crate." .. name, samples, stocks.crates[name], container, {}, PZLoot.countItems)
-            end
-            printMeasured(mark, "world:arrowBoard", samples, stocks.arrowBoard, container, {}, PZLoot.countItems)
-        end)
+        return containers, lists
+    end
+    withLoot(1, build, function(parsed)
+        print(string.format("%s settings: Other loot %.2f, Recipe Resources %.2f, loot rarity options 1, no zombie density bonus",
+            mark, ItemPickerJava.getLootModifierFromType("Other"), ItemPickerJava.getLootModifierFromType("RecipeResource")))
+        local container = PZLoot.scratchContainer(nil)
+        for i, target in ipairs(targets) do
+            local list = parsed["t" .. i]
+            printMeasured(mark, target.reference, samples,
+                list and PZLoot.sample(PZLoot.rollFill(list), samples, container, countModItems), target.items)
+        end
+        local square = PZLoot.squareOutsideRooms(getPlayer())
+        local roomContainer = PZLoot.scratchContainer(square)
+        for i, spec in ipairs(ROOM_CONTAINERS) do
+            local list = square and parsed["r" .. i]
+            printMeasured(mark, spec.room .. "." .. spec.container, samples,
+                list and PZLoot.sample(PZLoot.rollFill(list), samples, roomContainer, countModItems), {})
+        end
     end)
+    for _, name in ipairs(sortedKeys(stocks.banks)) do
+        printMeasured(mark, "world:bank." .. name, samples, stocks.banks[name].items, {})
+    end
+    for _, name in ipairs(sortedKeys(stocks.crates)) do
+        printMeasured(mark, "world:crate." .. name, samples, stocks.crates[name].items, {})
+    end
+    printMeasured(mark, "world:arrowBoard", samples, stocks.arrowBoard.items, {})
 end
 
 return Loot

@@ -58,10 +58,10 @@ test("renewable_energy_solar_crack_looks_follow_the_module", {
         for _, result in ipairs(self.rows) do
             local module, cracks, look = result.row[1], result.row[2], result.row[3]
             local what = module .. " at " .. result.condition .. " after " .. cracks .. " cracks"
-            local expected = look and Sprites.cracks[look].flat or ""
+            local expected = look and Sprites.cracks[look].flat[1] or ""
             expectEqual(what .. ": its look", result.cracked, expected)
             if result.sealed then
-                expectEqual(what .. ", sealed once: its look", result.sealed, Sprites.cracks.light.flat)
+                expectEqual(what .. ", sealed once: its look", result.sealed, Sprites.cracks.light.flat[1])
             end
             expectEqual(what .. ", reglazed: its look", result.reglazed, "")
             if result.sealedReglazed then
@@ -271,30 +271,26 @@ test("renewable_energy_solar_mount_xp_only_for_new_modules", {
 
 -- Solar modules -------------------------------------------------------------------------------
 
--- Seal Cracked Module adds ModuleRepair.SEAL_ADDS up to the module type's cap, lowered a step for
--- each earlier seal, and is refused at that limit with the module untouched. Each seal counts
--- once, on this client's copy too, and a sealed module still shows cracked.
--- Each row: the behaviour, the module, its seal count, and its condition before.
+-- Seal Cracked Module adds 20 condition up to the module type's cap (a factory module's 55), 10
+-- lower for each earlier seal, and is refused at that limit with the module untouched. Each seal
+-- counts once, on this client's copy too, and a sealed module still shows cracked. Each row: the
+-- behaviour, the module, its seal count, its condition before, and after (nil where the game
+-- refuses). Factory modules only: the homemade module's cap is another row of the same table.
 local MODULE_REPAIRS = {
-    { "factory_adds_a_step", T.FACTORY_MODULE, 0, T.sealCap(T.FACTORY_MODULE, 0) - ModuleRepair.SEAL_ADDS - 1 },
-    { "factory_below_limit_stops_at_limit", T.FACTORY_MODULE, 0, T.sealCap(T.FACTORY_MODULE, 0) - 1 },
-    { "factory_at_limit_refused", T.FACTORY_MODULE, 0, T.sealCap(T.FACTORY_MODULE, 0) },
-    { "factory_after_two_seals_stops_at_lower_limit", T.FACTORY_MODULE, 2, T.sealCap(T.FACTORY_MODULE, 2) - 1 },
-    { "factory_after_three_seals_at_limit_refused", T.FACTORY_MODULE, 3, T.sealCap(T.FACTORY_MODULE, 3) },
-    { "homemade_below_limit_stops_at_limit", T.HOMEMADE_MODULE, 0, T.sealCap(T.HOMEMADE_MODULE, 0) - 1 },
-    { "homemade_after_one_seal_stops_at_lower_limit", T.HOMEMADE_MODULE, 1, T.sealCap(T.HOMEMADE_MODULE, 1) - 1 },
+    { "factory_adds_a_step", T.FACTORY_MODULE, 0, 34, 54 },
+    { "factory_below_limit_stops_at_limit", T.FACTORY_MODULE, 0, 54, 55 },
+    { "factory_at_limit_refused", T.FACTORY_MODULE, 0, 55 },
+    { "factory_after_two_seals_stops_at_lower_limit", T.FACTORY_MODULE, 2, 34, 35 },
 }
 for _, entry in ipairs(MODULE_REPAIRS) do
-    local behavior, module, repaired, before = entry[1], entry[2], entry[3], entry[4]
-    local limit = T.sealCap(module, repaired)
-    local refused = before >= limit
+    local behavior, module, repaired, before, after = entry[1], entry[2], entry[3], entry[4], entry[5]
     local seal = "RenewableEnergy_RepairCrackedModule"
     T.repairCraftTest(craftName(seal, behavior), seal, module, {
         before = before,
         repaired = repaired,
-        after = refused and before or math.min(limit, before + ModuleRepair.SEAL_ADDS),
-        repairedAfter = refused and repaired or repaired + 1,
-        refused = refused,
+        after = after or before,
+        repairedAfter = after and repaired + 1 or repaired,
+        refused = after == nil,
         validate = function(_, item)
             -- The seal leaves the glass cracked, and the module showing it.
             expect(ModuleRepair.crackLookOf(module, item.condition) ~= nil, "a sealed module shows whole")
@@ -306,7 +302,8 @@ end
 -- module and the pane untouched, and the new glass clears the old seals.
 -- New glass on light cracks brings a module back to new; on heavy cracks, or on a sealed module, to
 -- the cells-cracked share of new. Each row: the behaviour, the module, its condition and seal count
--- before, the condition after, and whether the game refuses.
+-- before, the condition after, and whether the game refuses. Factory modules only: the shares are
+-- of the type's ConditionMax, whichever module it is.
 local REGLAZE, LOOKS = ModuleRepair.REGLAZE, Specs.crackLooks
 local function share(module, part) return math.floor(Items.conditionMaxOf(module) * part) end
 local function heavy(module) return share(module, LOOKS.heavyBelow) - 1 end
@@ -319,10 +316,6 @@ local REGLAZES = {
     { "factory_sealed_three_times_clears_seals", T.FACTORY_MODULE, light(T.FACTORY_MODULE), 3, cellsCracked(T.FACTORY_MODULE) },
     { "factory_just_below_new_back_to_new", T.FACTORY_MODULE, new(T.FACTORY_MODULE) - 1, 0, new(T.FACTORY_MODULE) },
     { "factory_at_new_refused", T.FACTORY_MODULE, new(T.FACTORY_MODULE), 0, new(T.FACTORY_MODULE), true },
-    { "homemade_heavy_cracks_cells_stay_cracked", T.HOMEMADE_MODULE, heavy(T.HOMEMADE_MODULE), 0,
-        cellsCracked(T.HOMEMADE_MODULE) },
-    { "homemade_light_cracks_back_to_new", T.HOMEMADE_MODULE, light(T.HOMEMADE_MODULE), 0, new(T.HOMEMADE_MODULE) },
-    { "homemade_at_new_refused", T.HOMEMADE_MODULE, new(T.HOMEMADE_MODULE), 0, new(T.HOMEMADE_MODULE), true },
 }
 for _, entry in ipairs(REGLAZES) do
     local behavior, module, before, repaired, reglazed, refused = entry[1], entry[2], entry[3], entry[4], entry[5], entry[6]

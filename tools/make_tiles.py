@@ -229,11 +229,13 @@ def sprite_tiles():
         chargers.setdefault(_field(model), {})[blades] = _by(first, DIRECTIONS)
         models.setdefault(_field(model), _wind_model(model, ROTOR_SPIN, True))
 
+    # Every mount's cracks are a list by module slot: a flat or wall panel has one slot.
     cracks = {}
     for look, flat, mounts in CRACKS:
         cracks[look] = {
-            "flat": _name(flat),
-            "wall": {material: _by(wall, "SE") for material, (wall, _) in mounts.items()},
+            "flat": [_name(flat)],
+            "wall": {material: {facing: [name] for facing, name in _by(wall, "SE").items()}
+                     for material, (wall, _) in mounts.items()},
             "rack": {material: {facing: _run(rack + RACK_SLOTS * f, RACK_SLOTS) for f, facing in enumerate(FACINGS)}
                      for material, (_, rack) in mounts.items()},
         }

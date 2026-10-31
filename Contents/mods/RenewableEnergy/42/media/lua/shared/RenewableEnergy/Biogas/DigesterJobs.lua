@@ -3,6 +3,7 @@
 
 local Digester = require "RenewableEnergy/Biogas/Digester"
 local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
+local Sprites = require "RenewableEnergy/Sprites"
 local Items = require "cf_commonlib/Items"
 local Jobs = require "cf_commonlib/Jobs"
 local Tables = require "cf_commonlib/Tables"
@@ -31,6 +32,17 @@ local STEEL_WOOL = "Base.SteelWool"
 local PIPES = { "Base.Pipe", "Base.ClayPipeSegment", "Base.LeadPipe", "Base.MetalPipe" }
 -- The water a scrubber charge takes, named in litres in the tooltip.
 local SCRUB_WATER = { water = Digester.SCRUB_WATER, labelKey = "IGUI_RenewableEnergy_WaterLitres" }
+
+-- The barrels a barrel digester can be built from, each with its own tile, in a steady order for
+-- the tooltip: the Metal Drum, whose entity the build menu builds on, first.
+local BARRELS = {}
+for barrel in pairs(Sprites.digester.barrel) do
+    if barrel ~= "MetalDrum" then
+        table.insert(BARRELS, "Base." .. barrel)
+    end
+end
+table.sort(BARRELS)
+table.insert(BARRELS, 1, "Base.MetalDrum")
 
 --- Sludge in one use of a compost bag.
 function DigesterJobs.sludgePerUse()
@@ -110,19 +122,13 @@ local function isVessel(item)
     return Digester.FILL_SHARES[item:getFullType()] ~= nil
 end
 
--- The whole uses of `vessel` that make `share` of it. It holds whole uses, read back as a float
--- that may fall a hair short (InventoryItem.getCurrentUsesFloat), so fills count in uses.
-local function usesAt(vessel, share)
-    return round(share / vessel:getUseDelta())
-end
-
 --- The uses of `vessel`, a tank, torch or bottle, a fill (a fill job's row.fill) would add now
 --- from a digester whose summary (or record) is `summary`: unscrubbed gas up to the pump's share,
 --- and for a fill that takes scrubbed gas, that beyond it. Returns the unscrubbed and the scrubbed
 --- uses, and the m³ in a use.
 function DigesterJobs.fillUses(fill, summary, vessel)
     local perUse = Digester.M3_PER_TANK * Digester.FILL_SHARES[vessel:getFullType()] * vessel:getUseDelta()
-    local filled, pumped = vessel:getCurrentUses(), usesAt(vessel, Digester.PUMP_FILL)
+    local filled, pumped = vessel:getCurrentUses(), Items.usesAt(vessel, Digester.PUMP_FILL)
     local gasUses = math.floor(summary.gas / perUse)
     local plain = math.min(gasUses, math.max(0, pumped - filled))
     local scrubbed = 0
@@ -177,7 +183,7 @@ local function fillJob(fields)
             return "Tooltip_RenewableEnergy_NoPower"
         end
         if fillAmount(fill, summary, vessel) <= 0 then
-            if vessel:getCurrentUses() >= usesAt(vessel, fill.limit) then
+            if vessel:getCurrentUses() >= Items.usesAt(vessel, fill.limit) then
                 return fill.full
             end
             return "Tooltip_RenewableEnergy_NeedsScrubbed"
@@ -232,8 +238,7 @@ DigesterJobs.JOBS = {
             { perk = "Mechanics", need = 2 },
             { tool = "HAMMER", item = "Base.Hammer" },
             { tool = "SAW", item = "Base.Saw" },
-            -- The barrels the Barrel Digester recipe takes (Entities.txt).
-            { item = "Base.MetalDrum", types = { "Base.MetalDrum", "Base.Mov_OrangeBarrel", "Base.Mov_DarkGreenBarrel", "Base.Mov_LightGreenBarrel" }, need = 1 },
+            { item = BARRELS[1], types = BARRELS, need = 1 },
             { item = "Base.Plank", need = 6 },
             { item = "Base.Nails", need = 12 },
             { item = "Base.Tarp", need = 1 },

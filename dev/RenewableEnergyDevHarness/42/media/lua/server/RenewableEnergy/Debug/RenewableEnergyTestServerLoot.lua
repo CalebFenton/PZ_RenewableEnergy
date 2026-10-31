@@ -1,6 +1,4 @@
 -- The authority's half of the loot tests: the server's loot tables alone hold the mod's entries.
--- Only registers handlers, so a --stay rerun loads it again (RELOAD_FILES);
--- RenewableEnergyTestHelpers.lua says how these handlers work.
 
 require "PZHarness/ServerChecks"
 require "PZHarness/Fixtures"
@@ -87,19 +85,8 @@ local function checkHandedOut(expect, spec, capacity)
     end
 end
 
--- The rows a loot rarity option scales; the stash maps' (stashMap) are the stash tests'.
-local function optionRows(items)
-    local rows = {}
-    for _, spec in ipairs(items) do
-        if not spec.stashMap then
-            table.insert(rows, spec)
-        end
-    end
-    return rows
-end
-
 check("lootListsInUse", function(expect)
-    local rows = optionRows(Distributions.items)
+    local rows = Loot.rows(false)
     local procUsers = PZHarness.Loot.procListUsers()
     local vehicleTables = vehicleTablesInUse()
     local stashTables = stashSpawnTables()
@@ -186,7 +173,7 @@ check("lootRarityOptions", function(expect, expectNear, _, args, defer)
         D.apply()
         D.apply()
         local removed = {}
-        for _, spec in ipairs(optionRows(D.items)) do
+        for _, spec in ipairs(Loot.rows(false)) do
             local multiplier = row[spec.option]
             if multiplier == 0 then
                 removed[spec.fullType] = true

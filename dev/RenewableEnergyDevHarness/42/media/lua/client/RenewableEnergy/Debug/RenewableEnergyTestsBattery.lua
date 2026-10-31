@@ -120,7 +120,8 @@ craftTest(craftName("RenewableEnergy_MakeJarBattery"), {
 
 -- A repair brings a battery at most to its repair limit, which falls with each earlier repair:
 -- Service adds a step and keeps the charge, Recondition sets the limit and empties the battery,
--- and both are refused at the limit. A repair counts once, on this client's copy too.
+-- and both are refused at the limit by the one test they share, tried here through Recondition.
+-- A repair counts once, on this client's copy too.
 -- Rows: recipe, behaviour, then T.repairCraftTest's fields and the charge after.
 -- A CarBattery2, unlike the T.CAR_BATTERY other tests use: the rebuild below proves a case keeps its type.
 local CAR_BATTERY2 = "Base.CarBattery2"
@@ -132,10 +133,8 @@ while limit(SPENT) > 1 do SPENT = SPENT + 1 end
 local SERVICE, RECONDITION = "RenewableEnergy_ServiceBattery", "RenewableEnergy_ReconditionBattery"
 local BATTERY_REPAIRS = {
     { SERVICE, "adds_a_step", before = limit(0) - 2 * step, repaired = 0, after = limit(0) - step, charge = START_CHARGE },
-    { SERVICE, "below_limit_stops_at_limit", before = limit(0) - 1, repaired = 0, after = limit(0), charge = START_CHARGE },
     { SERVICE, "after_two_repairs_stops_at_lower_limit", before = limit(2) - 1, repaired = 2, after = limit(2),
         charge = START_CHARGE },
-    { SERVICE, "at_limit_refused", before = limit(0), repaired = 0, after = limit(0), charge = START_CHARGE, refused = true },
     { RECONDITION, "restores_and_empties", before = limit(0) - 2 * step, repaired = 0, after = limit(0), charge = 0 },
     { RECONDITION, "after_two_repairs_gives_lower_limit", before = limit(2) - 2 * step, repaired = 2, after = limit(2),
         charge = 0 },

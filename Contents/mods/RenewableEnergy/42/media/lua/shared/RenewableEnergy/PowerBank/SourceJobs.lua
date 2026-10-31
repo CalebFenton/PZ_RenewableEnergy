@@ -1,5 +1,5 @@
 -- The hands-on jobs at a source a bank takes (Sources): what each takes of the
--- character and what refuses it (cf_commonlib's Jobs). SourceSite does them.
+-- character and what refuses it (cf_commonlib's Jobs).
 
 require "Util/BuildingHelper"
 local Wind = require "RenewableEnergy/Wind"
@@ -89,18 +89,14 @@ end
 -- it to, the tool or blades a job works with, or the module slot Seal Cracked Module seals.
 SourceJobs.JOBS = {
     -- A source feeds one bank, and connecting it again to the bank it feeds leaves it as it is,
-    -- snow and all. The authority counts the bank's input slots afresh first
-    -- (SourceSite.source); a client has its summary's.
+    -- snow and all.
     [SourceJobs.CONNECT] = {
         minutes = function(source, bank, character) return connectMinutes(character) end,
         light = true, sound = "GeneratorConnect", tooltip = "Tooltip_RenewableEnergy_ConnectSource",
         blocker = function(character, source, bank)
-            local summary = PowerBank.isBank(bank) and PowerBank.currentSummary(bank)
-            if not summary then
-                return "no bank"
-            end
-            return Sources.connectRefusal(source, Squares.positionOf(bank)) or Sources.bankRefusal(bank:isConnected())
-                or Sources.slotRefusal(Sources.kindOf(source), summary.freeSlots)
+            return PowerBank.sourceRefusal(bank, Sources.slotsOf(Sources.kindOf(source)), function(bankPosition)
+                return Sources.connectRefusal(source, bankPosition)
+            end)
         end,
     },
     [SourceJobs.DISCONNECT] = {
@@ -152,7 +148,8 @@ Jobs.define(SourceJobs, {
 
 --- Select currently eligible Connect jobs in discovery order. An already-refused action would
 --- clear the whole queue, losing the sources that fit. Later jobs still recheck live slots.
---- Also returns the refusal when none fit, and the total nearby count for the menu's label.
+--- Also returns the batch's verdict ({ blocker }, the refusal when none fit) and the total nearby
+--- count for the menu's label.
 function SourceJobs.connectBatch(character, bank)
     local sources = Sources.sourcesInReach(Squares.positionOf(bank))
     local count, ready, refusal = #sources, 0, "Tooltip_RenewableEnergy_NoSourcesInReach"
@@ -166,7 +163,7 @@ function SourceJobs.connectBatch(character, bank)
         end
     end
     for i = count, ready + 1, -1 do sources[i] = nil end
-    return sources, ready == 0 and refusal or nil, count
+    return sources, { blocker = ready == 0 and refusal or nil }, count
 end
 
 return SourceJobs

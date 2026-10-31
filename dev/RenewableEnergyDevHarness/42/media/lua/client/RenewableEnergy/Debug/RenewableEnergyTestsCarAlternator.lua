@@ -102,16 +102,26 @@ test("renewable_energy_gadgets_car_alternator_out_stops_charging", {
     end,
 })
 
--- Scrapping a smashed wreck drops one alternator on a roll just under the character's scrap
--- chance and none on a roll at it; a burnt wreck never does, even just under it.
+-- Scrapping a smashed wreck drops one alternator on a roll under the character's scrap chance and
+-- none on a roll over it; a burnt wreck never does, even on the lowest roll. The chance is that of
+-- vanilla's scrap giving at least one Engine Parts: a round per Metalworking level, at least 5, of
+-- two rolls, each 1 in (25 less the lower of Mechanics and Metalworking). At Mechanics and
+-- Metalworking 0 that is 1 - (24/25)^10 = 0.33517; at Mechanics 3 and Metalworking 8 it is
+-- 1 - (21/22)^16 = 0.52494 (with the two skills swapped it would be 0.37199). Each roll lies within
+-- 0.0001 of its chance.
+local SMASHED, BURNT = "Base.CarNormalSmashedFront", "Base.CarNormalBurnt"
 local SCRAPS = {
-    { behavior = "smashed_wreck_hit_drops_one", script = "Base.CarNormalSmashedFront", roll = "under", alternators = 1 },
-    { behavior = "smashed_wreck_miss_drops_none", script = "Base.CarNormalSmashedFront", roll = "at", alternators = 0 },
-    { behavior = "burnt_wreck_never_drops", script = "Base.CarNormalBurnt", roll = "under", alternators = 0 },
+    { behavior = "smashed_wreck_hit_drops_one", script = SMASHED, mechanics = 0, metalworking = 0, roll = 0.3351, alternators = 1 },
+    { behavior = "smashed_wreck_miss_drops_none", script = SMASHED, mechanics = 0, metalworking = 0, roll = 0.3352, alternators = 0 },
+    { behavior = "skilled_hit_drops_one", script = SMASHED, mechanics = 3, metalworking = 8, roll = 0.5249, alternators = 1 },
+    { behavior = "skilled_miss_drops_none", script = SMASHED, mechanics = 3, metalworking = 8, roll = 0.525, alternators = 0 },
+    { behavior = "burnt_wreck_never_drops", script = BURNT, mechanics = 0, metalworking = 0, roll = 0, alternators = 0 },
 }
 for _, case in ipairs(SCRAPS) do
     test("renewable_energy_gadgets_car_alternator_scrap_" .. case.behavior, {
         run = function(self)
+            T.setPerk(self, Perks.Mechanics, case.mechanics)
+            T.setPerk(self, Perks.MetalWelding, case.metalworking)
             local wreck = T.placeVehicle(self, case.script)
             if not wreck then return end
             T.onVehicle(self, wreck, "scrapWreck", { roll = case.roll }, "scrap")

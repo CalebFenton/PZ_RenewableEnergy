@@ -1,4 +1,5 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLibArrowBoard"
+local ArrowBoard = require "RenewableEnergy/ArrowBoard/Trailer"
 local BatteryBoxLid = require "RenewableEnergy/UI/BatteryBoxLid"
 
 -- The arrow board's battery box (ArrowBoard/Trailer.lua, UI/BatteryBoxLid.lua, Vehicles.txt): its
@@ -8,12 +9,13 @@ local BatteryBoxLid = require "RenewableEnergy/UI/BatteryBoxLid"
 
 local T = RenewableEnergyTest
 local test, expect, expectEqual, player = T.test, T.expect, T.expectEqual, T.player
-local lidOf, boxOf, spawnTrailer, boxItems, standIn = T.lidOf, T.boxOf, T.spawnTrailer, T.boxItems, T.standIn
+local spawnTrailer, boxItems, standIn = T.spawnTrailer, T.boxItems, T.standIn
+local LID, BOX = ArrowBoard.LID, ArrowBoard.BATTERY_BOX
 
 -- Queues the box's lid unpadlocked and down, and a wait until this client's copy shows it.
 local function unlockBox(self, trailer)
     T.onVehicle(self, trailer, "setTrailer", { lidOpen = false, lidLocked = false })
-    T.waitFor(self, function() return not lidOf(trailer.vehicle):getDoor():isLocked() end, "this client's copy of the unlocked lid")
+    T.waitFor(self, function() return not trailer.vehicle:getPartById(LID):getDoor():isLocked() end, "this client's copy of the unlocked lid")
 end
 
 -- Whether this game draws the trailer's lid held still, open or shut, as T.lidPose reads it.
@@ -38,7 +40,7 @@ test("renewable_energy_world_arrow_board_lid_swings", {
         local trailer, p = self.trailer, player()
         T.onVehicle(self, trailer, "setTrailer", { lidOpen = false, lidLocked = false })
         T.waitFor(self, function()
-            local door = lidOf(trailer.vehicle):getDoor()
+            local door = trailer.vehicle:getPartById(LID):getDoor()
             return not door:isLocked() and not door:isOpen() and lidHeld(T.lidPose(trailer), false)
         end, "this client's copy of the lid unlocked and held shut")
         self.swings = {}
@@ -48,7 +50,7 @@ test("renewable_energy_world_arrow_board_lid_swings", {
             local seen = { name = name, open = open }
             table.insert(self.swings, seen)
             T.step(function()
-                standIn(trailer.vehicle, boxOf(trailer.vehicle):getArea())
+                standIn(trailer.vehicle, trailer.vehicle:getPartById(BOX):getArea())
                 act()
             end)
             T.waitFor(self, function()
@@ -56,16 +58,16 @@ test("renewable_energy_world_arrow_board_lid_swings", {
                 if seen.pose and seen.pose.playing and seen.pose.open and seen.pose.open > 0.1 and seen.pose.open < 0.9 then
                     seen.between = true
                 end
-                return lidOf(trailer.vehicle):getDoor():isOpen() == open and lidHeld(seen.pose, open)
+                return trailer.vehicle:getPartById(LID):getDoor():isOpen() == open and lidHeld(seen.pose, open)
             end, "the lid held " .. (open and "open" or "shut") .. " after " .. name)
             T.step(function()
                 local vehicle = trailer.vehicle
-                seen.access = vehicle:canAccessContainer(boxOf(vehicle):getIndex(), p)
+                seen.access = vehicle:canAccessContainer(vehicle:getPartById(BOX):getIndex(), p)
             end)
         end
         -- What the trailer's menu does for Open Trunk and Close Trunk.
-        swing("opening it", true, function() ISVehicleMenu.onOpenDoor(p, lidOf(trailer.vehicle)) end)
-        swing("closing it", false, function() ISVehicleMenu.onCloseDoor(p, lidOf(trailer.vehicle)) end)
+        swing("opening it", true, function() ISVehicleMenu.onOpenDoor(p, trailer.vehicle:getPartById(LID)) end)
+        swing("closing it", false, function() ISVehicleMenu.onCloseDoor(p, trailer.vehicle:getPartById(LID)) end)
         swing("someone else opening it", true, function() T.onVehicle(self, trailer, "setTrailer", { lidOpen = true }) end)
         swing("someone else closing it", false, function() T.onVehicle(self, trailer, "setTrailer", { lidOpen = false }) end)
     end,
@@ -82,11 +84,11 @@ test("renewable_energy_world_arrow_board_lid_swings", {
 local function padlockBox(self, trailer, box)
     T.onVehicle(self, trailer, "setTrailer", { lidOpen = false, lidLocked = true, box = box })
     T.waitFor(self, function()
-        local lid = lidOf(trailer.vehicle)
+        local lid = trailer.vehicle:getPartById(LID)
         return lid and lid:getDoor() and lid:getDoor():isLocked() and not lid:getDoor():isOpen()
     end, "this client's copy of the padlocked lid")
     T.step(function()
-        self.lid, self.box = lidOf(trailer.vehicle), boxOf(trailer.vehicle)
+        self.lid, self.box = trailer.vehicle:getPartById(LID), trailer.vehicle:getPartById(BOX)
         standIn(trailer.vehicle, self.box:getArea())
     end)
 end
@@ -208,7 +210,7 @@ test("renewable_energy_world_arrow_board_padlock_shows_while_locked", {
 -- Puts the character in the box's area near its side, facing the trailer, where the menu offers
 -- the lid (BaseVehicle.getUseablePart can't from the area's middle).
 local function standAtBox(vehicle)
-    standIn(vehicle, boxOf(vehicle):getArea(), 0.7)
+    standIn(vehicle, vehicle:getPartById(BOX):getArea(), 0.7)
 end
 
 -- The slices of the trailer's radial menu where the character stands; undisplayed before drawing.
@@ -266,7 +268,7 @@ test("renewable_energy_world_arrow_board_cut_padlock_opens_the_box", {
         T.waitFor(self, function() return self.box:getItemContainer():getItems():size() == 1 end,
             "this client's copy of the battery in the box")
         T.give(self, "cutters", { { type = BatteryBoxLid.CUTTERS } })
-        T.server(self, "arrowBoardKey", function() return T.vehicleArgs(trailer) end)
+        T.server(self, "arrowBoardKey", function() return T.at(trailer, { id = trailer.id }) end)
         T.step(function()
             local vehicle = trailer.vehicle
             standAtBox(vehicle)
@@ -311,8 +313,8 @@ test("renewable_energy_world_arrow_board_cut_padlock_opens_the_box", {
     end,
 })
 
--- Cut Padlock is offered only at a holding padlock to a player with cutters; without them a
--- slice says what it takes; unlocked or lidless boxes show neither.
+-- Without cutters a padlocked box's Cut Padlock slice says what it takes; with them, an unlocked
+-- or lidless box shows no Cut Padlock at all.
 test("renewable_energy_world_arrow_board_cut_padlock_needs_cutters_and_a_padlock", {
     instant = true,
     run = function(self)
@@ -328,12 +330,11 @@ test("renewable_energy_world_arrow_board_cut_padlock_needs_cutters_and_a_padlock
         padlockBox(self, trailer)
         look("at a padlocked box without bolt cutters", "unavailable")
         T.give(self, "cutters", { { type = BatteryBoxLid.CUTTERS } })
-        look("at a padlocked box with bolt cutters", "offered")
         unlockBox(self, trailer)
         look("at an unlocked box", "none")
         T.onVehicle(self, trailer, "setTrailer", { lidInstalled = false, lidLocked = true })
         T.waitFor(self, function()
-            local lid = lidOf(trailer.vehicle)
+            local lid = trailer.vehicle:getPartById(LID)
             return lid:getInventoryItem() == nil and lid:getDoor():isLocked()
         end, "this client's copy of the locked box without its lid")
         look("at a locked box without its lid", "none")
@@ -355,7 +356,7 @@ test("renewable_energy_world_arrow_board_box_shows_in_the_loot_window", {
         local trailer, p = self.trailer, player()
         unlockBox(self, trailer)
         T.step(function()
-            self.lid, self.box = lidOf(trailer.vehicle), boxOf(trailer.vehicle)
+            self.lid, self.box = trailer.vehicle:getPartById(LID), trailer.vehicle:getPartById(BOX)
             standAtBox(trailer.vehicle)
             getPlayerLoot(p:getPlayerNum()).forceSelectedContainer = nil
             ISVehicleMenu.onOpenDoor(p, self.lid)
@@ -396,7 +397,7 @@ test("renewable_energy_world_arrow_board_switch_works_only_in_the_open_box", {
         local function flip(on)
             T.step(function()
                 -- From where the switch's walk would end.
-                standIn(trailer.vehicle, boxOf(trailer.vehicle):getArea())
+                standIn(trailer.vehicle, trailer.vehicle:getPartById(BOX):getArea())
                 BatteryBoxLid.flipSwitch(p, trailer.vehicle, on)
             end)
             local label = on and "onAgain" or "off"

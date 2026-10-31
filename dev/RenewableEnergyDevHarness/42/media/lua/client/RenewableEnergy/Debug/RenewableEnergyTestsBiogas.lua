@@ -17,8 +17,13 @@ local test = T.test
 
 local FEED = "Base.Dung_Cow"
 
--- How strongly a digester stinks, as corpses: a mature barrel at the first smell level, a sour one
--- at the second; an unfed one not at all; the Brick Dome never past the first, at its worst.
+-- A stink score smells like no corpses just below the first of Digester.SMELL_SCORES, then like
+-- each smell level's corpses from its edge up to just below the next.
+T.serverCheck("renewable_energy_biogas_digester_stink_score_edges", "digesterCorpsesFor")
+
+-- How strongly a digester stinks, as the smell moodle of the character standing at it: a mature
+-- barrel at the first smell level, a sour one at the second; an unfed one not at all; the Brick
+-- Dome at its worst at the first and no further.
 test("renewable_energy_biogas_digester_stink_levels", {
     run = function(self)
         local barrel = T.placeRecord(self, "digester", "barrel.MetalDrum")
@@ -27,31 +32,22 @@ test("renewable_energy_biogas_digester_stink_levels", {
         -- Mid-startup, when the startup stinks most, full, its sludge at the top and sour.
         local worst = T.sourDigester("dome", { started = false, startupHours = getSandboxOptions():getCompostHours() / 2, seedHours = 0,
             sludge = 100 })
-        T.batch(function()
-            T.read(self, "stinkRead", T.at(barrel), "stink")
-            T.read(self, "digesterCorpsesFor", {}, "corpses")
-            T.setRecord(self, barrel, Fixtures.matureDigester("barrel"))
-            T.readRecord(self, barrel, "mature")
-            T.setRecord(self, barrel, T.sourDigester("barrel"))
-            T.readRecord(self, barrel, "sour")
-            T.setRecord(self, barrel, { fed = false })
-            T.readRecord(self, barrel, "unfed")
-            T.setRecord(self, dome, worst)
-            T.readRecord(self, dome, "dome")
-        end)
+        T.standOn(barrel)
+        T.setRecord(self, barrel, Fixtures.matureDigester("barrel"))
+        T.waitForAuthoritySmell(self, barrel, 1, "mature")
+        T.setRecord(self, barrel, T.sourDigester("barrel"))
+        T.waitForAuthoritySmell(self, barrel, 2, "sour")
+        T.setRecord(self, barrel, { fed = false })
+        T.waitForAuthoritySmell(self, barrel, 0, "unfed")
+        T.step(function() T.standOn(dome) end)
+        T.setRecord(self, dome, worst)
+        T.waitForAuthoritySmell(self, dome, 1, "dome")
     end,
     validate = function(self)
         local reads = self.reads
-        T.expectNoFailures(reads.corpses)
-        local levels = reads.stink.levels
-        local function within(label, lowest, below)
-            local ghosts = reads[label].ghosts
-            T.expect(ghosts >= lowest and (not below or ghosts < below), "the " .. label .. " digester counts as " .. ghosts .. " corpses")
+        for label, level in pairs({ mature = 1, sour = 2, unfed = 0, dome = 1 }) do
+            T.expectEqual("the smell level at the " .. label .. " digester", reads[label] and reads[label].level, level)
         end
-        within("mature", levels[1], levels[2])
-        within("sour", levels[2], levels[3])
-        within("unfed", 0, 1)
-        within("dome", 0, levels[2])
     end,
 })
 
@@ -279,35 +275,6 @@ test("renewable_energy_biogas_digester_hopper_meters", {
     end,
 })
 
--- While its chunk is unloaded a digester keeps eating from what its hopper held, an item an hour;
--- when the chunk loads, what it ate has left the hopper. Single player only, as the chunk reload
--- test.
-test("renewable_energy_biogas_digester_eats_while_unloaded", {
-    spOnly = T.CHUNK_RELOAD_SP_ONLY,
-    timeoutSeconds = T.CHUNK_RELOAD_SECONDS,
-    run = function(self)
-        local stand = T.square(self, nil, "a free outdoor square to stand on")
-        local handle = stand and T.placeRecord(self, "digester", "barrel.MetalDrum", { near = stand, minDistance = 2 })
-        if not handle then return end
-        T.fillRecord(self, handle, { hopper = { { type = FEED, count = 4 } } })
-        -- Part of an hour already on the meter, so each whole hour away eats one item.
-        T.runDigester(self, handle, 0.5, 25)
-        T.reloadChunk(self, handle, function()
-            T.ageRecord(self, handle, 3, "away")
-        end)
-        T.readRecord(self, handle, "back")
-    end,
-    validate = function(self)
-        local away, back = self.reads.away, self.reads.back
-        local cow = Digester.feedOf(instanceItem(FEED))
-        T.expect(not away.loaded, "the digester's tile stayed loaded")
-        T.expectEqual("items eaten while unloaded", away.eaten, 3)
-        T.expectEqual("items left in the unloaded hopper's snapshot", away.snapshot, 1)
-        T.expectNear("potential eaten while unloaded", away.potential, 3 * cow.potential, 0.001)
-        T.expectEqual("items in the hopper once back", back.hopperItems, 1)
-    end,
-})
-
 -- Holder -----------------------------------------------------------------------------------------
 
 -- The bags hold what they can and vent the rest; worn through they tear, hold nothing and show
@@ -483,11 +450,12 @@ test("renewable_energy_biogas_digester_upgrade", {
 })
 
 -- Queues, on this client's copy of the barrel digester `handle` showing the tile `tile`, what a
--- player does with it, into self.views[label]: its status window's title, and whether its hopper
--- took the cow dung they dragged in (the record's count, in self.reads[label]). Also whether its
--- SpriteConfig took the tile: the game logs "Invalid SpriteConfig object!" wherever an object
--- loads with one that didn't, and vanilla's menus get no master object for it.
-local function useBarrelDigester(self, handle, tile, label)
+-- player does with it, into self.views[label]: its status window's title, and whether its hopper,
+-- holding `held` dung already, took the cow dung they dragged in (the record's count, in
+-- self.reads[label]). Also whether its SpriteConfig took the tile: the game logs "Invalid
+-- SpriteConfig object!" wherever an object loads with one that didn't, and vanilla's menus get no
+-- master object for it.
+local function useBarrelDigester(self, handle, tile, label, held)
     T.waitFor(self, function()
         handle.object = T.objectWithSprite(getSquare(handle.x, handle.y, handle.z), tile)
         return handle.object ~= nil and Digester.summaryOf(handle.object) ~= nil
@@ -506,18 +474,19 @@ local function useBarrelDigester(self, handle, tile, label)
         window:close()
         ISTimedActionQueue.add(ISInventoryTransferAction:new(p, self.items[label][1], p:getInventory(), object:getContainer()))
     end)
-    T.waitFor(self, function() return handle.object and handle.object:getContainer():containsType(FEED) end,
+    T.waitFor(self, function() return handle.object and handle.object:getContainer():getCountType(FEED) > held end,
         "this client's hopper holding the dung")
     T.readRecord(self, handle, label)
 end
 
--- Expects useBarrelDigester's `label` to have found a whole barrel digester.
-local function expectBarrelDigester(self, label)
+-- Expects useBarrelDigester's `label` to have found a whole barrel digester, its hopper holding the
+-- `held` dung it held before and the one dragged in.
+local function expectBarrelDigester(self, label, held)
     local view, read = self.views[label], self.reads[label]
     if not T.expect(view ~= nil and read ~= nil, label .. ": never saw the digester") then return end
     T.expectEqual(label .. ": the status window's title", view.title, getText("IGUI_RenewableEnergy_Digester_barrel"))
     T.expect(view.configValid and view.master, label .. ": its SpriteConfig refused its tile")
-    T.expectEqual(label .. ": items in the hopper, the dung dragged in", read.hopperItems, 1)
+    T.expectEqual(label .. ": items in the hopper, with the dung dragged in", read.hopperItems, held + 1)
 end
 
 -- The build menu builds a barrel digester on the Metal Drum's tile, from any of the game's drums;
@@ -530,13 +499,13 @@ test("renewable_energy_biogas_build_menu_builds_digester", {
         self.tile = Sprites.digester.barrel.Mov_OrangeBarrel
         local handle = T.buildRecord(self, "digester", "Base.RenewableEnergy_BarrelDigester", self.tile, { "Base.Mov_OrangeBarrel" })
         if not handle then return end
-        useBarrelDigester(self, handle, self.tile, "fed")
+        useBarrelDigester(self, handle, self.tile, "fed", 0)
     end,
     validate = function(self)
         local built = self.reads.built or {}
         T.expectEqual("the built tier", built.tier, "barrel")
         T.expectEqual("the built tile", built.sprite, self.tile)
-        expectBarrelDigester(self, "fed")
+        expectBarrelDigester(self, "fed", 0)
     end,
 })
 
@@ -565,7 +534,8 @@ test("renewable_energy_biogas_brick_dome_builds_only_on_ground", {
 })
 
 -- A digester built from a barrel loads whole from the save: its chunk unloaded and loaded again, it
--- still opens and takes feed. Single player only, as the chunk reload test.
+-- still opens and takes feed. While unloaded it kept eating from what its hopper held, an item an
+-- hour, and what it ate has left the hopper. Single player only, as the chunk reload test.
 test("renewable_energy_biogas_barrel_digester_reloads_whole", {
     spOnly = T.CHUNK_RELOAD_SP_ONLY,
     timeoutSeconds = T.CHUNK_RELOAD_SECONDS,
@@ -575,11 +545,22 @@ test("renewable_energy_biogas_barrel_digester_reloads_whole", {
         local tile = Sprites.digester.barrel.Mov_LightGreenBarrel
         local handle = T.buildRecord(self, "digester", "Base.RenewableEnergy_BarrelDigester", tile, { "Base.Mov_LightGreenBarrel" })
         if not handle then return end
-        T.reloadChunk(self, handle)
-        useBarrelDigester(self, handle, tile, "reloaded")
+        T.fillRecord(self, handle, { hopper = { { type = FEED, count = 4 } } })
+        -- Part of an hour already on the meter, so each whole hour away eats one item.
+        T.runDigester(self, handle, 0.5, 25)
+        T.reloadChunk(self, handle, function()
+            T.ageRecord(self, handle, 3, "away")
+        end)
+        useBarrelDigester(self, handle, tile, "reloaded", 1)
     end,
     validate = function(self)
-        expectBarrelDigester(self, "reloaded")
+        local away = self.reads.away
+        local cow = Digester.feedOf(instanceItem(FEED))
+        T.expect(not away.loaded, "the digester's tile stayed loaded")
+        T.expectEqual("items eaten while unloaded", away.eaten, 3)
+        T.expectEqual("items left in the unloaded hopper's snapshot", away.snapshot, 1)
+        T.expectNear("potential eaten while unloaded", away.potential, 3 * cow.potential, 0.001)
+        expectBarrelDigester(self, "reloaded", 1)
     end,
 })
 
