@@ -15,12 +15,13 @@ local SolarGardenLight = require "RenewableEnergy/Gadgets/SolarGardenLight"
 local Digester = require "RenewableEnergy/Biogas/Digester"
 local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
 local Wind = require "RenewableEnergy/Wind"
+local BuiltScrap = require "RenewableEnergy/Moveables/BuiltScrap"
 local Chance = require "cf_commonlib/Chance"
 
 -- What dismantling (Scrap) a placed bank gives back, by the tile's Material. Digesters, gasifiers
--- and wind chargers scrap for their materials' vanilla scrap. Other placed objects have no
--- CanScrap: they are picked up whole (their tiles' CustomItem), and mounts are unmounted by
--- recipe, which returns the modules.
+-- and wind chargers give back what built them (BuiltScrap). Other placed objects have no CanScrap:
+-- they are picked up whole (their tiles' CustomItem), and mounts are unmounted by recipe, which
+-- returns the modules.
 
 local BANK_SCRAP = {
     RenewableEnergyBatteryBoxWood = {
@@ -80,17 +81,28 @@ local TRANSFORMER = "RenewableEnergy.MicrowaveTransformer"
 -- A dismantled treadmill gives its motor, a dismantled refrigerator may give its compressor,
 -- which a digester uses to fill propane tanks, and a dismantled microwave its transformer. Vanilla
 -- scraps each tile of a multi-tile object in turn (ISMoveableSpriteProps.scrapObject), so each
--- comes only with the clicked tile.
+-- comes only with the clicked tile. What is built in place gives what built it instead of its
+-- Material's scrap: its plan is read before vanilla takes the object and its record away, and its
+-- fittings, which keep their condition, land beside the rest.
 local vanillaScrapInternal = ISMoveableSpriteProps.scrapObjectInternal
 function ISMoveableSpriteProps:scrapObjectInternal(character, scrapDef, square, object, ...)
     self.scrappingMainTile = object == self.object
+    self.builtScrap = BuiltScrap.planOf(object)
     local added = vanillaScrapInternal(self, character, scrapDef, square, object, ...)
-    self.scrappingMainTile = nil
+    for _, fitting in ipairs(self.builtFittings or {}) do
+        square:AddWorldInventoryItem(fitting, ZombRandFloat(0.1, 0.9), ZombRandFloat(0.1, 0.9), 0)
+    end
+    self.scrappingMainTile, self.builtScrap, self.builtFittings = nil, nil, nil
     return added
 end
 
 local vanillaScrapItems = ISMoveableSpriteProps.getScrapItemsList
 function ISMoveableSpriteProps:getScrapItemsList(character)
+    if self.builtScrap and character then
+        local types, fittings = BuiltScrap.itemsOf(self.builtScrap, character)
+        self.builtFittings = fittings
+        return { usable = types, unusable = {} }
+    end
     local items = vanillaScrapItems(self, character)
     if items and self.scrappingMainTile ~= false then
         if Treadmill.isSprite(self.spriteName) then

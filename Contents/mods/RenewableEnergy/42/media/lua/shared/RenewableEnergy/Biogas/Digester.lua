@@ -115,6 +115,30 @@ function Digester.scrubLeft(state)
     return math.min(state.scrubCO2 or 0, state.scrubWool or 0)
 end
 
+--- The item a holder of kind `holder` (Digester.HOLDERS) comes off as, its wear `condition` (0 to
+--- 100) as the item's condition, rounded up so a holder not yet torn doesn't come back broken; nil
+--- for a holder that is no item.
+function Digester.holderItem(holder, condition)
+    local fullType = Digester.HOLDERS[holder].item
+    if not fullType then
+        return nil
+    end
+    local item = instanceItem(fullType)
+    item:setCondition(math.ceil(condition / 100 * item:getConditionMax()))
+    return item
+end
+
+--- The Iron Sponge a scrubber packed with one gives back, spent, with the packings it has left
+--- `packings` as its condition; nil once that was its last.
+function Digester.spentSponge(packings)
+    if (packings or 0) <= 1 then
+        return nil
+    end
+    local spent = instanceItem(Digester.SPENT_SPONGE)
+    spent:setCondition(packings)
+    return spent
+end
+
 -- By full type: potential (m³ before the Biogas multiplier), acid (what it adds to souring;
 -- below zero neutralises), seedHours (startup it saves: manure brings the bacteria).
 -- Manure stands for an animal's day of it, as the game drops one item about every other day for

@@ -11,6 +11,7 @@ local SolarCellCharger = require "RenewableEnergy/Gadgets/SolarCellCharger"
 local Sprites = require "RenewableEnergy/Sprites"
 local Squares = require "cf_commonlib/Squares"
 local Wind = require "RenewableEnergy/Wind"
+local BuiltScrap = require "RenewableEnergy/Moveables/BuiltScrap"
 
 -- The mod's tiles (Sprites.lua) and how its objects move (Moveables.lua, cf_commonlib PlaceTracker): kinds,
 -- overlays, tile properties, rotating, placing, picking up and scrapping. That every tile exists
@@ -257,6 +258,104 @@ scrapTest("renewable_energy_tiles_microwave_scraps_to_transformer", Perks.Electr
     { "a microwave at Electricity 0, rolling 20%", MICROWAVE, 0, 0.2, 0 },
     { "a microwave at Electricity 4, rolling just under 60%", MICROWAVE, 4, 0.6 - T.UNDER, 1 },
     { "a stove, on the lowest roll", STOVE, 10, 0, 0 },
+})
+
+-- Registers test `name` dismantling, in each case, a new object `case.place(self)` places (its
+-- handle), drawn as `case.sprite`, at `case.level` of the build recipe's first skill `case.perk`
+-- with every roll forced to `case.roll`, and expecting `case.gives`, counts by full type.
+local function builtScrapTest(name, cases)
+    test(name, {
+        instant = true,
+        run = function(self)
+            for _, case in ipairs(cases) do
+                local handle = case.place(self)
+                if not handle then return end
+                T.step(function() T.setPerk(self, case.perk, case.level) end)
+                T.forceRoll(self, case.roll)
+                T.read(self, "scrapItems", T.at(handle, { sprite = case.sprite }), case.label)
+            end
+        end,
+        validate = function(self)
+            for _, case in ipairs(cases) do
+                local result = self.reads[case.label]
+                expect(result.scrapped, case.label .. " wasn't dismantled")
+                for fullType, count in pairs(case.gives) do
+                    expectEqual(fullType .. " " .. case.label .. " gave", result.counts[fullType] or 0, count)
+                end
+            end
+        end,
+    })
+end
+
+local function dome(self)
+    return T.placeRecord(self, "digester", "dome")
+end
+
+-- A barrel digester on an orange barrel with every fitting: a worn tarp bag, a scrubber packed
+-- with an Iron Sponge, a compressor.
+local function fittedBarrel(self)
+    local handle = T.placeRecord(self, "digester", "barrel.Mov_OrangeBarrel")
+    if handle then
+        T.setRecord(self, handle, { holder = "tarp", holderCondition = 60, scrubber = true, scrubSponge = 3, compressor = true })
+    end
+    return handle
+end
+
+local CHARGER = Sprites.windCharger.propeller.wood.S
+
+local function charger(broken)
+    return function(self)
+        local square = T.square(self, {}, "a free outdoor square for a wind charger")
+        return square and T.placeTile(self, square, CHARGER, { [Wind.BROKEN_KEY] = broken })
+    end
+end
+
+-- Dismantling a brick dome gives back each piece its recipe used up, the bricks of its walls among
+-- them, on a roll under BuiltScrap.odds at the builder's Masonry, and nothing of its Material's
+-- vanilla scrap. Catches the dome's 40 bricks coming back as one.
+builtScrapTest("renewable_energy_tiles_dome_scraps_to_its_recipe", {
+    { label = "a dome rolling just under its odds", place = dome, sprite = Sprites.digester.dome, perk = Perks.Masonry,
+        level = 5, roll = BuiltScrap.odds(5) - T.UNDER,
+        gives = { ["Base.ClayBrick"] = 40, ["Base.RubberHose"] = 2, ["Base.Pipe"] = 1, ["Base.Nails"] = 0, ["Base.Stone2"] = 0 } },
+    { label = "a dome rolling its odds", place = dome, sprite = Sprites.digester.dome, perk = Perks.Masonry,
+        level = 5, roll = BuiltScrap.odds(5),
+        gives = { ["Base.ClayBrick"] = 0, ["Base.RubberHose"] = 0, ["Base.Pipe"] = 0 } },
+})
+
+-- A barrel digester gives back the barrel it was built from, and its scrubber's materials on the
+-- same rolls, but never the glue, tape or garbage bags a build uses up; its tarp bag, spent sponge
+-- and compressor come back whatever the roll.
+builtScrapTest("renewable_energy_tiles_barrel_digester_scraps_to_recipe_and_fittings", {
+    { label = "a fitted barrel digester rolling just under its odds", place = fittedBarrel,
+        sprite = Sprites.digester.barrel.Mov_OrangeBarrel, perk = Perks.Mechanics, level = 1, roll = BuiltScrap.odds(1) - T.UNDER,
+        gives = {
+            ["Base.Mov_OrangeBarrel"] = 1, ["Base.MetalDrum"] = 0, ["Base.RubberHose"] = 2, ["Base.Funnel"] = 1,
+            ["Base.Bucket"] = 1, ["Base.Pipe"] = 1, ["Base.Glue"] = 0, ["Base.DuctTape"] = 0, ["Base.Garbagebag"] = 0,
+            ["RenewableEnergy.TarpGasBag"] = 1, [Digester.SPENT_SPONGE] = 1, [Digester.COMPRESSOR] = 1,
+        } },
+    { label = "a fitted barrel digester rolling its odds", place = fittedBarrel,
+        sprite = Sprites.digester.barrel.Mov_OrangeBarrel, perk = Perks.Mechanics, level = 1, roll = BuiltScrap.odds(1),
+        gives = {
+            ["Base.Mov_OrangeBarrel"] = 0, ["Base.RubberHose"] = 0, ["Base.Bucket"] = 0,
+            ["RenewableEnergy.TarpGasBag"] = 1, [Digester.SPENT_SPONGE] = 1, [Digester.COMPRESSOR] = 1,
+        } },
+})
+
+-- A wind charger's motor and blades come off whole whatever the roll, broken blades broken; its
+-- metal and wiring come back on the rolls at the builder's Metalworking.
+builtScrapTest("renewable_energy_tiles_wind_charger_scraps_to_parts_and_recipe", {
+    { label = "a broken wind charger rolling just under its odds", place = charger(true), sprite = CHARGER,
+        perk = Perks.MetalWelding, level = 3, roll = BuiltScrap.odds(3) - T.UNDER,
+        gives = {
+            ["RenewableEnergy.BrokenWoodenBlades"] = 1, ["RenewableEnergy.WoodenBlades"] = 0, ["RenewableEnergy.TreadmillMotor"] = 1,
+            ["Base.SheetMetal"] = 1, ["Base.MetalBar"] = 4, ["Base.ElectricWire"] = 3, ["Base.ElectronicsScrap"] = 1,
+        } },
+    { label = "a wind charger rolling its odds", place = charger(nil), sprite = CHARGER,
+        perk = Perks.MetalWelding, level = 3, roll = BuiltScrap.odds(3),
+        gives = {
+            ["RenewableEnergy.WoodenBlades"] = 1, ["RenewableEnergy.TreadmillMotor"] = 1, ["Base.SheetMetal"] = 0,
+            ["Base.MetalBar"] = 0,
+        } },
 })
 
 -- The tiles' PickUpTool and PlaceTool, Electrician, are a screwdriver and some Electricity.

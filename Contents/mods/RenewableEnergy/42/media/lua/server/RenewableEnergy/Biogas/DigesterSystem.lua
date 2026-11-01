@@ -61,13 +61,11 @@ local function vent(character, record)
     return true
 end
 
--- Takes the holder off: one with an item (Digester.HOLDERS) comes back to the character with its
--- wear as the item's condition, rounded up so a holder not yet torn doesn't come back broken.
+-- Takes the holder off: one with an item comes back to the character with its wear
+-- (Digester.holderItem).
 local function takeOffHolder(character, record)
-    local fullType = Digester.HOLDERS[record.holder].item
-    if fullType then
-        local item = instanceItem(fullType)
-        item:setCondition(math.ceil(record.holderCondition / 100 * item:getConditionMax()))
+    local item = Digester.holderItem(record.holder, record.holderCondition)
+    if item then
         Items.giveItems(character, item)
     end
     record.holder = "none"
@@ -123,16 +121,15 @@ local function fitScrubber(character, record)
 end
 
 -- Refills the water with the row's charge, or the packing: out comes an Iron Sponge packed before,
--- spent, with the packings it had left as its condition, or nothing once that was its last; in
--- goes steel wool or the Iron Sponge `sponge`, whose condition the scrubber keeps.
+-- spent (Digester.spentSponge); in goes steel wool or the Iron Sponge `sponge`, whose condition
+-- the scrubber keeps.
 local function refill(character, record, row, isoObject, sponge)
     if row.charge then
         record.scrubCO2 = Digester.SCRUB_M3[row.charge]
         return true
     end
-    if (record.scrubSponge or 0) > 1 then
-        local spent = instanceItem(Digester.SPENT_SPONGE)
-        spent:setCondition(record.scrubSponge)
+    local spent = Digester.spentSponge(record.scrubSponge)
+    if spent then
         Items.giveItems(character, spent)
     end
     record.scrubSponge = 0

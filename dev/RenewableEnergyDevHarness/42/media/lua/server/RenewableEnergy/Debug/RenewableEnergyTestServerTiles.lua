@@ -68,8 +68,9 @@ end)
 -- Dismantles the object drawn as `args.sprite` on the square at `args` as the authority's
 -- character, clicking that tile, the way the moveables action completes a scrap
 -- (ISMoveableSpriteProps.scrapObject), first giving the character the tools its scrap definition
--- asks for that it lacks. Answers whether every tile went and how many `args.type` it gave, into
--- the inventory or onto the object's squares; what the dismantling gave and the tools go away.
+-- asks for that it lacks. Answers whether every tile went, how many `args.type` it gave and how
+-- many of each type (`counts`), into the inventory or onto the object's squares; what the
+-- dismantling gave and the tools go away.
 handler("scrapItems", function(player, args)
     local object = Kinds.find(args)
     local props = ISMoveableSpriteProps.fromObject(object)
@@ -104,18 +105,20 @@ handler("scrapItems", function(player, args)
         args.sprite, tostring(props.canScrap), tostring(can.craftValid), tostring(can.haveTool), tostring(can.haveTool2),
         tostring(can.containerFull)))
     props:scrapObject(player)
-    local count, scrapped = 0, true
+    local count, counts, scrapped = 0, {}, true
     for _, tile in ipairs(tiles) do
         scrapped = scrapped and Fixtures.objectWithSprite(tile.square, tile.sprite) == nil
     end
     for _, new in ipairs(PZHarness.Fixtures.newSince(before, held())) do
         local onFloor = instanceof(new, "IsoWorldInventoryObject")
-        count = count + ((onFloor and new:getItem() or new):getFullType() == args.type and 1 or 0)
+        local fullType = (onFloor and new:getItem() or new):getFullType()
+        count = count + (fullType == args.type and 1 or 0)
+        counts[fullType] = (counts[fullType] or 0) + 1
         if onFloor then
             Fixtures.removePlaced(new)
         else
             Items.removeItem(new)
         end
     end
-    return { count = count, scrapped = scrapped }
+    return { count = count, counts = counts, scrapped = scrapped }
 end)
