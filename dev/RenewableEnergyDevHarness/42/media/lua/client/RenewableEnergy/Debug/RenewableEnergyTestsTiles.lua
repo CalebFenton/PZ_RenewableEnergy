@@ -495,3 +495,36 @@ test("renewable_energy_tiles_cracked_modules_show", {
         end
     end,
 })
+
+-- Digesters, gasifiers and wind chargers are built where they stand: the Moveables cursor won't
+-- pick one up, and its panel says why. What they hold and how they stand would not go with them, so
+-- one put down again would start over.
+test("renewable_energy_tiles_built_in_place_not_picked_up", {
+    instant = true,
+    run = function(self)
+        local digester = T.placeRecord(self, "digester", "barrel.MetalDrum")
+        local gasifier = digester and T.placeRecord(self, "gasifier", "primitive")
+        local square = gasifier and T.square(self, {}, "a free outdoor square for a wind charger")
+        local charger = square and T.placeTile(self, square, Sprites.windCharger.propeller.wood.S)
+        if not charger then return end
+        self.built = { digester = digester, gasifier = gasifier, ["wind charger"] = charger }
+        T.step(function()
+            local character = T.player()
+            self.pickUp, self.says = {}, {}
+            for name, handle in pairs(self.built) do
+                local props = ISMoveableSpriteProps.fromObject(handle.object)
+                self.pickUp[name] = props:canPickUpMoveable(character, handle.square, handle.object)
+                local refusal = "- " .. getText("Tooltip_RenewableEnergy_BuiltInPlace")
+                for _, line in ipairs(props:getInfoPanelDescription(handle.square, handle.object, character, "pickup")) do
+                    self.says[name] = self.says[name] or line[1].txt == refusal
+                end
+            end
+        end)
+    end,
+    validate = function(self)
+        for name in pairs(self.built) do
+            expect(not self.pickUp[name], "the cursor picks up a " .. name)
+            expect(self.says[name], "the cursor's panel doesn't say a " .. name .. " is built in place")
+        end
+    end,
+})

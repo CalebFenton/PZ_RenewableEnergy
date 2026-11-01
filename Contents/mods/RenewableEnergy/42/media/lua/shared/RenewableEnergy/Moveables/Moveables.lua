@@ -1,5 +1,6 @@
 -- How the mod's placed objects move: what dismantling a bank gives back, where each may be
--- placed, and what an object's modData carries into its item when picked up.
+-- placed, what may not be picked up, and what an object's modData carries into its item when
+-- picked up.
 --
 -- Shared, not client: picking up, placing and scrapping complete on the server
 -- (ISMoveablesAction:complete), and a dedicated server never loads client Lua.
@@ -13,11 +14,14 @@ local Panel = require "RenewableEnergy/PowerBank/Panel"
 local Treadmill = require "RenewableEnergy/PowerBank/Treadmill"
 local SolarGardenLight = require "RenewableEnergy/Gadgets/SolarGardenLight"
 local Digester = require "RenewableEnergy/Biogas/Digester"
+local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
+local Wind = require "RenewableEnergy/Wind"
 local Chance = require "cf_commonlib/Chance"
 
--- What dismantling (Scrap) a placed bank gives back, by the tile's Material. Other placed objects
--- have no CanScrap: they are picked up whole (their tiles' CustomItem), and mounts are unmounted by
--- recipe, which returns the modules.
+-- What dismantling (Scrap) a placed bank gives back, by the tile's Material. What is built in
+-- place scraps for its materials' vanilla scrap. Other placed objects have no CanScrap: they are
+-- picked up whole (their tiles' CustomItem), and mounts are unmounted by recipe, which returns the
+-- modules.
 
 local BANK_SCRAP = {
     RenewableEnergyBatteryBoxWood = {
@@ -112,17 +116,26 @@ local function placementRefusal(fullType, square)
     return nil
 end
 
+-- Whether `isoObject` is built where it stands: a digester, gasifier or wind charger. Their tiles
+-- give no item (tools/make_tiles.py), and what they hold and how they stand lives in the world's
+-- record of them or on the placed object, so a pick-up would put down a new one in their place.
+local function isBuiltInPlace(isoObject)
+    return Digester.isDigester(isoObject) or Gasifier.isGasifier(isoObject) or Wind.isCharger(isoObject)
+end
+
 local vanillaCanPlace = ISMoveableSpriteProps.canPlaceMoveableInternal
 function ISMoveableSpriteProps:canPlaceMoveableInternal(character, square, item, forceTypeObject)
     return vanillaCanPlace(self, character, square, item, forceTypeObject)
         and not (item and placementRefusal(item:getFullType(), square))
 end
 
--- The placing cursor's panel says why, in the red vanilla gives its own refusals.
+-- The cursor's panel says why it refuses, in the red vanilla gives its own refusals: placing an
+-- item where it may not go, or picking up what is built in place.
 local vanillaInfoPanel = ISMoveableSpriteProps.getInfoPanelDescription
 function ISMoveableSpriteProps:getInfoPanelDescription(square, object, player, mode)
     local infoTable = vanillaInfoPanel(self, square, object, player, mode)
     local refusal = mode == "place" and self.customItem and placementRefusal(self.customItem, square)
+        or mode == "pickup" and object and isBuiltInPlace(object) and "Tooltip_RenewableEnergy_BuiltInPlace"
     if refusal then
         local bad = ISMoveableSpriteProps.bhc
         ISMoveableSpriteProps.addLineToInfoTable(infoTable, "- " .. getText(refusal),
@@ -132,10 +145,10 @@ function ISMoveableSpriteProps:getInfoPanelDescription(square, object, player, m
 end
 
 -- A connected bank, like a connected generator, must be disconnected before it is taken
--- (ISTakeGenerator.isValid).
+-- (ISTakeGenerator.isValid). What is built in place is scrapped there, never carried.
 local vanillaCanPickUp = ISMoveableSpriteProps.canPickUpMoveableInternal
 function ISMoveableSpriteProps:canPickUpMoveableInternal(character, square, object, isMulti)
-    if object and PowerBank.isBank(object) and object:isConnected() then
+    if object and (PowerBank.isBank(object) and object:isConnected() or isBuiltInPlace(object)) then
         return false
     end
     return vanillaCanPickUp(self, character, square, object, isMulti)
