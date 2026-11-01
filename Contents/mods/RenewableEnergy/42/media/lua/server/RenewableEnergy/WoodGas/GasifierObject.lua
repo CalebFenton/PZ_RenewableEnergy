@@ -38,10 +38,16 @@ function GasifierObject:initNew()
     self.condensate = 0
 end
 
---- An object the system has not seen: a gasifier just built. It gets its filter.
+--- An object the system has not seen: a gasifier just built, or one put down where it was carried
+--- to, as it was picked up. Either way the new tile gets its filter.
 function GasifierObject:stateFromIsoObject(isoObject)
-    self:initNew()
-    self.tier = Gasifier.tierOf(isoObject)
+    if self:takeCarried(isoObject) then
+        -- Its pipe led to a generator beside where it stood.
+        self.pipe = nil
+    else
+        self:initNew()
+        self.tier = Gasifier.tierOf(isoObject)
+    end
     if not Gasifier.filterOf(isoObject) then
         local filter = ItemContainer.new(Gasifier.FILTER, isoObject:getSquare(), isoObject)
         filter:setCapacity(self:tierSpec().filterCapacity)

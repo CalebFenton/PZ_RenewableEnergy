@@ -1,5 +1,6 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
 require "RenewableEnergy/Debug/RenewableEnergyTestLibCraft"
+require "RenewableEnergy/Debug/RenewableEnergyTestLibGas"
 local Specs = require "RenewableEnergy/Specs"
 local SolarGardenLight = require "RenewableEnergy/Gadgets/SolarGardenLight"
 require "Moveables/ISMoveableDefinitions"
@@ -9,6 +10,7 @@ local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local SolarCellCharger = require "RenewableEnergy/Gadgets/SolarCellCharger"
 local Sprites = require "RenewableEnergy/Sprites"
 local Squares = require "cf_commonlib/Squares"
+local Wind = require "RenewableEnergy/Wind"
 
 -- The mod's tiles (Sprites.lua) and how its objects move (Moveables.lua, cf_commonlib PlaceTracker): kinds,
 -- overlays, tile properties, rotating, placing, picking up and scrapping. That every tile exists
@@ -496,35 +498,93 @@ test("renewable_energy_tiles_cracked_modules_show", {
     end,
 })
 
--- Digesters, gasifiers and wind chargers are built where they stand: the Moveables cursor won't
--- pick one up, and its panel says why. What they hold and how they stand would not go with them, so
--- one put down again would start over.
-test("renewable_energy_tiles_built_in_place_not_picked_up", {
+-- The item a tile without a CustomItem is picked up as (ISMoveableSpriteProps:instanceItem).
+local function moveableType(sprite)
+    return instanceItem("Moveables." .. sprite):getFullType()
+end
+
+-- Picks up the object drawn as `sprite` on `handle` and puts it down on another free square as a
+-- player does, with the moveables action. Returns the new place's handle, of the record kind
+-- `kind` if given, or nil without a free square.
+local function carryAway(self, handle, sprite, kind)
+    T.pickUpAsPlayer(self, handle, sprite)
+    local square = T.square(self, {}, "a free square to put the " .. sprite .. " down on")
+    if not square then return nil end
+    local placed = T.placeAsPlayer(self, square, moveableType(sprite), sprite, nil, true)
+    placed.kind = kind
+    return placed
+end
+
+-- A digester, a gasifier and a wind charger the world leaves out to be found, picked up and put
+-- down somewhere else, go down as they were: the digester its gas, sludge, souring, tarp bag and
+-- its wear, scrubber and charge and compressor, the gasifier its tar, ash and condensate, the wind
+-- charger its broken blades and brake. Catches each starting over as newly built.
+test("renewable_energy_tiles_built_in_place_carry_their_state", {
     instant = true,
     run = function(self)
         local digester = T.placeRecord(self, "digester", "barrel.MetalDrum")
         local gasifier = digester and T.placeRecord(self, "gasifier", "primitive")
         local square = gasifier and T.square(self, {}, "a free outdoor square for a wind charger")
-        local charger = square and T.placeTile(self, square, Sprites.windCharger.propeller.wood.S)
+        local chargerSprite = Sprites.windCharger.propeller.wood.S
+        local charger = square and T.placeTile(self, square, chargerSprite, { [Wind.BROKEN_KEY] = true, [Wind.BRAKED_KEY] = true })
         if not charger then return end
-        self.built = { digester = digester, gasifier = gasifier, ["wind charger"] = charger }
+        -- Sour with the acid that keeps it so through the pass its pickup brings it up to now with.
+        T.setRecord(self, digester, T.sourDigester("barrel", {
+            gas = 0.4, sludge = 30, holder = "tarp", holderCondition = 60,
+            scrubber = true, scrubCO2 = 12, scrubWool = 7, compressor = true,
+        }))
+        T.setRecord(self, gasifier, { tarKg = 1.5, ash = 0.8, condensate = 0.6 })
+        T.readRecord(self, digester, "digesterBefore")
+        T.readRecord(self, gasifier, "gasifierBefore")
+        local digesterSprite = Sprites.digester.barrel.MetalDrum
+        local movedDigester = carryAway(self, digester, digesterSprite, "digester")
+        local movedGasifier = movedDigester and carryAway(self, gasifier, Sprites.gasifier.primitive, "gasifier")
+        local movedCharger = movedGasifier and carryAway(self, charger, chargerSprite)
+        if not movedCharger then return end
+        T.readRecord(self, movedDigester, "digesterAfter")
+        T.readRecord(self, movedGasifier, "gasifierAfter")
         T.step(function()
-            local character = T.player()
-            self.pickUp, self.says = {}, {}
-            for name, handle in pairs(self.built) do
-                local props = ISMoveableSpriteProps.fromObject(handle.object)
-                self.pickUp[name] = props:canPickUpMoveable(character, handle.square, handle.object)
-                local refusal = "- " .. getText("Tooltip_RenewableEnergy_BuiltInPlace")
-                for _, line in ipairs(props:getInfoPanelDescription(handle.square, handle.object, character, "pickup")) do
-                    self.says[name] = self.says[name] or line[1].txt == refusal
-                end
+            local data = movedCharger.object:getModData()
+            self.charger = { broken = data[Wind.BROKEN_KEY], braked = data[Wind.BRAKED_KEY] }
+        end)
+    end,
+    validate = function(self)
+        local before, after = self.reads.digesterBefore, self.reads.digesterAfter
+        for _, field in ipairs({ "holder", "sour", "scrubber", "compressor", "started", "tier" }) do
+            expectEqual("the moved digester's " .. field, after[field], before[field])
+        end
+        for _, field in ipairs({ "gas", "sludge", "holderCondition", "scrubCO2", "scrubWool" }) do
+            T.expectNear("the moved digester's " .. field, after[field], before[field], 0.05)
+        end
+        for _, field in ipairs({ "tarKg", "ash", "condensate" }) do
+            T.expectNear("the moved gasifier's " .. field, self.reads.gasifierAfter[field], self.reads.gasifierBefore[field], 0.01)
+        end
+        expect(self.charger.broken == true, "the moved wind charger's blades aren't broken")
+        expect(self.charger.braked == true, "the moved wind charger's brake isn't on")
+    end,
+})
+
+-- A gasifier still burning can't be picked up, as a running generator can't, and the cursor's
+-- panel says to put it out.
+test("renewable_energy_tiles_lit_gasifier_not_picked_up", {
+    instant = true,
+    run = function(self)
+        local gasifier = T.placeRecord(self, "gasifier", "primitive")
+        if not gasifier then return end
+        T.setRecord(self, gasifier, { lit = true, fireKg = 1 })
+        T.waitForSummary(self, gasifier, function(summary) return summary.lit end, "this client's summary of the lit gasifier")
+        T.step(function()
+            local character, object = T.player(), gasifier.object
+            local props = ISMoveableSpriteProps.fromObject(object)
+            self.pickUp = props:canPickUpMoveable(character, gasifier.square, object)
+            local refusal = "- " .. getText("Tooltip_RenewableEnergy_PutOutFirst")
+            for _, line in ipairs(props:getInfoPanelDescription(gasifier.square, object, character, "pickup")) do
+                self.says = self.says or line[1].txt == refusal
             end
         end)
     end,
     validate = function(self)
-        for name in pairs(self.built) do
-            expect(not self.pickUp[name], "the cursor picks up a " .. name)
-            expect(self.says[name], "the cursor's panel doesn't say a " .. name .. " is built in place")
-        end
+        expect(not self.pickUp, "the cursor picks up a lit gasifier")
+        expect(self.says, "the cursor's panel doesn't say to put the gasifier out")
     end,
 })

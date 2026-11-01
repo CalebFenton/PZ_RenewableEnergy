@@ -71,12 +71,20 @@ function DigesterObject:initNew()
     self.compressor = false
 end
 
---- An object the system has not seen: a digester just built.
+--- An object the system has not seen: a digester just built, or one put down where it was carried
+--- to, as it was picked up.
 function DigesterObject:stateFromIsoObject(isoObject)
-    self:initNew()
-    self.tier = Digester.tierOf(isoObject)
-    self.holder = self:tierSpec().holder
-    self.temp = getClimateManager():getAirTemperatureForSquare(isoObject:getSquare())
+    if self:takeCarried(isoObject) then
+        -- Picking it up put out the heater it fed (aboutToRemoveFromSystem), and took an empty
+        -- hopper, so no feed waits to leave it.
+        self.heaterLit = false
+        self.eaten = {}
+    else
+        self:initNew()
+        self.tier = Digester.tierOf(isoObject)
+        self.holder = self:tierSpec().holder
+        self.temp = getClimateManager():getAirTemperatureForSquare(isoObject:getSquare())
+    end
     self:loaded(isoObject)
 end
 

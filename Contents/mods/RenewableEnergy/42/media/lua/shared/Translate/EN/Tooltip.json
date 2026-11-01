@@ -118,7 +118,7 @@
     "Tooltip_RenewableEnergy_NoScrubber": "Fit a scrubber first.",
     "Tooltip_RenewableEnergy_HasCompressor": "It already has a compressor.",
     "Tooltip_RenewableEnergy_NoCompressor": "Fit a compressor first.",
-    "Tooltip_RenewableEnergy_BuiltInPlace": "Built where it stands: it can't be carried. Scrap it to take it down.",
+    "Tooltip_RenewableEnergy_PutOutFirst": "Put it out first.",
     "Tooltip_RenewableEnergy_FridgeCompressor": "Salvaged from a fridge. Fitted to a digester with power, it presses scrubbed biogas into propane tanks. Plugged in where there is power, it inflates tires.",
     "Tooltip_RenewableEnergy_GasHeater": "Burns a little biogas from a digester beside it to keep the digester warm, or a cold room.",
     "Tooltip_RenewableEnergy_NoDigesterNear": "There's no digester with gas beside it.",

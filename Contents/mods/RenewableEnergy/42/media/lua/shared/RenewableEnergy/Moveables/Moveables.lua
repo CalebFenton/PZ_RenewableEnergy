@@ -1,6 +1,5 @@
 -- How the mod's placed objects move: what dismantling a bank gives back, where each may be
--- placed, what may not be picked up, and what an object's modData carries into its item when
--- picked up.
+-- placed, what may not be picked up yet, and what an object carries into its item when picked up.
 --
 -- Shared, not client: picking up, placing and scrapping complete on the server
 -- (ISMoveablesAction:complete), and a dedicated server never loads client Lua.
@@ -18,10 +17,10 @@ local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
 local Wind = require "RenewableEnergy/Wind"
 local Chance = require "cf_commonlib/Chance"
 
--- What dismantling (Scrap) a placed bank gives back, by the tile's Material. What is built in
--- place scraps for its materials' vanilla scrap. Other placed objects have no CanScrap: they are
--- picked up whole (their tiles' CustomItem), and mounts are unmounted by recipe, which returns the
--- modules.
+-- What dismantling (Scrap) a placed bank gives back, by the tile's Material. Digesters, gasifiers
+-- and wind chargers scrap for their materials' vanilla scrap. Other placed objects have no
+-- CanScrap: they are picked up whole (their tiles' CustomItem), and mounts are unmounted by
+-- recipe, which returns the modules.
 
 local BANK_SCRAP = {
     RenewableEnergyBatteryBoxWood = {
@@ -116,11 +115,14 @@ local function placementRefusal(fullType, square)
     return nil
 end
 
--- Whether `isoObject` is built where it stands: a digester, gasifier or wind charger. Their tiles
--- give no item (tools/make_tiles.py), and what they hold and how they stand lives in the world's
--- record of them or on the placed object, so a pick-up would put down a new one in their place.
-local function isBuiltInPlace(isoObject)
-    return Digester.isDigester(isoObject) or Gasifier.isGasifier(isoObject) or Wind.isCharger(isoObject)
+-- Whether `isoObject` is a gasifier still burning, which, like a running generator
+-- (ISTakeGenerator.isValid), must be put out before it is taken.
+local function isLitGasifier(isoObject)
+    if not Gasifier.isGasifier(isoObject) then
+        return false
+    end
+    local summary = Gasifier.summaryOf(isoObject)
+    return summary ~= nil and summary.lit == true
 end
 
 local vanillaCanPlace = ISMoveableSpriteProps.canPlaceMoveableInternal
@@ -130,12 +132,12 @@ function ISMoveableSpriteProps:canPlaceMoveableInternal(character, square, item,
 end
 
 -- The cursor's panel says why it refuses, in the red vanilla gives its own refusals: placing an
--- item where it may not go, or picking up what is built in place.
+-- item where it may not go, or picking up a gasifier still burning.
 local vanillaInfoPanel = ISMoveableSpriteProps.getInfoPanelDescription
 function ISMoveableSpriteProps:getInfoPanelDescription(square, object, player, mode)
     local infoTable = vanillaInfoPanel(self, square, object, player, mode)
     local refusal = mode == "place" and self.customItem and placementRefusal(self.customItem, square)
-        or mode == "pickup" and object and isBuiltInPlace(object) and "Tooltip_RenewableEnergy_BuiltInPlace"
+        or mode == "pickup" and object and isLitGasifier(object) and "Tooltip_RenewableEnergy_PutOutFirst"
     if refusal then
         local bad = ISMoveableSpriteProps.bhc
         ISMoveableSpriteProps.addLineToInfoTable(infoTable, "- " .. getText(refusal),
@@ -145,10 +147,10 @@ function ISMoveableSpriteProps:getInfoPanelDescription(square, object, player, m
 end
 
 -- A connected bank, like a connected generator, must be disconnected before it is taken
--- (ISTakeGenerator.isValid). What is built in place is scrapped there, never carried.
+-- (ISTakeGenerator.isValid).
 local vanillaCanPickUp = ISMoveableSpriteProps.canPickUpMoveableInternal
 function ISMoveableSpriteProps:canPickUpMoveableInternal(character, square, object, isMulti)
-    if object and (PowerBank.isBank(object) and object:isConnected() or isBuiltInPlace(object)) then
+    if object and (PowerBank.isBank(object) and object:isConnected() or isLitGasifier(object)) then
         return false
     end
     return vanillaCanPickUp(self, character, square, object, isMulti)
@@ -156,9 +158,21 @@ end
 
 -- Placing copies an item's modData onto the object, but picking up copies an object's back only
 -- for an IsoThumpable. These keys go back with the item, so a mount keeps its modules'
--- conditions and a garden light its charge and bulb.
+-- conditions, a garden light its charge and bulb, and a wind charger its broken blades, its brake
+-- and that its first connection already taught its XP.
 
-local CARRIED_KEYS = { Panel.MODULES_KEY, SolarGardenLight.CHARGE_KEY, SolarGardenLight.BULB_KEY }
+local CARRIED_KEYS = { Panel.MODULES_KEY, SolarGardenLight.CHARGE_KEY, SolarGardenLight.BULB_KEY, Wind.BROKEN_KEY,
+    Wind.BRAKED_KEY, Panel.CONNECTED_ONCE_KEY }
+
+-- The record of `isoObject` if it is a digester or gasifier, on the authority; nil elsewhere.
+local function recordOf(isoObject)
+    if Digester.isDigester(isoObject) then
+        return Digester.recordOf(isoObject)
+    elseif Gasifier.isGasifier(isoObject) then
+        return Gasifier.recordOf(isoObject)
+    end
+    return nil
+end
 
 -- The object being picked up, until vanilla makes its item. Each pick-up makes one item, which
 -- takes it, so an error in vanilla's pick-up can't leave it for an unrelated item later.
@@ -172,18 +186,27 @@ function ISMoveableSpriteProps:pickUpMoveableInternal(character, square, object,
     return item
 end
 
--- Copies the keys before vanilla adds the item to the inventory and sends it to the client. Save
--- compatibility: a fixed tile (Sprites.fixedTiles) picks up as its turnable twin, so its item turns.
+-- Copies the keys, and a digester's or gasifier's record (cf_commonlib's Object:carryOn), before
+-- vanilla adds the item to the inventory and sends it to the client; placing the item gives them
+-- to the tile it puts down. Save compatibility: a fixed tile (Sprites.fixedTiles) picks up as its
+-- turnable twin, so its item turns.
 local vanillaInstanceItem = ISMoveableSpriteProps.instanceItem
 function ISMoveableSpriteProps:instanceItem(spriteNameOverride)
     local from = pickingUp
     pickingUp = nil
     local item = vanillaInstanceItem(self, spriteNameOverride or (self.spriteName and Sprites.fixedTiles[self.spriteName]))
-    if item and from and from:hasModData() then
+    if not (item and from) then
+        return item
+    end
+    if from:hasModData() then
         local fromData, to = from:getModData(), item:getModData()
         for _, key in ipairs(CARRIED_KEYS) do
             to[key] = fromData[key]
         end
+    end
+    local record = recordOf(from)
+    if record then
+        record:carryOn(item)
     end
     return item
 end
