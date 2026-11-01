@@ -88,7 +88,8 @@ Digester.PUMP = "Base.TirePump"
 Digester.PUMP_FILL = 0.25
 Digester.PUMP_MINUTES_PER_M3 = 15
 Digester.PUMP_ENDURANCE_PER_M3 = 0.06
--- A fridge compressor, on power, fills it all the way, but only with scrubbed gas past the pump's.
+-- A fridge compressor fitted to the digester, with power at the digester, fills it all the way,
+-- but only with scrubbed gas past the pump's.
 Digester.COMPRESSOR = "RenewableEnergy.FridgeCompressor"
 Digester.COMPRESSOR_MINUTES_PER_M3 = 2
 
@@ -247,10 +248,12 @@ GlobalObjects.declare(Digester, {
     isObject = Digester.isDigester, sprites = Sprites.namesOf("digester"),
     accept = "RenewableEnergy.Digester.acceptItem",
     -- The summary (DigesterObject:buildSummary) gets `hopper`, the feeds waiting, from this side's
-    -- copy of the hopper.
+    -- copy of the hopper, and `powered`, whether the digester's square has power for a fitted
+    -- compressor, as this side sees it now: power comes and goes between the authority's passes.
     decorate = function(summary, isoObject)
         local _, feeds = Digester.feedsIn(isoObject:getContainer())
         summary.hopper = #feeds
+        summary.powered = isoObject:getSquare():haveElectricity()
     end,
 })
 

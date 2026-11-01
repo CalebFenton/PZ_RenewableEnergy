@@ -4,6 +4,7 @@
 local Digester = require "RenewableEnergy/Biogas/Digester"
 local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
 local Sprites = require "RenewableEnergy/Sprites"
+local Specs = require "RenewableEnergy/Specs"
 local Items = require "cf_commonlib/Items"
 local Jobs = require "cf_commonlib/Jobs"
 local Tables = require "cf_commonlib/Tables"
@@ -24,6 +25,8 @@ DigesterJobs.REFILL_ASH = "RefillScrubberAsh"
 DigesterJobs.REFILL_LIME = "RefillScrubberLime"
 DigesterJobs.REFILL_WOOL = "RefillScrubberWool"
 DigesterJobs.REFILL_SPONGE = "RefillScrubberSponge"
+DigesterJobs.FIT_COMPRESSOR = "FitCompressor"
+DigesterJobs.REMOVE_COMPRESSOR = "RemoveCompressor"
 
 DigesterJobs.COMPOST_BAG = "Base.CompostBag"
 local STEEL_WOOL = "Base.SteelWool"
@@ -163,12 +166,23 @@ end
 
 -- Completes the row of a job that fills `with`, a tank, torch or bottle, from the holder.
 -- `fields.fill`: limit, the share of it a fill stops at, and `full`, the key that says it got
--- there; scrubbed, it takes scrubbed gas beyond the pump's share; power, it needs the square
--- powered; minutesPerM3, its minutes per m³ moved, at least `fields.baseMinutes` in all;
--- endurancePerM3, what each m³ costs the character.
+-- there; scrubbed, it takes scrubbed gas beyond the pump's share; compressor, it runs the
+-- digester's fitted compressor, which needs power at the digester; minutesPerM3, its minutes per
+-- m³ moved, at least `fields.baseMinutes` in all; endurancePerM3, what each m³ costs the
+-- character.
 local function fillJob(fields)
     local fill = fields.fill
-    fields.blocker = noGas
+    fields.blocker = function(character, summary)
+        if fill.compressor then
+            if not summary.compressor then
+                return "Tooltip_RenewableEnergy_NoCompressor"
+            end
+            if not summary.powered then
+                return "Tooltip_RenewableEnergy_NoPower"
+            end
+        end
+        return noGas(character, summary)
+    end
     fields.minutes = function(digester, vessel)
         local summary = Digester.currentSummary(digester)
         if not (summary and vessel) then
@@ -179,9 +193,6 @@ local function fillJob(fields)
     fields.with = isVessel
     fields.withMissing = "Tooltip_RenewableEnergy_NeedsVessel"
     fields.withRefusal = function(character, summary, vessel)
-        if fill.power and not Digester.compressorPowered(character) then
-            return "Tooltip_RenewableEnergy_NoPower"
-        end
         if fillAmount(fill, summary, vessel) <= 0 then
             if vessel:getCurrentUses() >= Items.usesAt(vessel, fill.limit) then
                 return fill.full
@@ -256,9 +267,8 @@ DigesterJobs.JOBS = {
     }),
     [DigesterJobs.FILL_COMPRESSOR] = fillJob({
         baseMinutes = 2, position = "Mid", tooltip = "Tooltip_RenewableEnergy_FillByCompressor",
-        materials = { { item = Digester.COMPRESSOR, keep = true } },
         fill = {
-            limit = 1, full = "Tooltip_RenewableEnergy_Full", scrubbed = true, power = true,
+            limit = 1, full = "Tooltip_RenewableEnergy_Full", scrubbed = true, compressor = true,
             minutesPerM3 = Digester.COMPRESSOR_MINUTES_PER_M3,
         },
     }),
@@ -303,6 +313,26 @@ DigesterJobs.JOBS = {
         minutes = 5, position = "Mid", blocker = noScrubber,
         tooltip = "Tooltip_RenewableEnergy_RefillScrubberSponge",
         with = Items.ofType(Digester.IRON_SPONGE), withMissing = "Tooltip_RenewableEnergy_NeedsIronSponge",
+    },
+    [DigesterJobs.FIT_COMPRESSOR] = {
+        minutes = 30, position = "Mid", tooltip = "Tooltip_RenewableEnergy_FitCompressor",
+        blocker = function(character, summary)
+            return summary.compressor and "Tooltip_RenewableEnergy_HasCompressor" or nil
+        end,
+        materials = {
+            { perk = "Electricity", need = 1 },
+            Specs.SCREWDRIVER,
+            { item = Digester.COMPRESSOR, need = 1 },
+        },
+        xp = { perk = "Electricity", amount = 10 },
+    },
+    -- The compressor comes back off whole, to inflate tires or go on another digester.
+    [DigesterJobs.REMOVE_COMPRESSOR] = {
+        minutes = 15, position = "Mid", tooltip = "Tooltip_RenewableEnergy_RemoveCompressor",
+        blocker = function(character, summary)
+            return not summary.compressor and "Tooltip_RenewableEnergy_NoCompressor" or nil
+        end,
+        materials = { Specs.SCREWDRIVER },
     },
 }
 

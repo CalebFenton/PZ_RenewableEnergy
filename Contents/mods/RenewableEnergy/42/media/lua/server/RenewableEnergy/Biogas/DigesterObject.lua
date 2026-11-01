@@ -25,7 +25,7 @@ DigesterObject.SAVED_FIELDS = {
     "tier", "holder", "holderCondition", "potential", "gas", "temp", "fed", "startupHours",
     "seedHours", "started", "gasHours", "sludge", "acid", "sour", "leakHours", "indoors", "inRoom",
     "meterHours", "madePerDay", "hopper", "eaten", "scrubber", "scrubCO2", "scrubWool",
-    "scrubSponge", "heaterLit",
+    "scrubSponge", "heaterLit", "compressor",
 }
 
 -- Sour slows digestion to this share.
@@ -68,6 +68,7 @@ function DigesterObject:initNew()
     self.scrubWool = 0
     self.scrubSponge = 0
     self.heaterLit = false
+    self.compressor = false
 end
 
 --- An object the system has not seen: a digester just built.
@@ -512,6 +513,7 @@ function DigesterObject:buildSummary()
         scrubCO2 = round(self.scrubCO2 or 0, 1),
         scrubWool = round(self.scrubWool or 0, 1),
         heaterLit = self.heaterLit == true,
+        compressor = self.compressor == true,
     }
 end
 

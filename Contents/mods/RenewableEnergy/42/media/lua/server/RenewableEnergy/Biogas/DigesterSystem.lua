@@ -144,6 +144,17 @@ local function refill(character, record, row, isoObject, sponge)
     return true
 end
 
+local function fitCompressor(character, record)
+    record.compressor = true
+    return true
+end
+
+local function removeCompressor(character, record)
+    record.compressor = false
+    Items.giveItems(character, instanceItem(Digester.COMPRESSOR))
+    return true
+end
+
 -- What each job does to the digester's record `record` (its tile `isoObject`) beyond taking its
 -- materials, by its row of DigesterJobs.JOBS, with `item` the item it works with. Returns whether
 -- it was done.
@@ -162,6 +173,8 @@ local DO = {
     [DigesterJobs.REFILL_LIME] = refill,
     [DigesterJobs.REFILL_WOOL] = refill,
     [DigesterJobs.REFILL_SPONGE] = refill,
+    [DigesterJobs.FIT_COMPRESSOR] = fitCompressor,
+    [DigesterJobs.REMOVE_COMPRESSOR] = removeCompressor,
 }
 
 --- The authority's side of the jobs at a digester (Jobs.perform), whose `with` is the job's item.

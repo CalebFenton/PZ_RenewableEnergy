@@ -56,6 +56,14 @@ local function holderText(summary)
     return name
 end
 
+-- Whether a compressor is fitted and, if so, whether it has power to run.
+local function compressorText(summary)
+    if not summary.compressor then
+        return getText("IGUI_RenewableEnergy_CompressorNone")
+    end
+    return getText(summary.powered and "IGUI_RenewableEnergy_CompressorPowered" or "IGUI_RenewableEnergy_CompressorNoPower")
+end
+
 --- The rows the window shows for `summary`: { label, value, color }.
 function DigesterWindow:rowsOf(summary)
     local rows = {}
@@ -73,6 +81,8 @@ function DigesterWindow:rowsOf(summary)
             Format.number(summary.scrubCO2, 1), Format.number(summary.scrubWool, 1)),
             Digester.scrubLeft(summary) <= 0 and "bad" or nil)
     end
+    row(rows, "IGUI_RenewableEnergy_DigesterCompressor", compressorText(summary),
+        summary.compressor and not summary.powered and "bad" or nil)
     if summary.heaterLit then
         row(rows, "IGUI_RenewableEnergy_DigesterHeater", getText("IGUI_RenewableEnergy_HeaterBurning",
             getText("IGUI_RenewableEnergy_PerDay", Format.cubicMetres(GasHeater.m3PerHour() * 24))))

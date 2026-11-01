@@ -42,6 +42,8 @@
     "ContextMenu_RenewableEnergy_RefillScrubberLime": "Water and Quicklime",
     "ContextMenu_RenewableEnergy_RefillScrubberWool": "Steel Wool",
     "ContextMenu_RenewableEnergy_RefillScrubberSponge": "Iron Sponge",
+    "ContextMenu_RenewableEnergy_FitCompressor": "Fit Compressor",
+    "ContextMenu_RenewableEnergy_RemoveCompressor": "Remove Compressor",
     "ContextMenu_RenewableEnergy_LightHeater": "Light Gas Heater",
     "ContextMenu_RenewableEnergy_HeaterOff": "Turn Off Gas Heater",
     "ContextMenu_RenewableEnergy_LightGasifier": "Light Gasifier",

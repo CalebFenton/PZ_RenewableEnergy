@@ -166,26 +166,39 @@ test("renewable_energy_biogas_pump_fills_tank_to_limit", {
     end,
 })
 
--- A powered compressor won't fill a tank past the pump's share with unscrubbed gas. A scrubber,
--- fitted with a sound bucket (a broken one doesn't count) and charged, lets it; each m³ it scrubs
--- uses up its charge and its steel wool.
+-- Fill With Compressor runs the compressor fitted to the digester, which takes the carried one in,
+-- on power at the digester: refused with none fitted, and with one fitted while the digester has
+-- no power. A powered compressor won't fill a tank past the pump's share with unscrubbed gas. A
+-- scrubber, fitted with a sound bucket (a broken one doesn't count) and charged, lets it; each m³
+-- it scrubs uses up its charge and its steel wool. Removing the compressor gives it back.
 test("renewable_energy_biogas_compressor_fills_past_pump_with_scrubber", {
     instant = true,
     run = function(self)
+        T.setGrid(self, false)
         local handle = T.placeRecord(self, "digester", "dome")
         if not handle then return end
         -- Less than the dome, the charge, the wool or the tank's room above the pump's share holds.
         self.gas = math.min(Digester.HOLDERS.dome.capacity, Digester.SCRUB_M3.lime, Digester.WOOL_M3,
             (1 - Digester.PUMP_FILL) * Digester.M3_PER_TANK) / 2
         T.setRecord(self, handle, Fixtures.matureDigester("dome", { gas = self.gas }))
+        T.give(self, "fill", { { type = Digester.TANK, uses = Digester.PUMP_FILL } })
+        T.waitForGas(self, handle, self.gas)
+        local function fillRefusal()
+            return DigesterJobs.refusal(T.player(), DigesterJobs.FILL_COMPRESSOR, handle.object, self.items.fill[1])
+        end
+        T.step(function() self.notFitted = fillRefusal() end)
+        T.giveMaterials(self, "compressor", DigesterJobs.materials(T.player(), DigesterJobs.FIT_COMPRESSOR))
+        T.actionJob(self, "digester", handle, DigesterJobs.FIT_COMPRESSOR)
+        T.count(self, "fitted", { Digester.COMPRESSOR })
+        T.waitForSummary(self, handle, function(summary) return summary.compressor end, "this client's summary of the fitted compressor")
+        T.step(function()
+            self.unpowered = fillRefusal()
+            self.unpoweredSummary = T.recordSummary(handle)
+        end)
         -- A running generator powers the squares around it, outdoors too.
         if not T.generator(self, { near = handle.square, fuel = 10, running = true }) then return end
-        T.give(self, "fill", { { type = Digester.COMPRESSOR }, { type = Digester.TANK, uses = Digester.PUMP_FILL } })
-        waitForPower(self)
-        T.waitForGas(self, handle, self.gas)
-        T.step(function()
-            self.unscrubbed = DigesterJobs.refusal(T.player(), DigesterJobs.FILL_COMPRESSOR, handle.object, self.items.fill[2])
-        end)
+        T.waitForSummary(self, handle, function(summary) return summary.powered end, "power at the digester")
+        T.step(function() self.unscrubbed = fillRefusal() end)
         local scrubber = DigesterJobs.materials(T.player(), DigesterJobs.FIT_SCRUBBER)
         local bucket
         for _, material in ipairs(scrubber) do
@@ -217,13 +230,22 @@ test("renewable_energy_biogas_compressor_fills_past_pump_with_scrubber", {
         T.actionJob(self, "digester", handle, DigesterJobs.REFILL_LIME)
         T.readRecord(self, handle, "charged")
         T.waitForSummary(self, handle, function(summary) return summary.scrubCO2 > 0 end, "this client's summary of the charged scrubber")
-        T.actionJob(self, "digester", handle, DigesterJobs.FILL_COMPRESSOR, function() return self.items.fill[2] end)
+        T.actionJob(self, "digester", handle, DigesterJobs.FILL_COMPRESSOR, function() return self.items.fill[1] end)
         T.readRecord(self, handle, "filled")
         T.readCarried(self, { Digester.TANK })
+        T.actionJob(self, "digester", handle, DigesterJobs.REMOVE_COMPRESSOR)
+        T.readRecord(self, handle, "removed")
+        T.count(self, "removed", { Digester.COMPRESSOR })
     end,
     validate = function(self)
         local charged, filled = self.reads.charged, self.reads.filled
         T.expectEqual("broken buckets counted as the scrubber's", self.brokenBucket, 0)
+        T.expectEqual("the compressor's refusal with none fitted", self.notFitted, "Tooltip_RenewableEnergy_NoCompressor")
+        T.expectEqual("compressors carried once one is fitted", self.counts.fitted[Digester.COMPRESSOR] or 0, 0)
+        T.expectEqual("the fitted compressor's refusal without power at the digester", self.unpowered,
+            "Tooltip_RenewableEnergy_NoPower")
+        T.expect(self.unpoweredSummary and self.unpoweredSummary.compressor and not self.unpoweredSummary.powered,
+            "the status doesn't read the compressor as fitted with no power")
         T.expectEqual("the compressor's refusal without a scrubber, at the pump's share", self.unscrubbed,
             "Tooltip_RenewableEnergy_NeedsScrubbed")
         T.expect(charged.scrubber, "the scrubber wasn't fitted")
@@ -238,6 +260,8 @@ test("renewable_energy_biogas_compressor_fills_past_pump_with_scrubber", {
         end
         T.expectNear("scrubber charge left", filled.scrubCO2, Digester.SCRUB_M3.lime - self.gas, 0.02)
         T.expectNear("steel wool left", filled.scrubWool, Digester.WOOL_M3 - self.gas, 0.02)
+        T.expect(not self.reads.removed.compressor, "the compressor is still fitted after removing it")
+        T.expectEqual("compressors carried after removing it", self.counts.removed[Digester.COMPRESSOR] or 0, 1)
     end,
 })
 

@@ -74,6 +74,8 @@ function DigesterMenu.addOptions(playerNum, context, digester)
             return Format.withShare(vessel:getDisplayName(), vessel:getCurrentUsesFloat())
         end)
     end
+    JobOptions.add(menu, playerNum, DigesterJobs,
+        summary.compressor and DigesterJobs.REMOVE_COMPRESSOR or DigesterJobs.FIT_COMPRESSOR, digester)
     if not summary.scrubber then
         JobOptions.add(menu, playerNum, DigesterJobs, DigesterJobs.FIT_SCRUBBER, digester)
         return menu
