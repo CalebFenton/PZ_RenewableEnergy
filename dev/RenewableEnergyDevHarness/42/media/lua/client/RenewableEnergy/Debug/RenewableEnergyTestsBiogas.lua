@@ -23,8 +23,10 @@ T.serverCheck("renewable_energy_biogas_digester_stink_score_edges", "digesterCor
 
 -- How strongly a digester stinks, as the smell moodle of the character standing at it: a mature
 -- barrel at the first smell level, a sour one at the second; an unfed one not at all; the Brick
--- Dome at its worst at the first and no further.
+-- Dome at its worst at the first and no further. A sour barrel picked up stops smelling at once,
+-- before the clock moves on.
 test("renewable_energy_biogas_digester_stink_levels", {
+    instant = true,
     run = function(self)
         local barrel = T.placeRecord(self, "digester", "barrel.MetalDrum")
         local dome = barrel and T.placeRecord(self, "digester", "dome")
@@ -35,17 +37,22 @@ test("renewable_energy_biogas_digester_stink_levels", {
         T.standOn(barrel)
         T.setRecord(self, barrel, Fixtures.matureDigester("barrel"))
         T.waitForAuthoritySmell(self, barrel, 1, "mature")
-        T.setRecord(self, barrel, T.sourDigester("barrel"))
-        T.waitForAuthoritySmell(self, barrel, 2, "sour")
         T.setRecord(self, barrel, { fed = false })
         T.waitForAuthoritySmell(self, barrel, 0, "unfed")
+        T.setRecord(self, barrel, T.sourDigester("barrel"))
+        T.waitForAuthoritySmell(self, barrel, 2, "sour")
+        -- Frozen, the clock can't bring a later clear in while the smell settles.
+        T.server(self, "freezeClock", { frozen = true })
+        T.pickUpAsPlayer(self, barrel, Sprites.digester.barrel.MetalDrum)
+        T.waitForAuthoritySmell(self, barrel, 0, "picked up")
+        T.server(self, "freezeClock", { frozen = false })
         T.step(function() T.standOn(dome) end)
         T.setRecord(self, dome, worst)
         T.waitForAuthoritySmell(self, dome, 1, "dome")
     end,
     validate = function(self)
         local reads = self.reads
-        for label, level in pairs({ mature = 1, sour = 2, unfed = 0, dome = 1 }) do
+        for label, level in pairs({ mature = 1, sour = 2, unfed = 0, ["picked up"] = 0, dome = 1 }) do
             T.expectEqual("the smell level at the " .. label .. " digester", reads[label] and reads[label].level, level)
         end
     end,

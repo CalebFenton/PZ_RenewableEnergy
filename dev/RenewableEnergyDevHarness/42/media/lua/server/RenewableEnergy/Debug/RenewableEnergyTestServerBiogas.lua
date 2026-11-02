@@ -79,6 +79,16 @@ handler("stinkRead", function(player, args)
     }
 end)
 
+-- Stops the authority's clock while `args.frozen`, until the test ends, so that no game minute
+-- passes: what a game minute would do later can't pass for what happened at once.
+handler("freezeClock", function(player, args, defer)
+    local options, name = getDebugOptions(), "GameTime.TimeOfDay.Freeze"
+    local was = options:getBoolean(name)
+    options:setBoolean(name, args.frozen)
+    defer(function() options:setBoolean(name, was) end)
+    return {}
+end)
+
 -- The stink score's edges (Digester.SMELL_SCORES): none just below the first, then each smell
 -- level's corpses from its edge up to just below the next.
 PZHarness.checkHandler("digesterCorpsesFor", function(expect)

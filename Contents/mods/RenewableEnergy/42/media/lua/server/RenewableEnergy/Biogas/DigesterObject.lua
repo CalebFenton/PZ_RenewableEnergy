@@ -113,13 +113,15 @@ local function putOutHeater(isoObject)
     end
 end
 
--- Its stink goes, and the heater it fed goes out; a tile picked up or destroyed is still on its
--- square here (OnObjectAboutToBeRemoved).
+-- Its stink goes, and the heater it fed goes out. A tile picked up or destroyed is still on its
+-- square here (OnObjectAboutToBeRemoved); a record without one goes as its chunk loads.
 function DigesterObject:aboutToRemoveFromSystem()
-    Stink.clear(self:key())
     local isoObject = self:getIsoObject()
     if isoObject then
+        Stink.clear(self:key())
         putOutHeater(isoObject)
+    else
+        Stink.clearLater(self:key())
     end
     ObjectSystem.Object.aboutToRemoveFromSystem(self)
 end

@@ -178,14 +178,23 @@ function Stink.set(key, x, y, z, count)
     settleKey(key, source)
 end
 
--- Sources cleared since the last minute.
+--- Takes the source `key`'s stink away for good: at once in each chunk loaded now, else when it
+--- next loads.
+function Stink.clear(key)
+    local source = sources[key]
+    if source then
+        Stink.set(key, source.x, source.y, source.z, 0)
+    end
+end
+
+-- Sources cleared later since the last minute.
 local clearing = {}
 
---- Takes the source `key`'s stink away for good, at the next game minute or when its chunks next
---- load. Not at once: a source whose record goes as its chunk loads (SGlobalObjectSystem's
---- OnChunkLoaded) is cleared after the chunk zeroed its counts and before LoadChunk counts its
---- ghosts again, when taking one out would take a real corpse's place.
-function Stink.clear(key)
+--- Stink.clear for a source whose owner goes as its chunk loads (SGlobalObjectSystem's
+--- OnChunkLoaded), at the next game minute or when its chunks next load. Not at once: that runs
+--- after the chunk zeroed its counts and before LoadChunk counts its ghosts again, when taking
+--- one out would take a real corpse's place.
+function Stink.clearLater(key)
     local source = sources[key]
     if source then
         source.want = 0

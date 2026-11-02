@@ -4,7 +4,6 @@
 
 require "PZHarness/Fixtures"
 local Chance = require "cf_commonlib/Chance"
-local Digester = require "RenewableEnergy/Biogas/Digester"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local Sources = require "RenewableEnergy/PowerBank/Sources"
 local Treadmill = require "RenewableEnergy/PowerBank/Treadmill"
@@ -27,16 +26,6 @@ PZHarness.registerTests({
         if PowerBank.isBank(object) then
             object:getSquare():transmitRemoveItemFromSquare(object)
             return true
-        end
-        -- Removing a digester clears its stink only at the next game minute (Stink.clear waits, for
-        -- a record that goes as its chunk loads), by when the next test would smell it: settled now,
-        -- the later clear finds nothing. Vanilla's removal then takes the digester.
-        if Digester.isDigester(object) and not isClient() then
-            local record = Digester.recordOf(object)
-            if record then
-                require("RenewableEnergy/Biogas/Stink").set(record:key(), record.x, record.y, record.z, 0)
-            end
-            return false
         end
         if not (Sources.kindOf(object) or Treadmill.isTreadmill(object) or Treadmill.isWiredTile(object)) then
             return false
