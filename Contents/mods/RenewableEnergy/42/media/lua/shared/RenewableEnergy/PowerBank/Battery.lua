@@ -33,18 +33,23 @@ end
 Battery.SERVICE_REPAIR = 10
 Battery.REPAIR_LIMIT = 85
 
---- The most a repair can bring a battery repaired this many times to.
+--- The most a repair can bring a battery repaired this many times (nil is 0) to.
 function Battery.repairLimit(timesRepaired)
-    return Battery.REPAIR_LIMIT - Wear.REPAIR_LIMIT_STEP * timesRepaired
+    return Wear.repairLimit(Battery.REPAIR_LIMIT, timesRepaired)
+end
+
+--- The condition Service Battery brings a battery at `condition`, repaired `repaired` times, to.
+function Battery.serviced(condition, repaired)
+    return math.min(Battery.repairLimit(repaired), condition + Battery.SERVICE_REPAIR)
 end
 
 --- The repair that makes the most of one of a battery's limited repairs, as the translation key
---- that names it, or nil for one in perfect shape: Service where its step reaches the repair limit
+--- that names it, or nil for one in perfect shape: Service where it reaches the repair limit
 --- anyway (it keeps the charge), Recondition further below it, and past the limit only a rebuild.
 function Battery.bestRepair(condition, repaired)
-    local limit = Battery.repairLimit(repaired or 0)
+    local limit = Battery.repairLimit(repaired)
     if condition < limit then
-        return condition + Battery.SERVICE_REPAIR >= limit and "IGUI_RenewableEnergy_RepairService"
+        return Battery.serviced(condition, repaired) == limit and "IGUI_RenewableEnergy_RepairService"
             or "IGUI_RenewableEnergy_RepairRecondition"
     elseif condition < 100 then
         return "IGUI_RenewableEnergy_RepairRebuild"

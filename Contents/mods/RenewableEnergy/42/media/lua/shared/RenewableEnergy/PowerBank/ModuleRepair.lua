@@ -53,7 +53,7 @@ end
 -- that is no module.
 local function sealCap(fullType, repaired)
     local cap = ModuleRepair.SEAL_CAP[fullType]
-    return cap and cap - Wear.REPAIR_LIMIT_STEP * (repaired or 0)
+    return cap and Wear.repairLimit(cap, repaired)
 end
 
 --- Whether a seal can help a module of `fullType` at `condition`, sealed `repaired` times: its

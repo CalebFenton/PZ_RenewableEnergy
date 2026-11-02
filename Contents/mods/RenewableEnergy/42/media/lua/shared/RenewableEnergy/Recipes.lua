@@ -170,7 +170,7 @@ end
 -- OnCreate of Service Battery.
 function Recipes.serviceBattery(craftRecipeData, character)
     local battery = inputBattery(craftRecipeData)
-    Wear.setCondition(battery, math.min(Battery.repairLimit(battery:getHaveBeenRepaired()), battery:getCondition() + Battery.SERVICE_REPAIR))
+    Wear.setCondition(battery, Battery.serviced(battery:getCondition(), battery:getHaveBeenRepaired()))
     countRepair(battery)
 end
 

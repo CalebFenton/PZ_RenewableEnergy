@@ -37,6 +37,12 @@ end
 -- starts the count again.
 Wear.REPAIR_LIMIT_STEP = 10
 
+--- The most a patch-up repair brings an item repaired `repaired` times (nil is 0) to, when its
+--- first repair brings it to `firstLimit`.
+function Wear.repairLimit(firstLimit, repaired)
+    return firstLimit - Wear.REPAIR_LIMIT_STEP * (repaired or 0)
+end
+
 -- A crafted inverter comes out short of its ConditionMax by CRAFTED_SHORTFALL at the recipe's
 -- Electricity level, and each level past it makes up CRAFTED_PER_LEVEL, up to the cap: the more
 -- skilled the maker, the better the first build.
