@@ -119,7 +119,8 @@ end
 ---
 --- The game draws its own dawn and dusk from the season (ErosionSeason: noon shifts through
 --- the year, day length runs between the solstices'). The game hour is stretched onto the
---- solar hour so that the sun rises and sets exactly when the sky brightens and darkens.
+--- solar hour so that the sun rises at the game's dawn and sets at its dusk. The game darkens
+--- the sky after dusk and lightens it before dawn (Sun.isDark).
 function Sun.positionNow(hoursAgo)
     local time = getGameTime()
     local season = getClimateManager():getSeason()
@@ -141,12 +142,24 @@ function Sun.elevation()
     return math.deg(math.asin(max(-1, min(1, Sun.positionNow().up))))
 end
 
---- The sun now as a flat cell sees it, { up, flat }: the sun's `up` as Sun.position gives it,
---- below 0 at night, and `flat`, the light on open flat ground in W/m², weather included. A pass
---- over many gadgets works it out once.
+-- The game's darkness (ClimateManager.getNightStrength) at which a photocell switches its lamp on.
+-- It runs from 0 at the game's dusk to 1 a quarter of the night later, and back to 0 at dawn the
+-- same way (ClimateValues), so a lamp switched at sunset lit a sky still as bright as day, and a
+-- winter battery could run flat before the night was dark. Halfway is when the sky turns dark.
+local DARK_NIGHT_STRENGTH = 0.5
+
+--- Whether it is dark now, as the game draws it.
+local function darkNow()
+    return getClimateManager():getNightStrength() >= DARK_NIGHT_STRENGTH
+end
+
+--- The sun now as a flat cell sees it, { up, flat, dark }: the sun's `up` as Sun.position gives
+--- it, below 0 at night; `flat`, the light on open flat ground in W/m², weather included; and
+--- `dark`, whether the game draws the sky dark (Sun.isDark). A pass over many gadgets works it
+--- out once.
 function Sun.skyNow()
     local sun = Sun.positionNow()
-    return { up = sun.up, flat = Sun.planeIrradiance(sun, "flat", nil, Sun.weatherNow()) }
+    return { up = sun.up, flat = Sun.planeIrradiance(sun, "flat", nil, Sun.weatherNow()), dark = darkNow() }
 end
 
 --- Watts a flat cell rated `ratedWatts` lying on `square` makes under `sky` (Sun.skyNow): none
@@ -158,10 +171,13 @@ function Sun.squareWatts(square, ratedWatts, sky)
     return Sun.wattsFrom(ratedWatts, sky.flat, 0)
 end
 
---- Whether it is dark under `sky` (Sun.skyNow or Sun.positionNow, now if nil): the sun at or
---- below the horizon, when a photocell switches its lamp on.
+--- Whether it is dark under `sky` (Sun.skyNow; now if nil), when a photocell switches its lamp on:
+--- once the game's sky has darkened halfway after dusk, until it is halfway light before dawn.
 function Sun.isDark(sky)
-    return (sky or Sun.positionNow()).up <= 0
+    if sky then
+        return sky.dark
+    end
+    return darkNow()
 end
 
 return Sun

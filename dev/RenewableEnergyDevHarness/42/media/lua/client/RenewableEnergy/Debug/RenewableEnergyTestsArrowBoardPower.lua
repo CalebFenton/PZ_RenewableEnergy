@@ -257,42 +257,54 @@ test("renewable_energy_world_arrow_board_lamps_flash_for_players", {
     end,
 })
 
--- The box's discharge cycle is the calendar day's: a pass just after midnight, half an hour after
--- the evening's, finishes the day and wears its battery by the day's depth, run flat from full;
--- the evening's passes wear nothing.
+-- The box's discharge cycle is the calendar day's: a lamp pass across midnight finishes the day
+-- and wears its battery by the day's depth, run down from full, what the lamps drew before
+-- midnight included; what they drew after starts the next day's. The evening's passes wear nothing.
+-- The lamps stay lit only above the controller's cutoff, too shallow a day for a point of wear at
+-- the usual Battery Wear.
+local EVENING_CHARGE, PASS_HOURS, PAST_MIDNIGHT = 0.2, 0.6, 0.5
 test("renewable_energy_world_arrow_board_cycle_ends_at_midnight", {
-    sandbox = { BatteryWear = 100 },
+    sandbox = { BatteryWear = 1000 },
     run = function(self)
         local trailer = spawnTrailer(self, { repair = true })
         if not trailer then return end
-        -- readUntil sends its args as they are, so they carry the trailer's own.
-        local function lampsArgs()
-            return T.at(trailer, { id = trailer.id, call = "runLamps", with = { 0, true } })
+        local function lampsArgs(hours)
+            return { call = "runLamps", with = { hours, true } }
         end
-        T.step(function() T.setTime(self, 23.5) end)
-        batchOnTrailer(function()
-            T.onVehicle(self, trailer, "setTrailer", { box = { { type = T.CAR_BATTERY, charge = 1 } } })
-            T.onVehicle(self, trailer, "arrowBoardRun", lampsArgs)
-            T.onVehicle(self, trailer, "setTrailer", { box = { { type = T.CAR_BATTERY, charge = 0 } } })
-            T.onVehicle(self, trailer, "arrowBoardRun", lampsArgs, "evening")
-        end)
+        -- The clock stands still at the same minutes past the hour on both sides of midnight, so
+        -- the gadgets' ten-minute pass never runs (GameTime.update) and the test's pass is the one
+        -- that crosses midnight; a server frame between them lets the clock step at 23:30 first
+        -- (as in renewable_energy_battery_depth_of_discharge_wears_batteries).
         T.step(function()
-            self.full = instanceItem(T.CAR_BATTERY):getConditionMax()
-            T.setTime(self, 24.01)
+            T.setMultiplier(self, 0)
+            T.setTime(self, 23.5)
         end)
-        T.readUntil(self, "arrowBoardRun", lampsArgs, "morning", function(reply)
-            local battery = boxItems(reply.state, T.CAR_BATTERY)[1]
-            return battery ~= nil and battery.condition < self.full
+        batchOnTrailer(function()
+            T.onVehicle(self, trailer, "setTrailer", { box = { { type = T.CAR_BATTERY, charge = 1 } }, switchOn = true })
+            T.onVehicle(self, trailer, "arrowBoardRun", lampsArgs(0))
+            T.onVehicle(self, trailer, "setTrailer", { box = { { type = T.CAR_BATTERY, charge = EVENING_CHARGE } } })
+            T.onVehicle(self, trailer, "arrowBoardRun", lampsArgs(0), "evening")
         end)
+        T.awaitServerFrame(self)
+        T.step(function() T.setTime(self, 24 + PAST_MIDNIGHT) end)
+        T.serverUntil(self, "vehicleState", function() return T.at(trailer, { id = trailer.id }) end, function(reply)
+            return reply.state.calendarDay ~= self.reads.evening.state.calendarDay
+        end)
+        T.onVehicle(self, trailer, "arrowBoardRun", lampsArgs(PASS_HOURS), "morning")
     end,
     validate = function(self)
-        local new = instanceItem(T.CAR_BATTERY)
-        local full = new:getConditionMax()
-        local expected = full - math.floor(Battery.cycleWear(new, 1) * full)
-        if not expect(expected < full, "a flat day wears a car battery less than a point, so its wear can't show") then return end
-        local evening = boxItems(self.reads.evening.state, T.CAR_BATTERY)[1]
-        expectEqual("the battery's condition after the evening's passes", evening and evening.condition, full)
-        local morning = boxItems(self.reads.morning.state, T.CAR_BATTERY)[1]
-        expectEqual("the battery's condition after midnight", morning and morning.condition, expected)
+        local evening, morning = self.reads.evening.state, self.reads.morning.state
+        local before, after = boxItems(evening, T.CAR_BATTERY)[1], boxItems(morning, T.CAR_BATTERY)[1]
+        if not (expect(before and after, "no car battery in the box")
+            and expect(evening.lamps ~= nil, "the lamps weren't lit in the evening")) then return end
+        local full = instanceItem(T.CAR_BATTERY):getConditionMax()
+        expectEqual("the battery's condition after the evening's passes", before.condition, full)
+        local drawn = before.charge - after.charge
+        if not expect(drawn > 0, "the lamps drew nothing across midnight") then return end
+        local afterMidnight = drawn * PAST_MIDNIGHT / PASS_HOURS
+        local expected = T.conditionAfterDischarge(T.CAR_BATTERY, 1 - EVENING_CHARGE + drawn - afterMidnight)
+        if not expect(expected < full, "the day's depth wears a car battery less than a point, so its wear can't show") then return end
+        expectEqual("the battery's condition after midnight", after.condition, expected)
+        expectNear("the box's cycle depth on the new day, the draw after midnight", morning.box.cycleDepth, afterMidnight, 1e-4)
     end,
 })

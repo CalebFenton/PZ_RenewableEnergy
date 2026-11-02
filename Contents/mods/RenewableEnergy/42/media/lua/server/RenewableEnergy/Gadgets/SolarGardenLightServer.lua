@@ -26,8 +26,9 @@ local function setLit(light, lit, bulbChanged)
     end
 end
 
--- Runs a light for `hours` under `sky` (Sun.skyNow): by day its cell charges the battery, and after
--- sunset its bulb draws on it until it is empty; a light without a bulb draws nothing.
+-- Runs a light for `hours` under `sky` (Sun.skyNow): by day its cell charges the battery, and once
+-- it is dark (Sun.isDark) its bulb draws on it until it is empty; a light without a bulb draws
+-- nothing.
 -- `bulbChanged` says its bulb has just changed, so that its lamp's colour reaches the clients even
 -- if it stays lit.
 local function run(light, hours, sky, bulbChanged)

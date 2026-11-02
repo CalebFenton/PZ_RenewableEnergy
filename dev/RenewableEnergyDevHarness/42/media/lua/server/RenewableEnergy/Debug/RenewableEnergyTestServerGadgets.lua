@@ -92,6 +92,13 @@ handler("gardenLightUpdate", function(_, args)
         flat = Sun.skyNow().flat }
 end)
 
+-- Whether the sky (ClimateManager) has followed the clock: the climate works its darkness out at
+-- its next update after the clock's minute changes, and records the minute it did.
+handler("skyFollowsClock", function()
+    local time, day = getGameTime(), getClimateManager():getCurrentDay()
+    return { follows = day:getHour() == time:getHour() and day:getMinutes() == time:getMinutes() }
+end)
+
 -- Vehicles ----------------------------------------------------------------------------------------
 
 local function batteryOf(vehicle)
@@ -172,9 +179,10 @@ handler("lightbarDrain", function(_, args)
     end)
 end)
 
--- The battery update the mod wraps (Vehicles.Update.Battery) for `args.minutes` with the engine
--- running, from a battery at `args.uses`: the share of a full charge it added. The engine is
--- repaired and fuelled first, since it shuts down without fuel and stalls at random when worn.
+-- The battery update the mod wraps (Vehicles.Update.Battery), `args.updates` times (default once)
+-- for `args.minutes` each, with the engine running, from a battery at `args.uses`: the share of a
+-- full charge it added. The engine is repaired and fuelled first, since it shuts down without fuel
+-- and stalls at random when worn.
 handler("alternatorCharge", function(_, args)
     local vehicle = PZHarness.vehicleAt(args)
     vehicle:repair()
@@ -186,7 +194,9 @@ handler("alternatorCharge", function(_, args)
     battery:setCurrentUsesFloat(args.uses)
     vehicle:engineDoRunning()
     need(vehicle:isEngineRunning(), "a running engine in the vehicle on the server")
-    Vehicles.Update.Battery(vehicle, part, args.minutes)
+    for _ = 1, args.updates or 1 do
+        Vehicles.Update.Battery(vehicle, part, args.minutes)
+    end
     local gain = battery:getCurrentUsesFloat() - args.uses
     vehicle:shutOff()
     return { gain = gain, type = battery:getFullType() }

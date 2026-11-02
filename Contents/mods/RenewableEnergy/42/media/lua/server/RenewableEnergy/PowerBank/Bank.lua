@@ -363,7 +363,8 @@ end
 
 -- Follows the day's discharge cycle (Battery.trackCycle), the charge at midnight `midnight` closing
 -- the day a pass crossed. A new day wears the batteries by the depth of yesterday's deepest
--- discharge: now, or while the bank is unloaded, when it next loads.
+-- discharge: now, or while the bank is unloaded, when it next loads. Returns whether the day turned,
+-- which starts the day's watt-hour totals again.
 function Bank:trackCycle(container, midnight)
     local day, finished = Battery.today()
     self.cycleHigh, self.cycleDepth, finished = Battery.trackCycle(self.day, self.cycleHigh, self.cycleDepth,
@@ -377,6 +378,7 @@ function Bank:trackCycle(container, midnight)
         resetToday(self)
     end
     self.day = day
+    return finished ~= nil
 end
 
 --- The watts the batteries give the inverters now.
@@ -454,12 +456,14 @@ function Bank:advance(hours, context)
         self:addPartWear(container, hours, 0)
     end
 
+    -- The day's totals take the pass's hours on the day it ends: after midnight, for a pass that
+    -- crossed it. The batteries carried the load from the pass's start.
+    local todayHours = self:trackCycle(container, midnight) and Battery.hoursToday(hours) or hours
     for _, family in ipairs(Sources.FAMILIES) do
-        self[family.today] = (self[family.today] or 0) + watts[family.name] * hours
+        self[family.today] = (self[family.today] or 0) + watts[family.name] * todayHours
     end
-    self.loadWhToday = self.loadWhToday + self.loadW * hours * carried
-    self.backupWhToday = (self.backupWhToday or 0) + backupW * hours
-    self:trackCycle(container, midnight)
+    self.loadWhToday = self.loadWhToday + self.loadW * math.max(0, carried * hours - (hours - todayHours))
+    self.backupWhToday = (self.backupWhToday or 0) + backupW * todayHours
     if container then
         self:writeBatteries(container, false)
         self:recount()

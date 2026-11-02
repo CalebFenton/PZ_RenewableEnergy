@@ -531,7 +531,7 @@ These need no bank.
 
 - **Solar Battery Maintainer**: **Attach Solar Maintainer** to a car and it trickle-charges whatever battery is in it, in daylight, while the car stands in the open; in a garage it does nothing. It keeps a parked car topped up but is too slow to revive a flat battery. It stays with the car when you swap batteries.
 - **Solar Battery Charger**: place it outside and load up to four flashlight batteries. They charge in daylight, emptiest first, so a full tray takes a few sunny days.
-- **Solar Garden Light**: outside, on the ground floor. It charges by day and lights up after sunset until the charge runs out, which on a short winter day can be early in the evening. Right-click to swap the bulb for a coloured one. Found lights start without charge, and picking one up keeps its charge and bulb.
+- **Solar Garden Light**: outside, on the ground floor. It charges by day and lights up once it gets dark, until the charge runs out, which after a short winter day can be long before dawn. It goes out as the sky gets light. Right-click to swap the bulb for a coloured one. Found lights start without charge, and picking one up keeps its charge and bulb.
 
 Gadgets charge only while someone is near enough for the area to be loaded. A car parked across the map isn't charging.
 

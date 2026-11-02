@@ -324,15 +324,18 @@ end
 
 -- Each of the mod's wraps of vanilla's battery drain and update (the handlers named), given the
 -- same input, moves a car battery and a deep cycle battery by the same watt-hours, so the deep
--- cycle's share (the answer's `change`) moves less by the capacity ratio.
+-- cycle's share (the answer's `change`) moves less by the capacity ratio, to within the use or two
+-- the battery can't show yet. A game minute an update, as the game updates parts
+-- (VehicleParts.updatePart), for an hour: the battery keeps whole uses and a minute's scaled
+-- change is a few dozen at most, so the scale holds over the hour only if what rounding leaves of
+-- each minute carries on. Vanilla drains the lightbar inside the battery update the mod scales
+-- for the alternator: scaled once.
 local BATTERY_ROWS = {
-    -- A game minute an update, as the game updates parts (VehicleParts.updatePart), for an hour:
-    -- the battery keeps whole uses and a minute's scaled drain is a few, so the scale holds over
-    -- the hour only if what rounding leaves of each minute carries on. Vanilla drains the
-    -- lightbar inside the battery update the mod scales for the alternator: scaled once.
     { what = "lightbar drain", handler = "lightbarDrain", uses = 0.8, minutes = 1, updates = 60, change = "drop" },
-    { what = "alternator charge", handler = "alternatorCharge", uses = 0.2, minutes = 60, change = "gain" },
+    { what = "alternator charge", handler = "alternatorCharge", uses = 0.2, minutes = 1, updates = 60, change = "gain" },
 }
+-- Uses a battery may not show yet: the last minute's, and what an earlier row left on the part.
+local UNSHOWN_USES = 2
 -- A charge an hour of the alternator fills, scaled or not: the wrap scales the minutes vanilla
 -- charges for, before vanilla clamps the charge, not the gain after.
 local NEAR_FULL = 0.99
@@ -355,12 +358,13 @@ test("renewable_energy_gadgets_deep_cycle_battery_scales_vanilla_charge_and_drai
         T.onVehicle(self, cars[2], "alternatorCharge", { uses = NEAR_FULL, minutes = 60 }, "near full")
     end,
     validate = function(self)
+        local useDelta = instanceItem(T.CAR_BATTERY):getUseDelta()
         for _, row in ipairs(BATTERY_ROWS) do
             local car, deepCycle = self.reads[row.what .. " " .. T.CAR_BATTERY], self.reads[row.what .. " " .. VehicleBattery.ITEM]
             if expectEqual("the deep cycle car's battery in the " .. row.what, deepCycle.type, VehicleBattery.ITEM)
                 and expect(car[row.change] > 0, "the " .. row.what .. " didn't move the car battery") then
                 expectNear("deep cycle " .. row.change .. " over car battery " .. row.change .. " in the " .. row.what,
-                    deepCycle[row.change] / car[row.change], capacityRatio(), 0.01)
+                    deepCycle[row.change] / car[row.change], capacityRatio(), UNSHOWN_USES * useDelta / car[row.change])
             end
         end
         expectNear("the near-full deep cycle battery's charge after an hour of the alternator",

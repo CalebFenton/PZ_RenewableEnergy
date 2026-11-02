@@ -228,8 +228,8 @@ end
 
 --- What the tests read of a vehicle on either side: its battery and whether a maintainer is
 --- attached, whether its alternator is out, its colour, and an arrow board's panels' module,
---- condition and shown models, the frame's parts and the lamp board, what the battery box holds,
---- the lid, the switch and the lamps.
+--- condition and shown models, the frame's parts and the lamp board, what the battery box holds and
+--- its discharge cycle's depth today, the lid, the switch and the lamps, with the calendar day.
 function Kinds.vehicleState(vehicle)
     local slot = VehicleBattery.partOf(vehicle)
     local battery = slot and slot:getInventoryItem()
@@ -250,8 +250,9 @@ function Kinds.vehicleState(vehicle)
     local box = vehicle:getPartById(ArrowBoard.BATTERY_BOX)
     local container = box and box:getItemContainer()
     if container then
-        state.box = { items = Kinds.itemsOf(container) }
+        state.box = { items = Kinds.itemsOf(container), cycleDepth = box:getModData()[ArrowBoard.CYCLE_DEPTH_KEY] }
     end
+    state.calendarDay = getGameTime():getDay()
     local lid = vehicle:getPartById(ArrowBoard.LID)
     local door = lid and lid:getDoor()
     if door then

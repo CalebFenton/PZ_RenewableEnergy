@@ -52,8 +52,8 @@ test("renewable_energy_battery_wear", {
 -- A day's deepest discharge wears the batteries at the bank's first pass of the next day, on this
 -- client's copies too: a rack of jar batteries charged full and run down, then a pass across
 -- midnight with the inverter carrying the load in reach. What it draws before midnight deepens the
--- day that ends, and what it draws after starts the next. Batteries enough that the pass leaves
--- them some charge.
+-- day that ends, and what it draws after starts the next, and is the new day's Used Today.
+-- Batteries enough that the pass leaves them some charge.
 local EVENING_CHARGE, PASS_HOURS, PAST_MIDNIGHT = 0.3, 0.6, 0.5
 test("renewable_energy_battery_depth_of_discharge_wears_batteries", {
     sandbox = { BatteryWear = 100 },
@@ -83,8 +83,7 @@ test("renewable_energy_battery_depth_of_discharge_wears_batteries", {
             T.setCharge(self, bank, EVENING_CHARGE)
             T.bankPass(self, bank, 0, { hours = 0.1, label = "evening" })
         end)
-        T.read(self, "PZHarness.worldFrame", {}, "eveningFrame")
-        T.serverUntil(self, "PZHarness.worldFrame", {}, function(now) return now.frame > self.reads.eveningFrame.frame end)
+        T.awaitServerFrame(self)
         -- Past midnight: the clock's next step turns the day (GameTime.update).
         T.step(function() T.setTime(self, 24 + PAST_MIDNIGHT) end)
         T.serverUntil(self, "PZHarness.readRecord", T.at(bank, { kind = "bank" }), function(state)
@@ -112,6 +111,10 @@ test("renewable_energy_battery_depth_of_discharge_wears_batteries", {
         expectEqual("jar battery condition after the deep day", battery and battery.condition, expected)
         -- The run's last wait already failed the test if this client's copy differs.
         expectNear("cycle depth on the new day, the draw after midnight", morning.cycleDepth, afterMidnight, 0.001)
+        local status = morning.status
+        if expect(status.loadW > 0, "the bank powered no load across midnight") then
+            expectNear("Wh used on the new day, the load after midnight", status.loadWhToday, status.loadW * PAST_MIDNIGHT, 0.001)
+        end
     end,
 })
 

@@ -46,6 +46,15 @@ function T.expectDark()
     return T.expect(T.player():tooDarkToRead(), "midnight with the grid off isn't dark where the character stands")
 end
 
+--- Queues a wait until the server has run a world update since the wait began. A server serves
+--- commands between its world updates, so a clock it was just told to set hasn't stepped yet: its
+--- day hasn't turned (GameTime.update) and its sky is the old hour's (ClimateManager.update).
+function T.awaitServerFrame(self)
+    local name = "PZHarness.worldFrame"
+    T.read(self, name, {}, "frameBefore")
+    T.serverUntil(self, name, {}, function(now) return now.frame > self.reads.frameBefore.frame end)
+end
+
 -- Fixtures -------------------------------------------------------------------------------------
 
 -- This client's copy of the bank on `square` once it holds `count` items and has a summary.
@@ -237,12 +246,13 @@ function T.bankPart(self, bank, fullType, changes)
     T.onRecord(self, bank, "bankPart", changes)
 end
 
---- The condition a new `fullType` battery keeps after one day's discharge `depth` deep at a
---- Battery Wear of 100: Battery.cycleWear's fraction of its ConditionMax, in whole points.
+--- The condition a new `fullType` battery keeps after one day's discharge `depth` deep at the
+--- Battery Wear option the test set: Battery.cycleWear's fraction of its ConditionMax, scaled by
+--- the option (Battery.wearAll), in whole points.
 function T.conditionAfterDischarge(fullType, depth)
     local battery = instanceItem(fullType)
     local max = battery:getConditionMax()
-    return max - math.floor(Battery.cycleWear(battery, depth) * max)
+    return max - math.floor(Battery.cycleWear(battery, depth) * Battery.wearScale() * max)
 end
 
 --- The whole status of `bank` as this client last received it, or nil. It comes only while this

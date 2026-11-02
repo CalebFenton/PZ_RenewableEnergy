@@ -84,12 +84,18 @@ end
 
 -- At night a light stays lit while its battery holds any charge: a little more than the night
 -- draws leaves it lit, exactly that much puts it out. By day the cell charges it at its rating in
--- the sky the pass ran under (`sunlit`), never past full.
+-- the sky the pass ran under (`sunlit`), never past full. The hour after the game's dusk and the
+-- hour before its dawn are after sunset but not yet dark, as the game draws its sky: a full light
+-- stays off there and keeps its charge. A row's `hour` and `hours` may be worked out from today's
+-- dusk and dawn (ErosionSeason) as the test runs, `hours` from the row's hour.
 local NIGHT_HOURS = 0.5
 local SPEC = SolarGardenLight.SPEC
 local NIGHT_WH = SPEC.nightWatts * NIGHT_HOURS
 -- A full battery: lasts the night hours the tests run.
 local LIT_WH = SPEC.wh
+local function season()
+    return getClimateManager():getSeason()
+end
 local GARDEN_LIGHT_HOURS = {
     { what = "with a little more than the night draws", hour = MIDNIGHT, charge = NIGHT_WH + 0.01, hours = NIGHT_HOURS,
         lit = true, after = 0.01 },
@@ -97,7 +103,20 @@ local GARDEN_LIGHT_HOURS = {
     { what = "empty at noon", hour = NOON, charge = 0, hours = 1, lit = false, sunlit = true },
     { what = "nearly full at noon", hour = NOON, charge = SPEC.wh - 0.01, hours = 1, lit = false,
         after = SPEC.wh },
+    -- The pass runs from the whole hour, so it starts and ends within the hour after dusk.
+    { what = "full just after dusk", hour = function() return math.ceil(season():getDusk()) end, charge = LIT_WH,
+        hours = 0.25, lit = false, after = LIT_WH },
+    { what = "full just before dawn", hour = function() return math.ceil(season():getDawn()) - 1 end, charge = LIT_WH,
+        hours = function(hour) return (season():getDawn() - hour) / 2 end, lit = false, after = LIT_WH },
 }
+
+-- `value`, or what it works out to from `...` if it is a function.
+local function resolve(value, ...)
+    if type(value) == "function" then
+        return value(...)
+    end
+    return value
+end
 
 test("renewable_energy_gadgets_garden_light_update", {
     instant = true,
@@ -106,8 +125,11 @@ test("renewable_energy_gadgets_garden_light_update", {
         local light = placeGardenLight(self, GARDEN_LIGHT_HOURS[1].charge)
         if not light then return end
         for _, row in ipairs(GARDEN_LIGHT_HOURS) do
-            T.step(function() T.setTime(self, row.hour) end)
-            runLight(self, light, row.charge, row.hours, row.what)
+            local hour = resolve(row.hour)
+            T.step(function() T.setTime(self, hour) end)
+            -- The photocell reads the server's sky, which follows its clock at a later update.
+            T.serverUntil(self, "skyFollowsClock", {}, function(reply) return reply.follows end)
+            runLight(self, light, row.charge, resolve(row.hours, hour), row.what)
             T.step(function()
                 self.copies[row.what] = { sprite = light.object:getTextureName(), lamp = lampOn(light.square) }
             end)
