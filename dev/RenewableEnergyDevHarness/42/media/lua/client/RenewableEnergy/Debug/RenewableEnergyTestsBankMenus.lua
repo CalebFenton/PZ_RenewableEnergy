@@ -25,40 +25,25 @@ end
 
 -- Menus ----------------------------------------------------------------------------------------
 
--- Right-clicking a bank builds its submenu through vanilla's menu builder, without vanilla's
--- generator submenu that its IsoGenerator would otherwise get.
-test("renewable_energy_bank_context_menu_opens_bank_menu", {
+-- Right-clicking a bank builds its submenu through vanilla's menu builder, in place of vanilla's
+-- generator submenu that its IsoGenerator would otherwise get: its window, renaming, and Wire In
+-- greyed out while the character carries no part; nothing to unwire from an empty bank.
+test("renewable_energy_bank_menu_right_click_lists_bank_options", {
     run = function(self)
         self.bank = T.bank(self, "batteryBoxWood", {}, { outdoors = true })
     end,
     validate = function(self)
         local bank = self.bank.object
-        local context = T.worldMenu(bank)
+        local submenu, context = T.worldSubmenu(bank, BankMenu.bankLabel(bank))
         if not expect(context ~= nil, "right-clicking a bank built no menu") then return end
-        local option = T.optionNamed(context, BankMenu.bankLabel(bank))
-        expect(option ~= nil and option.subOption ~= nil, "right-clicking a bank shows no bank submenu")
         expect(T.optionNamed(context, getText("ContextMenu_Generator")) == nil, "right-clicking a bank shows vanilla's generator submenu")
-        context:hideAndChildren()
-    end,
-})
-
--- A bank's submenu lists its window, its switch, renaming and wiring.
-test("renewable_energy_bank_menu_lists_bank_options", {
-    run = function(self)
-        self.bank = T.bank(self, "batteryBankWood", {}, { outdoors = true })
-    end,
-    validate = function(self)
-        local context = T.newContext()
-        local submenu = BankMenu.addBankOptions(0, context, self.bank.object)
-        expect(T.optionNamed(submenu, getText("ContextMenu_RenewableEnergy_Status")) ~= nil, "the bank menu has no status option")
-        expect(T.optionNamed(submenu, getText("ContextMenu_RenewableEnergy_Rename")) ~= nil, "the bank menu has no Rename")
-        T.noteOption(self, "Turn On without an inverter", T.optionNamed(submenu, getText("ContextMenu_Turn_On")))
-        T.expectOptionRefused(self, "Turn On without an inverter")
-        T.noteOption(self, "Wire In with no part carried", T.optionNamed(submenu, getText("ContextMenu_RenewableEnergy_WireIn")))
-        T.expectOptionRefused(self, "Wire In with no part carried")
-        expectEqual("Wire In with no part carried's tooltip", self.menu["Wire In with no part carried"].tooltip,
-            getText("Tooltip_RenewableEnergy_NothingToWire"))
-        expect(T.optionNamed(submenu, getText("ContextMenu_RenewableEnergy_Unwire")) == nil, "an empty bank offers to unwire something")
+        if expect(submenu ~= nil, "right-clicking a bank shows no bank submenu") then
+            expect(T.optionNamed(submenu, getText("ContextMenu_RenewableEnergy_Status")) ~= nil, "the bank menu has no status option")
+            expect(T.optionNamed(submenu, getText("ContextMenu_RenewableEnergy_Rename")) ~= nil, "the bank menu has no Rename")
+            T.noteOption(self, "Wire In with no part carried", T.optionNamed(submenu, getText("ContextMenu_RenewableEnergy_WireIn")))
+            T.expectOptionRefused(self, "Wire In with no part carried", "Tooltip_RenewableEnergy_NothingToWire")
+            expect(T.optionNamed(submenu, getText("ContextMenu_RenewableEnergy_Unwire")) == nil, "an empty bank offers to unwire something")
+        end
         context:hideAndChildren()
     end,
 })
@@ -244,6 +229,8 @@ test("renewable_energy_bank_menu_unwire_all_batteries", {
         local screwdriverKg = getScriptManager():FindItem("Base.Screwdriver"):getActualWeight()
         local room = inventory:getEffectiveCapacity(p) - inventory:getCapacityWeight() - screwdriverKg
         T.give(self, "filler", { { type = "Base.Screwdriver" }, { type = "Base.Stone2", count = math.floor(room - 1.5 * batteryKg) } })
+        -- Where the jobs walk the character, as walking takes real time.
+        T.goNextTo(self, bank.square)
         T.step(function()
             local all = T.menuOption(BankMenu.addUnwireOptions, bank.object, getText("ContextMenu_RenewableEnergy_AllBatteries", 2))
             if not T.chooseOption(self, "Unwire > All Batteries", all) then return end
@@ -310,19 +297,21 @@ test("renewable_energy_bank_menu_wire_in_all_batteries", {
     end,
 })
 
--- Connect All is a sequence, not an atomic demand for enough slots for every candidate.
+-- Connect Sources in Reach connects the sources that fit and leaves out one that doesn't, rather
+-- than refusing them all for want of slots for every one.
 test("renewable_energy_bank_menu_connects_sources_that_fit", {
     instant = true,
     run = function(self)
         local bank = T.bank(self, "batteryBoxWood", {}, { outdoors = true })
         if not bank then return end
         self.bank = bank
-        local sprites = Sprites
-        self.large = T.panel(self, sprites.windCharger.alternator.steel.N, { near = bank })
-        self.small = T.panel(self, sprites.flat, { near = bank })
+        self.large = T.panel(self, Sprites.windCharger.alternator.steel.N, { near = bank })
+        self.small = T.panel(self, Sprites.flat, { near = bank })
         if not (self.large and self.small) then return end
         T.watch(self, bank)
         T.holdLight(self)
+        -- Where the job walks the character, as walking takes real time.
+        T.goNextTo(self, self.small.square)
         T.step(function()
             local option = T.menuOption(BankMenu.addBankOptions, bank.object,
                 getText("ContextMenu_RenewableEnergy_ConnectSourcesInReach", 2))

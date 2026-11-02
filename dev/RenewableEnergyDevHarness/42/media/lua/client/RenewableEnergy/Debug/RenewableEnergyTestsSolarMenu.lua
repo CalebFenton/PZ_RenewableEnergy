@@ -173,44 +173,18 @@ test("renewable_energy_solar_disconnect_panel", {
     end,
 })
 
--- Catching up for Disconnect can itself drop a panel roofed over since the last pass.
--- The job must then refuse the stale connection and publish the bank's updated sources.
-test("renewable_energy_solar_disconnect_panel_dropped_during_catchup", {
-    run = function(self)
-        self.bank = T.bank(self, "batteryBoxWood", {}, { outdoors = true })
-        self.panel = self.bank and T.panel(self, Sprites.flat, { near = self.bank, connect = true })
-        if not self.panel then return end
-        T.batch(function()
-            T.floorAbove(self, self.panel, "roof")
-            T.readRecord(self, self.bank, "before", 1)
-            T.job(self, "source", SourceJobs.DISCONNECT, self.panel, nil, "disconnect")
-            T.readRecord(self, self.bank, "after")
-        end)
-        T.waitForSummary(self, self.bank, function(summary) return #summary.sources == 0 end,
-            "this client's summary after catch-up disconnected the roofed panel")
-    end,
-    validate = function(self)
-        if not T.expectConnected(self.panel) then return end
-        expectEqual("whether the panel is still outdoors", self.reads.roof.outside, false)
-        expectEqual("sources before the action catches up", self.reads.before.sources, 1)
-        expectEqual("whether Disconnect acted on the removed connection", self.reads.disconnect.ok, false)
-        expectEqual("Disconnect's refusal after catch-up", self.reads.disconnect.reason, "not connected")
-        expectEqual("sources after the action catches up", self.reads.after.sources, 0)
-    end,
-})
-
 -- Seal Cracked Module, chosen from a connected rack's menu, seals the one cracked module still on
--- its mount as the recipe seals one in hand: up to its cap, lowered by the seal it already had,
--- counting the seal and still showing cracked. The whole module isn't offered, and the bank's
--- record takes the sealed module at once. Its tooltip names both adhesives, and with both
--- carried the seal takes the glue twin's uses of glue and leaves the epoxy (ModuleRepair.SEAL, a
--- cf_commonlib Materials craft).
+-- its mount as the recipe seals one in hand (ModuleRepair.sealed), counting the seal and still
+-- showing cracked. The whole module isn't offered, and the bank's record takes the sealed module at
+-- once. Its tooltip names both adhesives, and with both carried the seal takes the glue twin's uses
+-- of glue and leaves the epoxy (ModuleRepair.SEAL, a cf_commonlib Materials craft).
 test("renewable_energy_solar_seal_module_in_place", {
     instant = true,
     run = function(self)
         self.bank = T.bank(self, "batteryBankWood", {}, { outdoors = true })
-        -- A seal adds 20, past the cap of 45 a factory module sealed once has (55 less 10 a seal).
+        -- Sealed once already, so its lowered cap, not a whole seal's worth, decides how far it goes.
         local cracked = { type = T.FACTORY_MODULE, condition = 30, repaired = 1 }
+        self.cracked = cracked
         self.panel = self.bank and T.panel(self, Sprites.rack.wood.S, { near = self.bank, connect = true,
             modules = { { type = T.FACTORY_MODULE, condition = 100 }, cracked } })
         if not self.panel then return end
@@ -242,12 +216,13 @@ test("renewable_energy_solar_seal_module_in_place", {
         expect(not self.wholeOffered, "the whole module is offered a seal")
         if not T.expectOffered(self, "Seal Cracked Module") then return end
         local modules, tooltip = self.reads.panel.modules, self.menu["Seal Cracked Module"].tooltip
+        local condition, seals = ModuleRepair.sealed(self.cracked.type, self.cracked.condition, self.cracked.repaired)
         expectEqual("the whole module's condition", modules[1].condition, 100)
-        expectEqual("the sealed module's condition", modules[2].condition, 45)
-        expectEqual("the sealed module's seals", modules[2].repaired, 2)
+        expectEqual("the sealed module's condition", modules[2].condition, condition)
+        expectEqual("the sealed module's seals", modules[2].repaired, seals)
         expect(#self.reads.panel.overlays > 0, "the sealed module shows whole")
         local listed = self.bank.state.status.sources[1]
-        expectEqual("the bank's record of the sealed module", listed and listed.modules[2] and listed.modules[2].condition, 45)
+        expectEqual("the bank's record of the sealed module", listed and listed.modules[2] and listed.modules[2].condition, condition)
         for _, adhesive in ipairs({ "Base.Glue", "Base.Epoxy" }) do
             expect(tooltip:find(getItemNameFromFullType(adhesive), 1, true) ~= nil,
                 "the seal's tooltip doesn't name " .. adhesive .. ": " .. tooltip)

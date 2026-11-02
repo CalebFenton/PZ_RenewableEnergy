@@ -89,8 +89,8 @@ test("renewable_energy_wind_scoop_cut_in_and_brake", {
 -- (newtiledefinitions.tiles: walls_exterior_house_low_01_1 HoppableN and WallN, fencing_01_8
 -- TallHoppableN and WallN). A charger losing more than shelteredShare of its unsheltered watts to
 -- shelter gives "sheltered" as its reason, and one losing less gives none: a ring of walls beside
--- it costs about 6%, walls filling the squares out to 5 about 43% (WindSource's shelter weights,
--- worked by hand).
+-- it costs less than that, walls filling the squares out to 5 more, as WindSource's weights, nearer
+-- squares counting for more, make them.
 local WALL = "walls_exterior_wooden_01_24"
 local LOW_WALL = "walls_exterior_house_low_01_1"
 local TALL_FENCE = "fencing_01_8"
@@ -180,9 +180,9 @@ test("renewable_energy_wind_mast_sheltered_only_at_its_blades", {
     end,
 })
 
--- Two treadmill chargers two squares apart take wind from each other, each its crowdShare of the
--- distance (Wind.SPEC.crowdRadius, crowdLoss), which costs enough for the status to say so; a
--- scoop rotor right beside one turns a level below its blades and takes nothing, nor loses any.
+-- Two treadmill chargers two squares apart take wind from each other, each the crowding its
+-- neighbour's distance gives (Wind.crowding), which costs enough for the status to say so; a scoop
+-- rotor right beside one turns a level below its blades and takes nothing, nor loses any.
 test("renewable_energy_wind_chargers_close_together_crowd_each_other", {
     run = function(self)
         local bank = T.bank(self, "batteryRackWood", { T.CAR_BATTERY, T.PLUG_IN_INVERTER, CONTROLLER })
@@ -214,14 +214,12 @@ test("renewable_energy_wind_chargers_close_together_crowd_each_other", {
             if not T.expectConnected(handle) then return end
         end
         local spec = Wind.SPEC.turbines.propeller
-        -- Two squares apart, crowdLoss 0.25 falls by one of crowdRadius 3's steps: 0.25 * 2 / 3,
-        -- a sixth of the wind, which the status rounds to 17%.
-        local crowding = 1 / 6
+        local crowding = Wind.crowding({ self.distance })
         for label, handle in pairs({ first = self.first, second = self.second }) do
             local source = T.stateSource(self.reads.crowded, handle)
             if expect(source ~= nil, "the bank's status lists no " .. label .. " treadmill charger") then
                 T.expectEqual(string.format("the %s charger's crowding %%, %g squares from the other", label, self.distance),
-                    source.crowdingPct, 17)
+                    source.crowdingPct, round(100 * crowding))
                 T.expectNear("the " .. label .. " charger's watts", source.watts,
                     (1 - crowding) * Wind.watts(spec, spec.ratedKph, source.z, source.shelterPct / 100), spec.watts * 0.01)
                 T.expectEqual("the " .. label .. " charger's reason", source.reason, "crowded")
@@ -241,7 +239,8 @@ test("renewable_energy_wind_chargers_close_together_crowd_each_other", {
 -- charger takes more input slots than a bank has free, so it needs a charge controller. The
 -- chargers rank in every wind: the car alternator's never makes less than the treadmill motor's,
 -- nor the turbine, furled or not, less than the car alternator's, from either's cut-in up to the
--- game's strongest wind.
+-- game's strongest wind. A neighbour takes crowdLoss of a charger's wind right beside it, less
+-- each square further, none past crowdRadius, and a second takes its share of what the first left.
 test("renewable_energy_wind_power_curve_rule", {
     sandbox = { WindMultiplier = 3 },
     validate = function()
@@ -289,6 +288,14 @@ test("renewable_energy_wind_power_curve_rule", {
                     ranks[i], low))
             end
         end
+        local beside = Wind.crowding({ 1 })
+        T.expectNear("the wind a neighbour right beside takes", beside, wind.crowdLoss, 1e-9)
+        for distance = 2, wind.crowdRadius do
+            expect(Wind.crowding({ distance }) < Wind.crowding({ distance - 1 }) and Wind.crowding({ distance }) > 0,
+                "a neighbour " .. distance .. " squares away doesn't take less than one nearer, and some")
+        end
+        T.expectEqual("the wind a neighbour past the crowding radius takes", Wind.crowding({ wind.crowdRadius + 1 }), 0)
+        T.expectNear("the wind two neighbours right beside take", Wind.crowding({ 1, 1 }), 1 - (1 - beside) ^ 2, 1e-9)
     end,
 })
 
@@ -542,56 +549,69 @@ test("renewable_energy_wind_any_charger_takes_any_blades", {
 
 -- Replacing a broken charger's blades with another material's makes it that material's tile of
 -- its kind facing the same way, its entity and model too, and its bank's record turns those
--- blades; the new blades are used and the broken old ones come back. `bank` is one with room for it.
-local function swapTest(name, what, bank, from, to, newBlades, brokenBlades)
-    test(name, {
-        instant = true,
-        run = function(self)
-            self.bank = T.bank(self, bank.kind, bank.parts)
-            if not self.bank then return end
-            self.charger = T.panel(self, from, { near = self.bank, connect = true, built = true, broken = true })
-            if not self.charger then return end
-            T.waitFor(self, function() return Wind.isBroken(self.charger.object) end, "this client's copy of the broken blades")
-            T.holdLight(self)
-            T.give(self, "blades", { { type = newBlades } })
-            T.actionJob(self, "source", self.charger, SourceJobs.REPLACE_BLADES, function() return self.items.blades[1] end)
-            self.texture = getScriptManager():getSpriteModel(Sprites.windModelOf(to) .. "0"):getTextureName()
+-- blades; the new blades are used and the broken old ones come back. A wooden treadmill charger
+-- takes pipe blades and a steel turbine wooden ones, side by side on a bank with room for both.
+local SWAPS = {
+    { what = "pipe treadmill charger", from = Sprites.windCharger.propeller.wood.E, to = Sprites.windCharger.propeller.pipe.E,
+        blades = PIPE_BLADES, broken = BROKEN_WOODEN_BLADES },
+    { what = "wooden turbine", from = Sprites.windCharger.alternator.steel.N, to = Sprites.windCharger.alternator.wood.N,
+        blades = WOODEN_BLADES, broken = "RenewableEnergy.BrokenSteelBlades" },
+}
+
+test("renewable_energy_wind_blades_swap_material", {
+    instant = true,
+    run = function(self)
+        local bank = T.bank(self, "batteryRackWood", { T.CAR_BATTERY, T.PLUG_IN_INVERTER, CONTROLLER })
+        if not bank then return end
+        self.bank, self.chargers = bank, {}
+        local blades, carried = {}, {}
+        for i, swap in ipairs(SWAPS) do
+            self.chargers[i] = T.panel(self, swap.from, { near = bank, connect = true, built = true, broken = true })
+            if not self.chargers[i] then return end
+            blades[i] = { type = swap.blades }
+            table.insert(carried, swap.blades)
+            table.insert(carried, swap.broken)
+        end
+        T.waitFor(self, function()
+            return Wind.isBroken(self.chargers[1].object) and Wind.isBroken(self.chargers[2].object)
+        end, "this client's copies of the broken blades")
+        T.holdLight(self)
+        T.give(self, "blades", blades)
+        for i, swap in ipairs(SWAPS) do
+            local charger = self.chargers[i]
+            T.actionJob(self, "source", charger, SourceJobs.REPLACE_BLADES, function() return self.items.blades[i] end)
+            local texture = getScriptManager():getSpriteModel(Sprites.windModelOf(swap.to) .. "0"):getTextureName()
             -- The new tile's entity, or each load of it logs "Invalid SpriteConfig object!".
             T.waitFor(self, function()
-                local object = Sources.findOn(self.charger.square)
+                local object = Sources.findOn(charger.square)
                 local config = object and object:getSpriteConfig()
                 local model = object and object:getSpriteModel()
-                self.object = object
-                return object ~= nil and not Wind.isBroken(object) and Sprites.nameOf(object) == to
-                    and config ~= nil and config:isValid() and model ~= nil and model:getTextureName() == self.texture
-            end, "this client's copy of the " .. what .. ", its entity and its model")
-            T.batch(function()
-                T.readCarried(self, { newBlades, brokenBlades })
-                T.readRecord(self, self.bank)
-            end)
-        end,
-        validate = function(self)
-            if not T.expectConnected(self.charger) then return end
+                return object ~= nil and not Wind.isBroken(object) and Sprites.nameOf(object) == swap.to
+                    and config ~= nil and config:isValid() and model ~= nil and model:getTextureName() == texture
+            end, "this client's copy of the " .. swap.what .. ", its entity and its model")
+        end
+        T.batch(function()
+            T.readCarried(self, carried)
+            T.readRecord(self, bank)
+        end)
+    end,
+    validate = function(self)
+        for i, swap in ipairs(SWAPS) do
+            local charger = self.chargers[i]
+            if not T.expectConnected(charger) then return end
             local blades
             for _, record in ipairs(self.bank.state and self.bank.state.records or {}) do
-                if Squares.samePosition(record, self.charger) then
+                if Squares.samePosition(record, charger) then
                     blades = record.blades
                 end
             end
-            local _, _, material = Sprites.kindOf(to)
-            T.expectEqual("the blades in the bank's record of the " .. what, blades, material)
-            expect(T.carriedFirst(self, newBlades) == nil, "the new blades stayed in the inventory")
-            T.expectEqual("the " .. brokenBlades .. " carried", #T.carriedItems(self, brokenBlades), 1)
-        end,
-    })
-end
-
-swapTest("renewable_energy_wind_blades_swap_material", "pipe treadmill charger",
-    { kind = "batteryRackWood", parts = { T.CAR_BATTERY, T.PLUG_IN_INVERTER, CONTROLLER } },
-    Sprites.windCharger.propeller.wood.E, Sprites.windCharger.propeller.pipe.E, PIPE_BLADES, BROKEN_WOODEN_BLADES)
-swapTest("renewable_energy_wind_turbine_blades_swap_material", "wooden turbine",
-    { kind = "batteryRackWood", parts = { T.CAR_BATTERY, T.PLUG_IN_INVERTER, CONTROLLER } },
-    Sprites.windCharger.alternator.steel.N, Sprites.windCharger.alternator.wood.N, WOODEN_BLADES, "RenewableEnergy.BrokenSteelBlades")
+            local _, _, material = Sprites.kindOf(swap.to)
+            T.expectEqual("the blades in the bank's record of the " .. swap.what, blades, material)
+            expect(T.carriedFirst(self, swap.blades) == nil, "the new blades of the " .. swap.what .. " stayed in the inventory")
+            T.expectEqual("the " .. swap.broken .. " carried", #T.carriedItems(self, swap.broken), 1)
+        end
+    end,
+})
 
 -- Each bladed kind's one build menu entry, which builds its wooden-bladed entity, and other blades
 -- to build it with, a different material for each kind, with the entity those blades make of it:

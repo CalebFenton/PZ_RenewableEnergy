@@ -352,12 +352,11 @@ test("renewable_energy_bank_clock_drives_banks_and_gadgets", {
 
 -- Unloaded ---------------------------------------------------------------------------------------
 
--- Hours the bank powers while away, which its batteries carry the houses around through, and the
--- wear its inverter brings to the trip, pending on the item: together they make a whole point,
--- with a tenth to spare so the summed fractions can't fall short of it, so the hours away must
--- reach the inverter for its wear to show.
-local AWAY_HOURS = 20
-local PRIMED_WEAR = math.max(0, 1.1 - Specs.partWear.perHour.inverter * AWAY_HOURS)
+-- Hours the bank powers while away, and the wear its inverter brings to the trip, pending on the
+-- item: neither makes a whole point alone, and together they make one with a tenth to spare, so
+-- the point shows only if the hours away reach the inverter when its chunk loads.
+local AWAY_HOURS = 5
+local PRIMED_WEAR = 1.1 - Specs.partWear.perHour.inverter * AWAY_HOURS
 
 -- This client's copy of the bank at `position`, found afresh: a chunk loaded again brings new
 -- objects.
@@ -365,39 +364,50 @@ local function bankHere(position)
     return PowerBank.findOn(getSquare(position.x, position.y, position.z))
 end
 
--- While its chunk is unloaded a switched-on bank carries on from what it last knew: a pass across
--- midnight draws on its charge, turns its day on the depth of yesterday's deepest discharge, and
--- counts the hours its inverter powered. When the chunk loads, the batteries take the charge it
--- reached and that discharge's wear, and the inverter those hours' wear, on the server's items and
--- this client's copies. Batteries enough to carry what the houses around draw through the hours
--- away, so the inverter powers them all.
-test("renewable_energy_bank_unloaded_bank_writes_back_on_load", {
+-- While its chunk is unloaded a switched-on bank carries on from what it last knew. The grid goes
+-- while it is away: it carries what was switched on in its reach, measured while the grid still
+-- powered it, not just its inverter's idle draw, and no longer charges from the grid. Its pass
+-- across midnight draws on its charge, turns its day on yesterday's deepest discharge and counts
+-- the hours its inverter powered. When the chunk loads, the batteries take the charge it reached
+-- and that discharge's wear, and the inverter those hours' wear, on the server's items and this
+-- client's copies. One trip for all of it: each costs seconds of real time.
+test("renewable_energy_bank_unloaded_bank_carries_on_and_writes_back_on_load", {
     spOnly = T.CHUNK_RELOAD_SP_ONLY,
     timeoutSeconds = T.CHUNK_RELOAD_SECONDS,
     sandbox = { BatteryWear = 100 },
     run = function(self)
-        T.setGrid(self, false)
+        T.setGrid(self, true)
+        -- Batteries enough that the hours away drain less than the discharge the day already saw,
+        -- which then stays the day's deepest.
         local parts = { T.JAR_BATTERY, T.INVERTER_CHARGER }
         for _ = 2, Specs.banks["RenewableEnergy.BatteryRackMetal"].maxBatteries do
             table.insert(parts, T.L16)
         end
-        local stand = T.square(self, nil, "a free outdoor square to stand on")
-        local bank = stand and T.bank(self, "batteryRackMetal", parts, { near = stand })
-        if not bank then return end
+        local bank = T.bank(self, "batteryRackMetal", parts)
+        local fridge = bank and T.square(self, { indoors = true, near = bank }, "a free indoor square for a fridge")
+        if not fridge then return end
         self.bank, self.parts = bank, parts
         local at = T.at(bank)
         T.step(function() T.setTime(self, 23.5) end)
         T.switchOn(self, bank)
+        T.step(function() self.fridge = T.placeTile(self, fridge, T.MINI_FRIDGE) end)
         T.batch(function()
+            -- A full bank, then a discharge for the day to wear the batteries by.
             T.bankPass(self, bank, 0, { hours = 0.1 })
             T.setCharge(self, bank, 0.3)
-            T.bankPass(self, bank, 0, { hours = 0.1 })
+            T.bankPass(self, bank, 0, { hours = 0.1, label = "onGrid" })
             T.setCharge(self, bank, 1)
             T.bankPart(self, bank, T.INVERTER_CHARGER, { wear = PRIMED_WEAR })
             T.readRecord(self, bank, "left")
         end)
+        -- The fridge goes before the trip: unloaded, the bank keeps what it measured, and a tile in a
+        -- chunk that loads again is a new copy the fixture's removal would miss.
+        T.step(function() PZHarness.Fixtures.removePlaced(self.fridge.object) end)
         T.reloadChunk(self, at, function()
-            T.step(function() T.setTime(self, 24.01) end)
+            T.step(function()
+                T.setTime(self, 24.01)
+                T.setGrid(self, false)
+            end)
             T.serverUntil(self, "PZHarness.readRecord", T.at(bank, { kind = "bank" }), function(state)
                 return state ~= nil and state.calendarDay ~= self.reads.left.calendarDay
             end)
@@ -411,18 +421,25 @@ test("renewable_energy_bank_unloaded_bank_writes_back_on_load", {
         end, "this client's copy of the bank loaded again")
     end,
     validate = function(self)
-        local away, back, left = self.reads.away, self.bank.state, self.reads.left
+        local onGrid, left, away, back = self.reads.onGrid, self.reads.left, self.reads.away, self.bank.state
         expectEqual("items the server sees in the bank away (any: its chunk stayed loaded)", #away.items, 0)
         expect(away.calendarDay ~= left.calendarDay, "the day never turned while the bank was away")
-        expect(away.status.state == "on" and away.charge < 1, string.format(
-            "the bank away drew it to %.3f in %d hours, %s", away.charge, AWAY_HOURS, tostring(away.status.state)))
+        expect(onGrid.status.state == "grid" and onGrid.status.loadW >= T.fridgeW(), string.format(
+            "on the grid the bank reads %s and measures %.1f W with a fridge on", tostring(onGrid.status.state), onGrid.status.loadW))
+        expectEqual("the state of the bank away with the grid gone", away.status.state, "on")
+        expectEqual("the load the bank carries away, against the one it measured on the grid", away.status.loadW, onGrid.status.loadW)
+        expect(away.drawW > onGrid.status.loadW, string.format("away the bank draws %.1f W for a load of %.1f W",
+            away.drawW, onGrid.status.loadW))
+        expect(away.charge < left.charge, "away with the grid gone the bank's charge didn't fall")
+        expect(away.status.chargeSource == nil, "away with the grid gone the chargers charge from " .. tostring(away.status.chargeSource))
+        expectEqual("the inverter's condition as the bank left, which the hours away must wear", T.stateCondition(left, T.INVERTER_CHARGER), 100)
         local cameBack = {
             [T.JAR_BATTERY] = T.conditionAfterDischarge(T.JAR_BATTERY, left.cycleDepth),
             [T.L16] = T.conditionAfterDischarge(T.L16, left.cycleDepth),
             [T.INVERTER_CHARGER] = 100 - math.floor(PRIMED_WEAR + Specs.partWear.perHour.inverter * AWAY_HOURS),
         }
-        expect(cameBack[T.JAR_BATTERY] < 100 and cameBack[T.INVERTER_CHARGER] < 100, string.format("a %.2f deep day and %d hours on"
-            .. " don't wear both the jar battery and the inverter a whole point, so their wear can't show", left.cycleDepth, AWAY_HOURS))
+        expect(cameBack[T.JAR_BATTERY] < 100, string.format("a %.2f deep day doesn't wear the jar battery a whole point,"
+            .. " so its wear can't show", left.cycleDepth))
         local function check(what, fullType, condition, uses)
             expectEqual(what .. "'s condition", condition, cameBack[fullType])
             if fullType ~= T.INVERTER_CHARGER then
@@ -440,44 +457,5 @@ test("renewable_energy_bank_unloaded_bank_writes_back_on_load", {
             local item = items:get(i)
             check("this client's " .. item:getFullType(), item:getFullType(), item:getCondition(), item:getCurrentUsesFloat())
         end
-    end,
-})
-
--- A switched-on bank whose chunk is unloaded when the grid goes carries what was switched on in its
--- reach, measured while the grid still powered it: the hours away drain it for that load, not just
--- its inverter's idle draw, and its inverter/charger no longer charges from the grid.
-test("renewable_energy_bank_unloaded_bank_carries_its_load_when_the_grid_goes", {
-    spOnly = T.CHUNK_RELOAD_SP_ONLY,
-    timeoutSeconds = T.CHUNK_RELOAD_SECONDS,
-    run = function(self)
-        T.setGrid(self, true)
-        local stand = T.square(self, nil, "a free outdoor square to stand on")
-        local bank = stand and T.bank(self, "batteryRackWood", { T.L16, T.L16, T.INVERTER_CHARGER }, { near = stand })
-        local fridge = bank and T.square(self, { indoors = true, near = bank }, "a free indoor square for a fridge")
-        if not fridge then return end
-        self.bank = bank
-        local at = T.at(bank)
-        T.switchOn(self, bank)
-        T.step(function() self.fridge = T.placeTile(self, fridge, T.MINI_FRIDGE) end)
-        T.bankPass(self, bank, 0, { label = "onGrid" })
-        -- The fridge goes before the trip: unloaded, the bank keeps what it measured, and a tile in a
-        -- chunk that loads again is a new copy the fixture's removal would miss.
-        T.step(function() PZHarness.Fixtures.removePlaced(self.fridge.object) end)
-        T.reloadChunk(self, at, function()
-            T.step(function() T.setGrid(self, false) end)
-            T.bankPass(self, bank, 0, { hours = 2, label = "away" })
-        end)
-    end,
-    validate = function(self)
-        local onGrid, away = self.reads.onGrid, self.reads.away
-        expectEqual("items the server sees in the bank away (any: its chunk stayed loaded)", #away.items, 0)
-        expect(onGrid.status.state == "grid" and onGrid.status.loadW >= T.fridgeW(), string.format(
-            "on the grid the bank reads %s and measures %.1f W with a fridge on", tostring(onGrid.status.state), onGrid.status.loadW))
-        expectEqual("the state of the bank away with the grid gone", away.status.state, "on")
-        expectEqual("the load the bank carries away, against the one it measured on the grid", away.status.loadW, onGrid.status.loadW)
-        expect(away.drawW > onGrid.status.loadW, string.format("away the bank draws %.1f W for a load of %.1f W",
-            away.drawW, onGrid.status.loadW))
-        expect(away.charge < onGrid.charge, "away with the grid gone the bank's charge didn't fall")
-        expect(away.status.chargeSource == nil, "away with the grid gone the chargers charge from " .. tostring(away.status.chargeSource))
     end,
 })

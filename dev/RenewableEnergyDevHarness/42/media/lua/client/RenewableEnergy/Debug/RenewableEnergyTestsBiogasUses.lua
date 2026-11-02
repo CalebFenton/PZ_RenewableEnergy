@@ -328,58 +328,71 @@ test("renewable_energy_biogas_iron_sponge_packing", {
     end,
 })
 
--- Refill Propane Bottle moves propane from a tank into a lantern bottle and makes none: what the
--- bottle gains is what the tank loses. Each case's start is (tank use) → tank, bottle.
+-- Refill Propane Bottle moves propane from a tank into a lantern bottle in whole uses of the tank
+-- and makes none: what the bottle gains is what the tank loses. Each row's `start(use)` gives the
+-- tank's and the bottle's uses from a tank use; a half tank filling a half bottle is
+-- renewable_energy_biogas_propane_refill_from_floor_tank.
 local SHARE = Digester.BOTTLE_SHARE
 local REFILLS = {
-    propane_refill_fills_bottle = { start = function() return 0.5, 0.5 end, check = function(bottle)
-        T.expectNear("bottle refilled from a half tank", bottle, 1, 0.001)
-    end },
-    -- A tank holding less than the bottle's room empties into it.
-    propane_refill_empties_low_tank = { start = function(use)
+    { what = "a tank holding less than the bottle's room", start = function(use)
         return math.max(1, math.floor(0.5 * SHARE / use / 2)) * use, 0.5
-    end, check = function(_, tank)
-        T.expectNear("low tank after refilling", tank, 0, 0.0001)
+    end, check = function(what, _, tank)
+        T.expectNear(what .. ": the tank after refilling", tank, 0, 0.0001)
     end },
-    -- A bottle with less room than a tank use takes nothing.
-    propane_refill_skips_bottle_without_room = { start = function(use) return 0.5, 1 - 3 * use / SHARE / 4 end,
-        check = function(bottle, tank, self)
-            T.expectNear("nearly full bottle after refilling", bottle, self.bottleStart, 0.00001)
-            T.expectNear("tank after refilling a nearly full bottle", tank, self.tankStart, 0.0001)
+    { what = "a bottle with less room than a tank use", start = function(use) return 0.5, 1 - 3 * use / SHARE / 4 end,
+        check = function(what, bottle, tank, row)
+            T.expectNear(what .. ": the bottle after refilling", bottle, row.bottleStart, 0.00001)
+            T.expectNear(what .. ": the tank after refilling", tank, row.tankStart, 0.0001)
         end },
-    propane_refill_fits_one_tank_use = { start = function(use) return 0.5, 1 - use / SHARE end,
-        check = function(bottle)
-            T.expectNear("bottle after taking exactly one tank use", bottle, 1, 0.00001)
+    { what = "a bottle with room for exactly one tank use", start = function(use) return 0.5, 1 - use / SHARE end,
+        check = function(what, bottle)
+            T.expectNear(what .. ": the bottle after refilling", bottle, 1, 0.00001)
         end },
 }
-for name, case in pairs(REFILLS) do
-    T.craftTest("renewable_energy_biogas_" .. name, {
-        recipe = "RenewableEnergy_RefillPropaneBottle",
-        from = "Base.Propane_Refill",
-        setup = function(self)
-            local use
-            for _, item in ipairs(self.items.inputs or {}) do
-                use = item:getFullType() == Digester.TANK and item:getUseDelta() or use
+
+test("renewable_energy_biogas_propane_refill_moves_whole_tank_uses", {
+    instant = true,
+    run = function(self)
+        local name = "RenewableEnergy_RefillPropaneBottle"
+        local recipe = (T.readyToCraft(self, { name }) or {})[name]
+        if not recipe then return end
+        local use = instanceItem(Digester.TANK):getUseDelta()
+        self.rows = {}
+        for i, row in ipairs(REFILLS) do
+            local tankStart, bottleStart = row.start(use)
+            local result = T.craftFrom(self, recipe, { type = Digester.BOTTLE, uses = bottleStart }, {
+                inputs = function(items)
+                    for _, item in ipairs(items) do
+                        if item.type == Digester.TANK then
+                            item.uses = tankStart
+                        end
+                    end
+                end,
+                read = { Digester.TANK },
+            })
+            self.rows[i] = { result = result, tankStart = tankStart, bottleStart = bottleStart }
+            -- The bottle made and the tank kept go, so the next row's craft takes its own.
+            T.takeItems(self, nil, Digester.BOTTLE)
+            T.takeItems(self, nil, Digester.TANK)
+        end
+    end,
+    validate = function(self)
+        for i, row in ipairs(REFILLS) do
+            local state, what = self.rows[i], row.what
+            if state and T.expectCrafted(state.result, what) then
+                local bottles = T.carriedItems(self, Digester.BOTTLE, state.result.label)
+                local tanks = T.carriedItems(self, Digester.TANK, state.result.label)
+                if T.expect(#bottles == 1 and #tanks == 1, what .. ": " .. #bottles .. " bottles and " .. #tanks
+                    .. " tanks after the craft, not one of each") then
+                    local bottle, tank = bottles[1].uses, tanks[1].uses
+                    T.expectNear(what .. ": propane the bottle gained, in tanks, against what the tank lost",
+                        (bottle - state.bottleStart) * SHARE, state.tankStart - tank, 0.0000001)
+                    row.check(what, bottle, tank, state)
+                end
             end
-            if not T.need(self, use, "the propane tank among the inputs") then return end
-            self.tankStart, self.bottleStart = case.start(use)
-            for _, item in ipairs(self.items.inputs or {}) do
-                T.changeItem(self, item, { uses = item:getFullType() == Digester.TANK and self.tankStart or self.bottleStart })
-            end
-        end,
-        counts = { ["Base.Propane_Refill"] = 1, [Digester.TANK] = 1 },
-        after = function(self)
-            T.readCarried(self, { Digester.TANK, "Base.Propane_Refill" })
-        end,
-        validate = function(self)
-            local bottle, tank = T.carriedFirst(self, "Base.Propane_Refill"), T.carriedFirst(self, Digester.TANK)
-            if not T.expect(bottle and tank, "the bottle or the tank is gone") then return end
-            T.expectNear("propane the bottle gained, in tanks, against what the tank lost",
-                (bottle.uses - self.bottleStart) * SHARE, self.tankStart - tank.uses, 0.0000001)
-            case.check(bottle.uses, tank.uses, self)
-        end,
-    })
-end
+        end
+    end,
+})
 
 -- Airing out a spent Iron Sponge gives an Iron Sponge with one packing fewer left than the spent
 -- one had, short of a fresh sponge's, so the packings can only come from the spent one.
@@ -414,8 +427,8 @@ local function floorTank(square)
     return nil
 end
 
--- Refilling a bottle from a tank on the floor beside the character draws the tank down on this
--- client too, as the loot window shows it.
+-- Refilling a half bottle from a half tank on the floor beside the character fills the bottle and
+-- draws the tank down by what the bottle took, on this client too, as the loot window shows it.
 test("renewable_energy_biogas_propane_refill_from_floor_tank", {
     instant = true,
     run = function(self)
@@ -424,7 +437,7 @@ test("renewable_energy_biogas_propane_refill_from_floor_tank", {
         local here = T.player():getCurrentSquare()
         self.tankUses, self.bottleUses = 0.5, 0.5
         T.batch(function()
-            T.give(self, "bottle", { { type = "Base.Propane_Refill", uses = self.bottleUses } })
+            T.give(self, "bottle", { { type = Digester.BOTTLE, uses = self.bottleUses } })
             T.floorItem(self, here, Digester.TANK, self.tankUses)
         end)
         T.waitFor(self, function()
@@ -438,9 +451,12 @@ test("renewable_energy_biogas_propane_refill_from_floor_tank", {
             self.tank = floorTank(here)
             return self.tank ~= nil and self.tank:getCurrentUsesFloat() < self.tankUses - 0.0001
         end, "this client's copy of the floor tank drawn down")
+        T.readCarried(self, { Digester.BOTTLE })
     end,
     validate = function(self)
-        T.expectNear("this client's floor tank after refilling", self.tank:getCurrentUsesFloat(),
+        local bottle = T.carriedFirst(self, Digester.BOTTLE)
+        T.expectNear("bottle refilled from a half tank", bottle and bottle.uses or -1, 1, 0.001)
+        T.expectNear("this client's floor tank after refilling", self.tank and self.tank:getCurrentUsesFloat() or -1,
             self.tankUses - (1 - self.bottleUses) * SHARE, 0.0005)
     end,
 })

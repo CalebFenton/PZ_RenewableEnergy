@@ -169,8 +169,9 @@ end
 
 -- Every stock's parts are of their line's kind; the bank `args.stock` holds a part when the roll
 -- comes in under its chance × the misc loot option and not at it, so neither a part's chance nor
--- the option goes astray; and a bank tier with no charge controller slot (Specs.banks
--- maxControllers 0) never gets one, even from a stock that lists one, while the others get it.
+-- the option goes astray; a bank tier with no charge controller slot (Specs.banks
+-- maxControllers 0) never gets one, even from a stock that lists one, while the others get it;
+-- and with the battery and misc options at 0 the bank holds nothing, even on the lowest roll.
 check("bankStockParts", function(expect, _, _, args, defer)
     for stockName, stock in pairs(WorldSpawns.BANK_STOCK) do
         for _, kind in ipairs(PARTS) do
@@ -209,6 +210,12 @@ check("bankStockParts", function(expect, _, _, args, defer)
             "a " .. spec.sprite .. " bank listing a certain controller holds " .. controllers)
     end
     WorldSpawns.BANK_STOCK[name] = nil
+    options.LRMBatteries, options.LRMMisc = 0, 0
+    local held = 0
+    for _, count in pairs(withRolls(defer, 0, PZHarness.Loot.fillOnce, function(c) WorldSpawns.stockBank(c, args.stock) end, container)) do
+        held = held + count
+    end
+    expect(held == 0, held .. " items in a " .. args.stock .. " bank with the battery and misc options at 0")
     restoreOptions()
 end)
 
@@ -228,7 +235,7 @@ end
 -- its half width at the lowest rolls, its mean at middling ones, and no better than new at the
 -- highest, unrepaired; with a dud chance, a roll just under it makes a dud, at the dud's lowest
 -- and highest condition by the next roll, with the dud's repairs, and a roll at it doesn't.
-check("batteryWear", function(expect, _, _, _, defer)
+local function expectBatteryWear(expect, defer)
     local dud = Finds.DUD
     for stockName, stock in pairs(WorldSpawns.BANK_STOCK) do
         expect(Finds.BATTERY_WEAR[stock.batteries.wear] ~= nil, stockName .. " batteries wear as " .. tostring(stock.batteries.wear))
@@ -259,7 +266,7 @@ check("batteryWear", function(expect, _, _, _, defer)
             end
         end
     end
-end)
+end
 
 -- PART_WEAR wears every found inverter and the charge controller, not a homemade inverter or the
 -- battery charger: to its mean less its half width at the lowest rolls, its mean at middling ones
@@ -268,7 +275,7 @@ end)
 -- roll at it doesn't. Each worn part is marked as having a condition of its own. With every roll
 -- middling, the parts of a bank's stock, a crate's and an arrow board's battery box come at the
 -- mean, marked.
-check("partWear", function(expect, _, _, _, defer)
+local function expectPartWear(expect, defer)
     local wear, dud = Finds.PART_WEAR, Finds.PART_DUD
     local lowest = wearRange(wear).min
     expect(dud.min >= 0 and dud.min <= dud.max and dud.max < lowest,
@@ -326,15 +333,12 @@ check("partWear", function(expect, _, _, _, defer)
     end
     container:removeAllItems()
     restoreOptions()
-end)
+end
 
--- How many items a `args.stock` bank gets at the save's options with every roll at `args.roll`.
-handler("bankStockCount", function(_, args, defer)
-    local container = PZHarness.Loot.scratchContainer(nil)
-    withRolls(defer, args.roll, WorldSpawns.stockBank, container, args.stock)
-    local count = container:getItems():size()
-    container:removeAllItems()
-    return { items = count }
+-- How found batteries and parts wear, whatever stocks them.
+check("foundWear", function(expect, _, _, _, defer)
+    expectBatteryWear(expect, defer)
+    expectPartWear(expect, defer)
 end)
 
 -- WorldSpawns.placeCrate with CRATE_STOCK[args.stock] on the square at `args`. Answers its stock
@@ -357,12 +361,13 @@ end
 
 -- Farm storage shelves get a cracked module, at a cracked condition, when the roll comes in under
 -- their chance and not at it; a bedroom's furniture and a garage's fridge never do. The chance
--- follows the Solar Panels loot option.
+-- follows the Solar Panels loot option. Each container is filled as the game hands a fill to the
+-- mod, by OnFillContainer.
 check("crackedModules", function(expect, _, _, _, defer)
     local container = PZHarness.Loot.scratchContainer(nil)
     local function modulesAt(roomName, containerType, roll)
         -- The chance's roll, then the cracked condition's, at the middle of its range.
-        withRolls(defer, { roll, 0.5 }, Finds.addCrackedModules, roomName, containerType, container)
+        withRolls(defer, { roll, 0.5 }, triggerEvent, "OnFillContainer", roomName, containerType, container)
         local conditions = moduleConditions(container)
         container:removeAllItems()
         return conditions

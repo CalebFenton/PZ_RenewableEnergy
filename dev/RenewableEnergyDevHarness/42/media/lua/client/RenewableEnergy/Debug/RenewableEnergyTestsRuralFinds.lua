@@ -13,87 +13,83 @@ local Sprites = require "RenewableEnergy/Sprites"
 local T = RenewableEnergyTest
 local test, expect, serverCheck = T.test, T.expect, T.serverCheck
 
+-- Each find, how this client tells its object, and the Global Object System record kind it keeps
+-- its state in, if any.
+local FINDS = {
+    { kind = "wind", isObject = Wind.isCharger },
+    { kind = "digester", isObject = Digester.isDigester, record = "digester" },
+    { kind = "gasifier", isObject = Gasifier.isGasifier, record = "gasifier" },
+}
 
--- Each rural find test rolls the building near the start for that find for certain and checks the
--- state it is found in; rolled again, the building gets nothing more. The wind and wood gas suites
--- mend the same objects.
-
--- Queues the roll of the find `kind` and a wait for this client's copy of it, `isObject` telling
--- it, with its summary when `recordKind` names a Global Object System record ("digester",
--- "gasifier"); the handle { x, y, z, square, kind, object } lands in self.find.
-local function rollFind(self, kind, isObject, recordKind)
-    T.server(self, "ruralFindsRoll", { kinds = { kind } })
-    T.step(function()
-        local at = T.need(self, self.server.ruralFindsRoll.found[kind],
-            "a square for the " .. kind .. " by the building near the start")
-        self.find = at and T.at(at, { square = getSquare(at.x, at.y, at.z), kind = recordKind })
-    end)
-    T.waitFor(self, function()
-        local find = self.find
-        local object = Squares.findObjectOn(find.square, isObject)
-        find.object = object and (not recordKind or T.recordSummary(find)) and object or nil
-        return find.object ~= nil
-    end, "this client's copy of the " .. kind)
-end
-
--- Expects the RuralFinds.FINDS kind `kind` that rollFind rolled to stand outdoors with its roll
--- kept, and the building's second roll to have placed nothing.
-local function expectKept(self, kind)
-    local answer = self.server.ruralFindsRoll
-    expect(answer.found[kind].outdoors, "the " .. kind .. " stands indoors")
-    expect(answer.kept and answer.kept[kind], "the building's roll for the " .. kind .. " was not kept")
-    T.expectEqual("finds rolling the building again placed", answer.again, 0)
-end
-
--- The old wind charger is found braked with its blades broken.
-test("renewable_energy_world_rural_wind_charger", {
+-- The building near the start, rolled for every find for certain, keeps its roll, gets each find
+-- outdoors in the state it is found in, and rolled again gets nothing more: the old wind charger
+-- braked with its blades broken; the barrel digester in one of the drums, its bags torn, cold and
+-- sour, and re-bagged it is mended and eats manure; the primitive gasifier with its ash pit full
+-- and its filter packing all tarred. The wind and wood gas suites mend the same objects.
+test("renewable_energy_world_rural_finds_found_worn", {
     instant = true,
     run = function(self)
-        rollFind(self, "wind", Wind.isCharger)
+        local kinds = {}
+        for i, find in ipairs(FINDS) do
+            kinds[i] = find.kind
+        end
+        T.server(self, "ruralFindsRoll", { kinds = kinds })
+        self.finds = {}
         T.step(function()
-            self.found = { broken = Wind.isBroken(self.find.object), braked = Wind.isBraked(self.find.object) }
+            for _, find in ipairs(FINDS) do
+                local at = T.need(self, self.server.ruralFindsRoll.found[find.kind],
+                    "a square for the " .. find.kind .. " by the building near the start")
+                if not at then return end
+                self.finds[find.kind] = T.at(at, { square = getSquare(at.x, at.y, at.z), kind = find.record })
+            end
         end)
-    end,
-    validate = function(self)
-        expectKept(self, "wind")
-        expect(self.found.broken, "the wind charger was found with whole blades")
-        expect(self.found.braked, "the wind charger was found unbraked")
-    end,
-})
-
--- The barrel digester is found in one of the drums, its bags torn, cold and sour. Re-bagged it is
--- mended and eats manure.
-test("renewable_energy_world_rural_digester", {
-    instant = true,
-    run = function(self)
-        rollFind(self, "digester", Digester.isDigester, "digester")
+        T.waitFor(self, function()
+            for _, find in ipairs(FINDS) do
+                local handle = self.finds[find.kind]
+                local object = Squares.findObjectOn(handle.square, find.isObject)
+                handle.object = object and (not find.record or T.recordSummary(handle)) and object or nil
+                if not handle.object then
+                    return false
+                end
+            end
+            return true
+        end, "this client's copies of the finds")
         T.step(function()
-            local find = self.find
-            self.found = T.recordSummary(find)
-            self.drum = find.object:getSprite():getName()
+            local charger, digester = self.finds.wind.object, self.finds.digester
+            self.charger = { broken = Wind.isBroken(charger), braked = Wind.isBraked(charger) }
+            self.digester = T.recordSummary(digester)
+            self.drum = digester.object:getSprite():getName()
             -- Its drum's entity, or each load of it logs "Invalid SpriteConfig object!".
-            local config = find.object:getSpriteConfig()
+            local config = digester.object:getSpriteConfig()
             self.configValid = config ~= nil and config:isValid()
+            T.readRecord(self, self.finds.gasifier, "gasifier")
             T.giveMaterials(self, "bags", DigesterJobs.materials(T.player(), DigesterJobs.FIT_BAGS))
-            T.actionJob(self, "digester", find, DigesterJobs.FIT_BAGS)
+            T.actionJob(self, "digester", digester, DigesterJobs.FIT_BAGS)
             T.batch(function()
-                T.fillRecord(self, find, { hopper = { { type = "Base.Dung_Cow", count = 2 } } })
-                T.runDigester(self, find, 2, 30)
-                T.readRecord(self, find, "fed")
+                T.fillRecord(self, digester, { hopper = { { type = "Base.Dung_Cow", count = 2 } } })
+                T.runDigester(self, digester, 2, 30)
+                T.readRecord(self, digester, "fed")
             end)
         end)
     end,
     validate = function(self)
-        expectKept(self, "digester")
+        local answer = self.server.ruralFindsRoll
+        for _, find in ipairs(FINDS) do
+            expect(answer.found[find.kind].outdoors, "the " .. find.kind .. " stands indoors")
+            expect(answer.kept and answer.kept[find.kind], "the building's roll for the " .. find.kind .. " was not kept")
+        end
+        T.expectEqual("finds rolling the building again placed", answer.again, 0)
+        expect(self.charger.broken, "the wind charger was found with whole blades")
+        expect(self.charger.braked, "the wind charger was found unbraked")
         local drums = {}
         for _, tile in pairs(Sprites.digester.barrel) do
             drums[tile] = true
         end
         expect(drums[self.drum], "the digester stands on " .. tostring(self.drum) .. ", not a drum's tile")
         expect(self.configValid, "the found digester's SpriteConfig refused its " .. tostring(self.drum) .. " tile")
-        local found = self.found
-        T.expectEqual("the found digester's tier", found.tier, "barrel")
-        expect(found.torn and found.sour and not found.started, "the digester wasn't found torn, sour and not started")
+        local digester = self.digester
+        T.expectEqual("the found digester's tier", digester.tier, "barrel")
+        expect(digester.torn and digester.sour and not digester.started, "the digester wasn't found torn, sour and not started")
         local fed = self.reads.fed
         -- New bags, worn only by the two hours since; the summary rounds the condition.
         local wear = (Digester.HOLDERS[fed.holder].wearPerDay or 0) * 2 / 24
@@ -101,23 +97,11 @@ test("renewable_energy_world_rural_digester", {
             "Fit Garbage Bags didn't mend the found digester: condition " .. tostring(fed.holderCondition))
         T.expectEqual("manure left in the re-bagged digester's hopper", fed.hopperItems, 0)
         expect(fed.potential > 0, "the re-bagged digester ate no manure")
-    end,
-})
-
--- The primitive gasifier is found with its ash pit full and its filter packing all tarred.
-test("renewable_energy_world_rural_gasifier", {
-    instant = true,
-    run = function(self)
-        rollFind(self, "gasifier", Gasifier.isGasifier, "gasifier")
-        T.step(function() T.readRecord(self, self.find, "found") end)
-    end,
-    validate = function(self)
-        expectKept(self, "gasifier")
-        local found = self.reads.found
-        T.expectEqual("the found gasifier's tier", found.tier, "primitive")
-        T.expectEqual("the found gasifier's ash", found.ash, Gasifier.ASH_FULL)
-        T.expectEqual("clean packing in the found gasifier", found.clean, 0)
-        expect(found.tarry > 0, "the gasifier was found with no tarry packing")
+        local gasifier = self.reads.gasifier
+        T.expectEqual("the found gasifier's tier", gasifier.tier, "primitive")
+        T.expectEqual("the found gasifier's ash", gasifier.ash, Gasifier.ASH_FULL)
+        T.expectEqual("clean packing in the found gasifier", gasifier.clean, 0)
+        expect(gasifier.tarry > 0, "the gasifier was found with no tarry packing")
     end,
 })
 

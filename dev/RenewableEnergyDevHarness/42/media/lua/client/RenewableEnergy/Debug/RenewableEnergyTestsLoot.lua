@@ -1,7 +1,10 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLibWorld"
+local Stash = require "RenewableEnergy/Stash"
 
 -- The mod's loot (Distributions.lua, LootEntries.lua, Finds.lua): its tables live only where loot
--- is rolled, so the checks run there (RenewableEnergyTestServerLoot.lua).
+-- is rolled, so the checks run there (RenewableEnergyTestServerLoot.lua). They feed the mod's
+-- code what the game hands it rather than sampling the game's rolls, which the --loot report
+-- measures.
 
 local T = RenewableEnergyTest
 local test, serverCheck = T.test, T.serverCheck
@@ -10,52 +13,39 @@ local test, serverCheck = T.test, T.serverCheck
 
 -- Every entry names an item that exists, since the game drops an unknown item silently, and sits
 -- in a list the game rolls: a room's procList, a vehicle's container, a stash house's spawn
--- table or a corpse's outfit list. The game hands each item out: not obsolete, light enough for a
--- crate, and with a weight and loot multiplier above 0 at the default settings.
+-- table, a corpse's or a bag's. The game hands each item out: not obsolete, light enough for a
+-- crate, and with a weight and loot multiplier above 0 at the default settings. The utility vans
+-- and camper trailers roll the mod's lists and keep their vanilla loot, and the prepper's map
+-- drops from every survivalist and bandit outfit.
 serverCheck("renewable_energy_loot_lists_in_use", "lootListsInUse")
 
--- Vehicles -------------------------------------------------------------------------------------
+-- Options ---------------------------------------------------------------------------------------
 
--- The utility vans keep every vanilla builder's item and get the mod's own truck bed; trailers
--- can roll a camper's.
-serverCheck("renewable_energy_loot_vehicle_tables", "lootVehicleTables")
-
--- Rarity options ------------------------------------------------------------------------------
-
--- Each option scales its items' weights everywhere; at 0 it removes them, since the zombie density
--- bonus would still spawn a weight-0 item. Applying again replaces entries instead of adding more.
-serverCheck("renewable_energy_loot_rarity_options_scale_weights", "lootRarityOptions", { rows = {
-    { LRMSolarPanels = 0, LRMBatteries = 0, LRMMisc = 0 },
-    { LRMSolarPanels = 0, LRMBatteries = 1, LRMMisc = 1 },
-    { LRMSolarPanels = 2.5, LRMBatteries = 0.5, LRMMisc = 3 },
+-- Each rarity option scales its items' weights everywhere; at 0 it removes them, since the zombie
+-- density bonus would still spawn a weight-0 item. The Stash Houses option puts the stash maps in
+-- at their own weights when it hands out maps and removes them otherwise. Applying again replaces
+-- entries instead of adding more.
+local MODE = Stash.MODE
+serverCheck("renewable_energy_loot_options_scale_weights", "lootOptions", { rows = {
+    { options = { LRMSolarPanels = 0, LRMBatteries = 0, LRMMisc = 0, StashMode = MODE.NONE }, maps = false },
+    { options = { LRMSolarPanels = 0, LRMBatteries = 1, LRMMisc = 1, StashMode = MODE.MAPS }, maps = true },
+    { options = { LRMSolarPanels = 2.5, LRMBatteries = 0.5, LRMMisc = 3, StashMode = MODE.STOCKED }, maps = false },
+    { options = { LRMSolarPanels = 1, LRMBatteries = 1, LRMMisc = 1, StashMode = MODE.MAPS_AND_STOCKED }, maps = true },
 } })
 
--- Found batteries -------------------------------------------------------------------------------
+-- Found items ------------------------------------------------------------------------------------
 
--- Batteries that rooms and corpses hand out hold a part charge, once: a later refill leaves a
--- battery already there alone.
-test("renewable_energy_loot_found_batteries_part_charged", {
+-- A container's fill, or the first sight of its room for the safehouse and stash house fills that
+-- fire no fill event, readies the mod's finds once: batteries at a part charge, inverters and
+-- controllers worn. A refill leaves what has a charge or condition of its own alone, and nothing
+-- in a bank is worn.
+test("renewable_energy_loot_finds_readied_once", {
     run = function(self)
         local square = T.square(self, nil, "a free outdoor square")
         if not square then return end
-        T.read(self, "lootFoundBatteries", T.at(square), "batteries")
+        T.read(self, "lootFindsReadied", T.at(square), "finds")
     end,
-    validate = function(self) T.expectNoFailures(self.reads.batteries) end,
-})
-
--- Inverters and controllers that rooms hand out come worn, once: a later refill leaves a found or
--- crafted part already there alone, and a bank's parts are never worn by a fill.
-serverCheck("renewable_energy_loot_found_parts_worn", "lootFoundParts")
-
--- Safehouses and stash houses fill their containers without the event a room's fill fires, so the
--- mod's items on their shelves are readied when the room is first seen, once.
-test("renewable_energy_loot_seen_room_finds_readied", {
-    run = function(self)
-        local square = T.square(self, nil, "a free outdoor square")
-        if not square then return end
-        T.read(self, "lootSeenRoomReadied", T.at(square), "seen")
-    end,
-    validate = function(self) T.expectNoFailures(self.reads.seen) end,
+    validate = function(self) T.expectNoFailures(self.reads.finds) end,
 })
 
 -- Containers the player owns --------------------------------------------------------------------

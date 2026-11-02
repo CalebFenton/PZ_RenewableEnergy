@@ -206,76 +206,39 @@ local function roomAround(square)
     end)
 end
 
--- Registers test `name`, placing each case's whole object anew and dismantling it by its tile as
--- the server's character does, at the case's `perk` level and forced roll, and expecting the case's
--- count of `fullType` from it. `premise`, if given, checks the tiles first. Each case: what is
--- scrapped, the tile, the level, the roll and the count.
-local function scrapTest(name, perk, fullType, cases, premise)
+-- Registers test `name`, dismantling in each case a new object as the server's character does,
+-- clicking its tile `case.sprite`, at `case.level` of `case.perk`, and expecting `case.gives`,
+-- counts by full type. `case.place(self)` places it and returns its handle; without it the whole
+-- object of `case.sprite` goes on a square with room around it. Every roll is `case.roll`, or
+-- with `case.chanceOf`, a scrap material, just "under" or "at" the character's vanilla chance
+-- for that material, worked out on the authority. `premise`, if given, checks the tiles first.
+local function dismantleTest(name, cases, premise)
     test(name, {
+        instant = true,
         run = function(self)
-            local square = T.square(self, { accept = roomAround }, "a free square with free squares around it")
-            if not square then return end
+            local roomy
             for _, case in ipairs(cases) do
-                T.step(function() T.setPerk(self, perk, case[3]) end)
-                T.forceRoll(self, case[4])
-                T.server(self, "placeWhole", T.at(square, { sprite = case[2] }))
-                T.read(self, "scrapItems", T.at(square, { sprite = case[2], type = fullType }), case[1])
+                local handle
+                if case.place then
+                    handle = case.place(self)
+                else
+                    roomy = roomy or T.square(self, { accept = roomAround }, "a free square with free squares around it")
+                    handle = roomy and T.at(roomy)
+                    if handle then
+                        T.server(self, "placeWhole", T.at(roomy, { sprite = case.sprite }))
+                    end
+                end
+                if not handle then return end
+                T.step(function() T.setPerk(self, case.perk, case.level) end)
+                if not case.chanceOf then
+                    T.forceRoll(self, case.roll)
+                end
+                T.read(self, "scrapItems", T.at(handle, { sprite = case.sprite, chanceOf = case.chanceOf,
+                    roll = case.chanceOf and case.roll or nil }), case.label)
             end
         end,
         validate = function(self)
             if premise then premise() end
-            for _, case in ipairs(cases) do
-                local result = self.reads[case[1]]
-                expect(result.scrapped, case[1] .. " wasn't dismantled")
-                expectEqual(fullType .. " " .. case[1] .. " gave", result.count, case[5])
-            end
-        end,
-    })
-end
-
--- Cutting up a vanilla fridge gives its compressor, which a digester needs to fill propane tanks,
--- on a roll under the character's chance, and one only, though vanilla scraps each of its tiles:
--- 10% at Metalworking 0, 10% more a level, so certain at 9. A stove, which vanilla also cuts up as
--- a Fridge, has none.
--- The wide two-door fridge, two tiles.
-local FRIDGE, STOVE = "appliances_refrigeration_01_18", "appliances_cooking_01_0"
-scrapTest("renewable_energy_tiles_fridge_scraps_to_compressor", Perks.MetalWelding, Digester.COMPRESSOR, {
-    { "a fridge at Metalworking 0, rolling just under 10%", FRIDGE, 0, 0.1 - T.UNDER, 1 },
-    { "a fridge at Metalworking 0, rolling 10%", FRIDGE, 0, 0.1, 0 },
-    { "a fridge at Metalworking 4, rolling just under 50%", FRIDGE, 4, 0.5 - T.UNDER, 1 },
-    { "a stove, on the lowest roll", STOVE, 9, 0, 0 },
-}, function()
-    expect(getSprite(FRIDGE):getSpriteGrid() ~= nil, "the fridge is one tile, so nothing shows it gives one compressor, not one a tile")
-    expect(ISMoveableSpriteProps.new(STOVE).material == "Fridge", "the stove isn't cut up as a Fridge")
-end)
-
--- Dismantling a vanilla microwave gives its transformer, which the homemade inverters are wound on,
--- on a roll under vanilla's chance for the microwave's Electric scrap: 20% at Electricity 0, 10%
--- more a level, so certain at 8. A stove has none.
-local MICROWAVE = "appliances_cooking_01_24"
-scrapTest("renewable_energy_tiles_microwave_scraps_to_transformer", Perks.Electricity, "RenewableEnergy.MicrowaveTransformer", {
-    { "a microwave at Electricity 0, rolling just under 20%", MICROWAVE, 0, 0.2 - T.UNDER, 1 },
-    { "a microwave at Electricity 0, rolling 20%", MICROWAVE, 0, 0.2, 0 },
-    { "a microwave at Electricity 4, rolling just under 60%", MICROWAVE, 4, 0.6 - T.UNDER, 1 },
-    { "a stove, on the lowest roll", STOVE, 10, 0, 0 },
-})
-
--- Registers test `name` dismantling, in each case, a new object `case.place(self)` places (its
--- handle), drawn as `case.sprite`, at `case.level` of the build recipe's first skill `case.perk`
--- with every roll forced to `case.roll`, and expecting `case.gives`, counts by full type.
-local function builtScrapTest(name, cases)
-    test(name, {
-        instant = true,
-        run = function(self)
-            for _, case in ipairs(cases) do
-                local handle = case.place(self)
-                if not handle then return end
-                T.step(function() T.setPerk(self, case.perk, case.level) end)
-                T.forceRoll(self, case.roll)
-                T.read(self, "scrapItems", T.at(handle, { sprite = case.sprite }), case.label)
-            end
-        end,
-        validate = function(self)
             for _, case in ipairs(cases) do
                 local result = self.reads[case.label]
                 expect(result.scrapped, case.label .. " wasn't dismantled")
@@ -286,6 +249,34 @@ local function builtScrapTest(name, cases)
         end,
     })
 end
+
+-- Cutting up a vanilla fridge gives its compressor, which a digester needs to fill propane tanks,
+-- and dismantling a microwave its transformer, which the homemade inverters are wound on: each on
+-- a roll under vanilla's own chance for the tile's scrap material, which rises with the level,
+-- and one only, though vanilla scraps each tile of the wide fridge. A stove, which vanilla also
+-- cuts up as a Fridge, has neither.
+-- The wide two-door fridge, two tiles.
+local FRIDGE, MICROWAVE, STOVE = "appliances_refrigeration_01_18", "appliances_cooking_01_24", "appliances_cooking_01_0"
+local TRANSFORMER = "RenewableEnergy.MicrowaveTransformer"
+dismantleTest("renewable_energy_tiles_appliances_scrap_to_parts", {
+    { label = "a fridge at Metalworking 0, rolling just under its chance", sprite = FRIDGE, perk = Perks.MetalWelding,
+        level = 0, chanceOf = "Fridge", roll = "under", gives = { [Digester.COMPRESSOR] = 1 } },
+    { label = "a fridge at Metalworking 0, rolling its chance", sprite = FRIDGE, perk = Perks.MetalWelding,
+        level = 0, chanceOf = "Fridge", roll = "at", gives = { [Digester.COMPRESSOR] = 0 } },
+    { label = "a fridge at Metalworking 4, rolling just under its chance", sprite = FRIDGE, perk = Perks.MetalWelding,
+        level = 4, chanceOf = "Fridge", roll = "under", gives = { [Digester.COMPRESSOR] = 1 } },
+    { label = "a microwave at Electricity 0, rolling just under its chance", sprite = MICROWAVE, perk = Perks.Electricity,
+        level = 0, chanceOf = "Electric", roll = "under", gives = { [TRANSFORMER] = 1 } },
+    { label = "a microwave at Electricity 0, rolling its chance", sprite = MICROWAVE, perk = Perks.Electricity,
+        level = 0, chanceOf = "Electric", roll = "at", gives = { [TRANSFORMER] = 0 } },
+    { label = "a microwave at Electricity 4, rolling just under its chance", sprite = MICROWAVE, perk = Perks.Electricity,
+        level = 4, chanceOf = "Electric", roll = "under", gives = { [TRANSFORMER] = 1 } },
+    { label = "a stove, on the lowest roll", sprite = STOVE, perk = Perks.MetalWelding, level = 10, roll = 0,
+        gives = { [Digester.COMPRESSOR] = 0, [TRANSFORMER] = 0 } },
+}, function()
+    expect(getSprite(FRIDGE):getSpriteGrid() ~= nil, "the fridge is one tile, so nothing shows it gives one compressor, not one a tile")
+    expect(ISMoveableSpriteProps.new(STOVE).material == "Fridge", "the stove isn't cut up as a Fridge")
+end)
 
 local function dome(self)
     return T.placeRecord(self, "digester", "dome")
@@ -310,22 +301,20 @@ local function charger(broken)
     end
 end
 
--- Dismantling a brick dome gives back each piece its recipe used up, the bricks of its walls among
--- them, on a roll under BuiltScrap.odds at the builder's Masonry, and nothing of its Material's
--- vanilla scrap. Catches the dome's 40 bricks coming back as one.
-builtScrapTest("renewable_energy_tiles_dome_scraps_to_its_recipe", {
+-- What is built in place gives back each piece its recipe used up, on a roll under BuiltScrap.odds
+-- at the builder's level of the recipe's skill, and nothing of its Material's vanilla scrap: a
+-- brick dome the bricks of its walls, all of them; a barrel digester the barrel it was built from
+-- and its scrubber's materials, but never the glue, tape or garbage bags a build uses up, and its
+-- tarp bag, spent sponge and compressor whatever the roll; a wind charger its metal and wiring,
+-- and its motor and blades whole whatever the roll, broken blades broken. The counts are the build
+-- recipes', so that a piece coming back once for an input of many shows.
+dismantleTest("renewable_energy_tiles_built_in_place_scraps_to_recipe", {
     { label = "a dome rolling just under its odds", place = dome, sprite = Sprites.digester.dome, perk = Perks.Masonry,
         level = 5, roll = BuiltScrap.odds(5) - T.UNDER,
         gives = { ["Base.ClayBrick"] = 40, ["Base.RubberHose"] = 2, ["Base.Pipe"] = 1, ["Base.Nails"] = 0, ["Base.Stone2"] = 0 } },
     { label = "a dome rolling its odds", place = dome, sprite = Sprites.digester.dome, perk = Perks.Masonry,
         level = 5, roll = BuiltScrap.odds(5),
         gives = { ["Base.ClayBrick"] = 0, ["Base.RubberHose"] = 0, ["Base.Pipe"] = 0 } },
-})
-
--- A barrel digester gives back the barrel it was built from, and its scrubber's materials on the
--- same rolls, but never the glue, tape or garbage bags a build uses up; its tarp bag, spent sponge
--- and compressor come back whatever the roll.
-builtScrapTest("renewable_energy_tiles_barrel_digester_scraps_to_recipe_and_fittings", {
     { label = "a fitted barrel digester rolling just under its odds", place = fittedBarrel,
         sprite = Sprites.digester.barrel.Mov_OrangeBarrel, perk = Perks.Mechanics, level = 1, roll = BuiltScrap.odds(1) - T.UNDER,
         gives = {
@@ -339,11 +328,6 @@ builtScrapTest("renewable_energy_tiles_barrel_digester_scraps_to_recipe_and_fitt
             ["Base.Mov_OrangeBarrel"] = 0, ["Base.RubberHose"] = 0, ["Base.Bucket"] = 0,
             ["RenewableEnergy.TarpGasBag"] = 1, [Digester.SPENT_SPONGE] = 1, [Digester.COMPRESSOR] = 1,
         } },
-})
-
--- A wind charger's motor and blades come off whole whatever the roll, broken blades broken; its
--- metal and wiring come back on the rolls at the builder's Metalworking.
-builtScrapTest("renewable_energy_tiles_wind_charger_scraps_to_parts_and_recipe", {
     { label = "a broken wind charger rolling just under its odds", place = charger(true), sprite = CHARGER,
         perk = Perks.MetalWelding, level = 3, roll = BuiltScrap.odds(3) - T.UNDER,
         gives = {

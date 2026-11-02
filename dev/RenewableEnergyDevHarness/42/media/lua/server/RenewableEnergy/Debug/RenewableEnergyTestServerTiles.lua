@@ -5,6 +5,7 @@ require "PZHarness/Fixtures"
 local Sprites = require "RenewableEnergy/Sprites"
 local Items = require "cf_commonlib/Items"
 require "PZHarness/ServerFixtures"
+require "PZHarness/Rolls"
 local Helpers = require "RenewableEnergy/Debug/RenewableEnergyTestHelpers"
 local Kinds = require "RenewableEnergy/Debug/RenewableEnergyTestKinds"
 local PanelSource = require "RenewableEnergy/PowerBank/PanelSource"
@@ -68,10 +69,12 @@ end)
 -- Dismantles the object drawn as `args.sprite` on the square at `args` as the authority's
 -- character, clicking that tile, the way the moveables action completes a scrap
 -- (ISMoveableSpriteProps.scrapObject), first giving the character the tools its scrap definition
--- asks for that it lacks. Answers whether every tile went, how many `args.type` it gave and how
--- many of each type (`counts`), into the inventory or onto the object's squares; what the
--- dismantling gave and the tools go away.
-handler("scrapItems", function(player, args)
+-- asks for that it lacks. With `args.chanceOf`, a scrap material, every roll is `args.roll` ("under"
+-- or "at") the character's vanilla chance for that material (ISMoveableSpriteProps.getChanceByDef),
+-- the chance a part the mod takes out of an appliance follows. Answers whether every tile went,
+-- how many `args.type` it gave and how many of each type (`counts`), into the inventory or onto the
+-- object's squares; what the dismantling gave and the tools go away.
+handler("scrapItems", function(player, args, defer)
     local object = Kinds.find(args)
     local props = ISMoveableSpriteProps.fromObject(object)
     local tiles = tilesOf(object:getSquare(), args.sprite)
@@ -104,6 +107,11 @@ handler("scrapItems", function(player, args)
     need(can.canScrap, string.format("a %s the character may dismantle (canScrap %s, valid %s, tools %s and %s, full %s)",
         args.sprite, tostring(props.canScrap), tostring(can.craftValid), tostring(can.haveTool), tostring(can.haveTool2),
         tostring(can.containerFull)))
+    if args.chanceOf then
+        local chanceDef = need(ISMoveableDefinitions:getInstance().getScrapDefinition(args.chanceOf),
+            "the scrap definition " .. args.chanceOf)
+        PZHarness.Rolls.force(defer, PZHarness.Rolls.trialRoll(args.roll, props:getChanceByDef(chanceDef, player) / 100))
+    end
     props:scrapObject(player)
     local count, counts, scrapped = 0, {}, true
     for _, tile in ipairs(tiles) do

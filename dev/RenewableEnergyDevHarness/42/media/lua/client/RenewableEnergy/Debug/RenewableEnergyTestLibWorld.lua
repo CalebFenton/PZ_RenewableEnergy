@@ -17,10 +17,4 @@ function T.expectFoundCharges(charges, what)
     end
 end
 
---- Expects a count range read from the authority to be one a player can meet: at least one, and
---- no more at its low end than at its high. The test checks spawns against it.
-function T.expectSaneRange(range, what)
-    T.expect(range.min >= 1 and range.min <= range.max, what .. " runs from " .. range.min .. " to " .. range.max)
-end
-
 return T

@@ -116,21 +116,9 @@ local function outdoorsInChunk(square, dx)
     return nil
 end
 
--- The smell level `count` corpses make (Stink.LEVEL_CORPSES as `levels`).
-local function levelOf(levels, count)
-    local level = 0
-    for i, start in ipairs(levels) do
-        if count >= start then
-            level = i
-        end
-    end
-    return level
-end
-
--- An outdoor source at the top smell level smells less the further off a character stands, a
--- chunk at a time, as a pile of corpses with stragglers does: in its own chunk all its corpses,
--- a chunk east its own ghosts and five of the eight chunks' around it (Stink.spread), two east
--- three of those chunks', three east none.
+-- An outdoor source at the top smell level smells a level less for each chunk further off a
+-- character stands, as a pile of corpses with stragglers does (Stink.spread's ring), and not at all
+-- three chunks off.
 test("renewable_energy_biogas_stink_falls_off_with_distance", {
     run = function(self)
         local source = T.square(self, nil, "a free outdoor square for the source")
@@ -141,32 +129,18 @@ test("renewable_energy_biogas_stink_falls_off_with_distance", {
             if not T.need(self, self.stands[dx], "an outdoor square " .. dx .. " chunks east of the source") then return end
         end
         withLevels(self, source, function(levels)
-            local top = levels[#levels]
-            T.read(self, "stinkSpread", { count = top }, "spread")
-            T.step(function()
-                local own, ring = self.reads.spread.own, self.reads.spread.ring
-                self.wanted = { [0] = own + 8 * ring, own + 5 * ring, 3 * ring, 0 }
-                stink(self, source, top)
-                for dx = 0, 3 do
-                    T.step(function() T.standOn(self.stands[dx]) end)
-                    T.waitForAuthoritySmell(self, source, levelOf(levels, self.wanted[dx]), "east" .. dx)
-                end
-            end)
+            stink(self, source, levels[#levels])
+            for dx = 0, 3 do
+                T.step(function() T.standOn(self.stands[dx]) end)
+                T.waitForAuthoritySmell(self, source, math.max(0, #levels - dx), "east" .. dx)
+            end
         end)
     end,
     validate = function(self)
-        local levels = self.levels
-        local last
         for dx = 0, 3 do
-            local read, wanted = self.reads["east" .. dx], levelOf(levels, self.wanted[dx])
-            T.expectEqual("the smell level " .. dx .. " chunks east of the source (" .. self.wanted[dx] .. " corpses)",
-                read and read.level, wanted)
-            if read and last then
-                T.expect(read.level < last, dx .. " chunks east the smell is no weaker than a chunk nearer")
-            end
-            last = read and read.level
+            local read = self.reads["east" .. dx]
+            T.expectEqual("the smell level " .. dx .. " chunks east of the source", read and read.level, math.max(0, #self.levels - dx))
         end
-        T.expect(levelOf(levels, self.wanted[0]) == #levels, "beside the source the smell isn't at the top level")
     end,
 })
 

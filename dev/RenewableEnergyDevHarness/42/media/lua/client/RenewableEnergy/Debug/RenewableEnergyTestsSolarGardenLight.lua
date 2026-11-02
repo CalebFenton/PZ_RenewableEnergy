@@ -171,44 +171,10 @@ local function waitForDark(self, light)
     end, "this client's garden light dark")
 end
 
--- Taking the bulb out of a lit light puts its lamp out within the minute and gives the bulb back;
--- the light then stays dark at night without draining, and offers to take a bulb.
-test("renewable_energy_gadgets_garden_light_remove_bulb", {
-    hour = MIDNIGHT,
-    instant = true,
-    run = function(self)
-        local light = placeGardenLight(self, LIT_WH)
-        if not light then return end
-        self.light = light
-        runLight(self, light, LIT_WH, NIGHT_HOURS)
-        T.step(function() self.litBefore = lampOn(light.square) end)
-        startOfMinute(self)
-        chooseBulbOption(self, light, nil)
-        waitForDark(self, light)
-        T.step(function() self.darkMinute = gameMinute() end)
-        T.count(self, "removed", { SolarGardenLight.PLAIN_BULB })
-        runLight(self, light, LIT_WH, 1, "night")
-        T.step(function()
-            self.copyDarkAtNight = light.object:getTextureName() == Sprites.gardenLight.off and not lampOn(light.square)
-        end)
-    end,
-    validate = function(self)
-        if not expect(self.litBefore, "the light never lit") then return end
-        expect(self.darkMinute == self.minute, "this client's lamp went out only at a later game minute")
-        expectEqual("light bulbs taking the bulb out gave", self.counts.removed[SolarGardenLight.PLAIN_BULB], 1)
-        expect(not self.reads.night.lit and self.copyDarkAtNight, "the light without a bulb lit at night")
-        expectNear("charge of a light without a bulb after an hour of night", self.reads.night.charge, LIT_WH)
-        local context, add, remove = bulbMenu(self.light)
-        local plain = add and add:getOptionFromName(getItemName(SolarGardenLight.PLAIN_BULB))
-        expect(T.offered(plain), "the light without a bulb doesn't offer the carried bulb under Add Light Bulb")
-        expect(remove == nil, "the light without a bulb offers Remove Light Bulb")
-        context:hideAndChildren()
-    end,
-})
-
--- The plain bulb shines warm, and swapping it for a red one through the menu takes the red bulb
--- and shines red.
-test("renewable_energy_gadgets_garden_light_coloured_bulb", {
+-- The plain bulb shines warm. Taking it out of the lit light puts its lamp out within the minute
+-- and gives the bulb back; the light then stays dark at night without draining, and offers only
+-- to take a bulb. Putting a red one in through the menu takes it and shines red.
+test("renewable_energy_gadgets_garden_light_bulb_swap", {
     hour = MIDNIGHT,
     instant = true,
     run = function(self)
@@ -219,8 +185,20 @@ test("renewable_energy_gadgets_garden_light_coloured_bulb", {
             local lamp = lampAt(light.square)
             self.plain = lamp and shownColour(lamp)
         end)
+        startOfMinute(self)
         chooseBulbOption(self, light, nil)
         waitForDark(self, light)
+        T.step(function() self.darkMinute = gameMinute() end)
+        T.count(self, "removed", { SolarGardenLight.PLAIN_BULB })
+        runLight(self, light, LIT_WH, 1, "night")
+        T.waitForCarried(self, SolarGardenLight.PLAIN_BULB, "this client's copy of the bulb taken out")
+        T.step(function()
+            self.copyDarkAtNight = light.object:getTextureName() == Sprites.gardenLight.off and not lampOn(light.square)
+            local context, add, remove = bulbMenu(light)
+            local plain = add and add:getOptionFromName(getItemName(SolarGardenLight.PLAIN_BULB))
+            self.offersPlain, self.offersRemove = T.offered(plain), remove ~= nil
+            context:hideAndChildren()
+        end)
         T.give(self, "red", { { type = RED } })
         chooseBulbOption(self, light, RED)
         T.waitFor(self, function() return lampShines(light.square, RED) end, "this client's lamp shining red")
@@ -232,8 +210,14 @@ test("renewable_energy_gadgets_garden_light_coloured_bulb", {
         if not expect(plain ~= nil, "the light never lit with its plain bulb") then return end
         expect(plain.b < plain.r and not sameColour(plain, { r = 1, g = 1, b = 1 }),
             "the plain bulb's lamp shines " .. describeColour(plain) .. ", not a warm white")
+        expect(self.darkMinute == self.minute, "this client's lamp went out only at a later game minute")
+        expectEqual("light bulbs taking the bulb out gave", self.counts.removed[SolarGardenLight.PLAIN_BULB], 1)
+        expect(not self.reads.night.lit and self.copyDarkAtNight, "the light without a bulb lit at night")
+        expectNear("charge of a light without a bulb after an hour of night", self.reads.night.charge, LIT_WH)
+        expect(self.offersPlain, "the light without a bulb doesn't offer the carried bulb under Add Light Bulb")
+        expect(not self.offersRemove, "the light without a bulb offers Remove Light Bulb")
         expect(self.copyLit, "with a red bulb this client's light shows the unlit tile")
-        expect(self.counts.added[RED] == 0, "the red bulb is still in the inventory")
+        expectEqual("red bulbs left in the inventory", self.counts.added[RED], 0)
     end,
 })
 
@@ -264,22 +248,22 @@ test("renewable_energy_gadgets_garden_light_pick_up_keeps_bulb", {
     end,
 })
 
--- Taking a light apart gives back its bulb, whatever its colour, the plain one a light holds from
--- new (no bulb key), and none from a light without one.
-for _, entry in ipairs({ { "returns_bulb", RED }, { "returns_plain_bulb", nil }, { "without_bulb", SolarGardenLight.NO_BULB } }) do
+-- Taking a light apart gives back the bulb in it, not the plain one it came with, and none from a
+-- light without one. A light without the bulb key holds the plain bulb; the other tests' lights
+-- show that.
+for _, entry in ipairs({ { "returns_its_bulb", RED }, { "without_bulb", SolarGardenLight.NO_BULB } }) do
     local behavior, bulb = entry[1], entry[2]
     T.craftTest("renewable_energy_gadgets_garden_light_take_apart_" .. behavior, {
         recipe = "RenewableEnergy_TakeApartSolarGardenLight",
         from = SolarGardenLight.ITEM,
         setup = function(self)
-            for _, item in ipairs(bulb and self.items.inputs or {}) do
+            for _, item in ipairs(self.items.inputs) do
                 if item:getFullType() == SolarGardenLight.ITEM then
                     T.changeItem(self, item, { modData = { [SolarGardenLight.BULB_KEY] = bulb } })
                 end
             end
         end,
-        counts = { [SolarGardenLight.ITEM] = 0, [RED] = bulb == RED and 1 or 0,
-            [SolarGardenLight.PLAIN_BULB] = bulb == nil and 1 or 0 },
+        counts = { [SolarGardenLight.ITEM] = 0, [RED] = bulb == RED and 1 or 0, [SolarGardenLight.PLAIN_BULB] = 0 },
     })
 end
 

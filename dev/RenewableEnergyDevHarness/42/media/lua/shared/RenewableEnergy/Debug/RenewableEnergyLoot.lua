@@ -71,19 +71,6 @@ function Loot.withLootRarity(lrm, fn)
     end)
 end
 
---- The rows of the mod's loot entries (Distributions.items) that drop stash maps when
---- `stashMaps`, else the others, which the loot rarity options scale.
-function Loot.rows(stashMaps)
-    local Distributions = require "RenewableEnergy/Items/Distributions"
-    local rows = {}
-    for _, spec in ipairs(Distributions.items) do
-        if not spec.stashMap == not stashMaps then
-            table.insert(rows, spec)
-        end
-    end
-    return rows
-end
-
 -- The references in Distributions.items with junk lists folded into their own,
 -- each with the set of item types it lists: { { reference = ..., items = { [fullType] = true } } }.
 local function lootTargets()

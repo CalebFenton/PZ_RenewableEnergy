@@ -15,8 +15,8 @@ local Sprites = require "RenewableEnergy/Sprites"
 local T = RenewableEnergyTest
 local test, expect, expectEqual, serverCheck = T.test, T.expect, T.expectEqual, T.serverCheck
 
-
--- Game minutes to let pass once a spot's chunk is back: a spot goes down by the next.
+-- Game minutes to let pass once a house's chunk is loaded: BuildingWatch, which rolls a house once
+-- its surroundings are in, looks every game minute.
 local SETTLE_MINUTES = 2
 -- A wait on the game clock has no limit of its own: the test's time limit comes first.
 local CLOCK_MS = math.huge
@@ -28,80 +28,65 @@ local function waitGameMinutes(self, minutes)
         minutes .. " game minutes passing", CLOCK_MS)
 end
 
--- Queues a trip that unloads the chunk of `at` ({ x, y, z }) and loads it again, and a wait for
--- the minute after, when its waiting spots go down.
-local function reloadAndSettle(self, at)
-    T.reloadChunk(self, at)
-    waitGameMinutes(self, SETTLE_MINUTES)
+-- The armed spots of the stock tank, of the wind farm, and of both (siteArm), as the arguments of
+-- the handlers that read them.
+local function tankSpots(self) return { spots = self.reads.arm.tank } end
+local function windSpots(self) return { spots = self.reads.arm.wind } end
+local function allSpots(self)
+    local spots = {}
+    for _, list in ipairs({ self.reads.arm.tank, self.reads.arm.wind }) do
+        for _, spot in ipairs(list) do
+            table.insert(spots, spot)
+        end
+    end
+    return { spots = spots }
 end
 
--- The spots siteArm armed, as the arguments of the handlers that read them.
-local function armedSpots(self)
-    return { spots = self.reads.arm.spots }
+-- Queues a trip that unloads the chunks of the test sites around `at` and loads them again, a wait
+-- until the server has every spot's square back, and a tick more: a panel spot goes down as its
+-- chunk loads, a wind charger's line on the tick after. Each site's spots land in
+-- self.reads[label .. " tank"] and [label .. " wind"].
+local function reloadSites(self, at, label)
+    T.reloadChunk(self, at)
+    T.readUntil(self, "siteSpots", allSpots, label .. " loaded", function(answer) return answer.ready end)
+    T.wait(1)
+    T.read(self, "siteSpots", tankSpots, label .. " tank")
+    T.read(self, "siteSpots", windSpots, label .. " wind")
 end
 
 -- A site goes down once, when its chunk loads, and its spot is forgotten, so loading the chunk
--- again places nothing. Its pump's pole mount holds as many modules as its kind says, at site
--- conditions, and players see it.
-test("renewable_energy_world_site_placed_once", {
-    spOnly = T.CHUNK_RELOAD_SP_ONLY,
-    timeoutSeconds = 2 * T.CHUNK_RELOAD_SECONDS,
-    run = function(self)
-        T.setMultiplier(self, T.VISIT_SPEED)
-        local square = T.square(self, nil, "a free outdoor square")
-        if not square then return end
-        local at = T.at(square)
-        T.read(self, "siteArm", { at = at }, "arm")
-        reloadAndSettle(self, at)
-        T.read(self, "sitePlaced", armedSpots, "placed")
-        T.read(self, "siteSpots", armedSpots, "first")
-        T.waitFor(self, function() return T.objectWithSprite(getSquare(at.x, at.y, at.z), Sprites.rack.metal.S) ~= nil end,
-            "this client's copy of the site's rack")
-        reloadAndSettle(self, at)
-        T.read(self, "siteSpots", armedSpots, "again")
-    end,
-    validate = function(self)
-        T.expectNoFailures(self.reads.placed)
-        local first, again = self.reads.first, self.reads.again
-        if expect(first.ready and again.ready, "the site's squares weren't loaded on the server: " .. tostring(first.why or again.why)) then
-            expect(first.waiting == 0, "the site's spot was not forgotten once placed")
-            expectEqual("objects on the site's square after loading the chunk again", again.objects, first.objects)
-        end
-    end,
-})
-
--- A spot whose square holds something now, as a player's things or a grown tree would, stays and
--- is tried again each time its chunk loads: a wind farm whose charger's square holds a work table
--- places nothing, neither charger nor bank; with the table gone, the next load places both, the
--- charger braked with its blades broken and wired to a plugged-in rack of tired batteries.
-test("renewable_energy_world_site_waits_for_a_free_square", {
+-- again places nothing more; its pump's pole mount holds as many modules as its kind says, at site
+-- conditions. A spot whose square holds something now, as a player's things or a grown tree would,
+-- is kept and tried again each time its chunk loads: a wind farm whose charger's square holds a
+-- work table places nothing, neither charger nor bank, and with the table gone the next load places
+-- both, the charger braked with its blades broken and wired to a plugged-in rack of tired
+-- batteries. A stock tank and the blocked wind farm share the two trips.
+test("renewable_energy_world_site_placed_once_and_waits_for_a_free_square", {
     spOnly = T.CHUNK_RELOAD_SP_ONLY,
     timeoutSeconds = 2 * T.CHUNK_RELOAD_SECONDS,
     sandbox = { LRMBatteries = 1, LRMMisc = 1 },
     run = function(self)
-        T.setMultiplier(self, T.VISIT_SPEED)
-        local bank = T.square(self, { indoors = true }, "a free indoor square for the bank")
+        local rack = T.square(self, nil, "a free outdoor square for the stock tank's rack")
+        local bank = rack and T.square(self, { indoors = true }, "a free indoor square for the wind farm's bank")
         if not bank then return end
-        T.read(self, "siteArm", { bank = T.at(bank), block = true }, "arm")
-        T.step(function()
-            local at = self.reads.arm.at
-            reloadAndSettle(self, at)
-            T.read(self, "siteSpots", armedSpots, "blocked")
-            T.server(self, "removeAt", T.at(at, { sprite = PZHarness.Fixtures.WORK_TABLE_SPRITE }))
-            reloadAndSettle(self, at)
-            T.read(self, "sitePlaced", armedSpots, "placed")
-            T.waitFor(self, function()
-                return Squares.findObjectOn(getSquare(at.x, at.y, at.z), Wind.isCharger) ~= nil
-            end, "this client's copy of the wind charger")
+        local at = T.at(rack)
+        T.read(self, "siteArm", { at = at, bank = T.at(bank) }, "arm")
+        reloadSites(self, at, "first")
+        T.read(self, "sitePlaced", tankSpots, "tank placed")
+        T.server(self, "removeAt", function()
+            return T.at(self.reads.arm.charger, { sprite = PZHarness.Fixtures.WORK_TABLE_SPRITE })
         end)
+        reloadSites(self, at, "again")
+        T.read(self, "sitePlaced", windSpots, "wind placed")
     end,
     validate = function(self)
-        local blocked = self.reads.blocked
-        if expect(blocked.ready, "the site's squares weren't loaded on the server: " .. tostring(blocked.why)) then
-            expectEqual("times the blocked wind charger's spot was kept", blocked.waiting, 1)
-            expectEqual("objects the blocked site put on its squares", blocked.placed, 0)
-        end
-        T.expectNoFailures(self.reads.placed)
+        local reads = self.reads
+        T.expectNoFailures(reads["tank placed"])
+        expectEqual("objects on the stock tank's square after loading its chunk again", reads["again tank"].objects,
+            reads["first tank"].objects)
+        expectEqual("times the blocked wind charger's spot was kept", reads["first wind"].waiting, 1)
+        expectEqual("objects the blocked wind farm put on its squares", reads["first wind"].placed, 0)
+        T.expectNoFailures(reads["wind placed"])
     end,
 })
 

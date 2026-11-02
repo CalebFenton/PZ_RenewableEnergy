@@ -214,8 +214,9 @@ test("renewable_energy_solar_panel_slots", {
     end,
 })
 
--- Connecting a panel again to the bank it feeds leaves it as it was, snow included, and a bank
--- whose panel slots are all taken doesn't turn its own panel away as if there were no room.
+-- Connecting a panel again to the bank it feeds is refused as already connected and leaves it as
+-- it was, snow included, also when the bank's panel slots are all taken: the bank doesn't turn its
+-- own panel away as if there were no room.
 test("renewable_energy_solar_reconnecting_a_panel_keeps_it", {
     run = function(self)
         local bank = T.bank(self, "batteryBoxWood", {})
@@ -241,14 +242,14 @@ test("renewable_energy_solar_reconnecting_a_panel_keeps_it", {
         local snowed = (T.stateSource(self.reads.snowed, self.panel) or {}).snow or 0
         if not expect(snowed > 0, "a night of snowfall left no snow on the panel") then return end
         for _, case in ipairs({ { "again", 1, "a bank" }, { "full", 2, "a full bank" } }) do
-            local state, panels, what = self.reads[case[1] .. "State"], case[2], case[3]
+            local label, panels, what = case[1], case[2], case[3]
+            local state = self.reads[label .. "State"]
+            T.expectRefused(self.reads[label], "already connected", "connecting a panel again to " .. what .. " it feeds")
             expectEqual("panels after connecting one again to " .. what .. " it feeds", state.sources, panels)
             -- Connecting brings the bank up to now first, which may melt a trace of it.
             expectNear("snow on a panel connected again to " .. what .. " it feeds",
                 (T.stateSource(state, self.panel) or {}).snow or -1, snowed, 0.01)
         end
-        expect(self.reads.full.reason ~= "Tooltip_RenewableEnergy_NoInputSlot",
-            "a full bank turned its own panel away for want of a slot")
     end,
 })
 
@@ -312,29 +313,36 @@ test("renewable_energy_solar_snow_settles_dims_and_melts", {
 })
 
 -- A panel roofed over after it was connected, by a floor built above it, is no longer outdoors:
--- the next pass drops it and it makes nothing, as connecting it there would be refused. Catches a
--- panel checked for being outdoors only when it is connected.
-test("renewable_energy_solar_roofed_panel_makes_nothing", {
+-- the next pass drops it, even the one a Disconnect catches up with first, which then refuses
+-- the connection gone and publishes the bank's sources, and a roofed panel makes nothing. Catches
+-- a panel checked for being outdoors only when it is connected.
+test("renewable_energy_solar_roofed_panel_dropped_at_the_next_pass", {
     run = function(self)
         local bank = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY }, { charge = 0.5 })
         self.panel = bank and T.panel(self, Sprites.flat, { near = bank, connect = true })
         if not self.panel then return end
         T.batch(function()
-            T.bankPass(self, bank, 1000)
-            T.readRecord(self, bank, "open")
-            T.floorAbove(self, self.panel, "roofOver")
-            T.bankPass(self, bank, 1000)
-            T.readRecord(self, bank, "roofed")
+            T.bankPass(self, bank, 1000, { label = "open" })
+            T.floorAbove(self, self.panel, "roof")
+            -- An hour back, so the Disconnect catches up with a pass of its own.
+            T.readRecord(self, bank, "before", 1)
+            T.job(self, "source", SourceJobs.DISCONNECT, self.panel, nil, "disconnect")
+            T.readRecord(self, bank, "after")
+            T.bankPass(self, bank, 1000, { label = "roofed" })
         end)
+        T.waitForSummary(self, bank, function(summary) return #summary.sources == 0 end,
+            "this client's summary after the catch-up dropped the roofed panel")
     end,
     validate = function(self)
         if not T.expectConnected(self.panel) then return end
-        local open, roofed = self.reads.open, self.reads.roofed
-        expect(open.status.solarW > 0, "the panel in the open made nothing at 1000 W/m²")
-        expectEqual("whether the roofed panel's square is outdoors", self.reads.roofOver.outside, false)
-        expectEqual("panels feeding the roofed bank", roofed.sources, 0)
-        expectEqual("solar watts under the roof", roofed.status.solarW, 0)
-        expect(roofed.storedWh <= open.storedWh, string.format(
-            "the bank gained %.2f Wh in the hour after its panel was roofed over", roofed.storedWh - open.storedWh))
+        local reads = self.reads
+        expect(reads.open.status.solarW > 0, "the panel in the open made nothing at 1000 W/m²")
+        expectEqual("whether the roofed panel's square is outdoors", reads.roof.outside, false)
+        expectEqual("sources before the Disconnect catches up", reads.before.sources, 1)
+        T.expectRefused(reads.disconnect, "not connected", "Disconnect acted on the connection the catch-up dropped")
+        expectEqual("sources after the Disconnect caught up", reads.after.sources, 0)
+        expectEqual("solar watts under the roof", reads.roofed.status.solarW, 0)
+        expect(reads.roofed.storedWh <= reads.open.storedWh, string.format(
+            "the bank gained %.2f Wh in the hour after its panel was roofed over", reads.roofed.storedWh - reads.open.storedWh))
     end,
 })

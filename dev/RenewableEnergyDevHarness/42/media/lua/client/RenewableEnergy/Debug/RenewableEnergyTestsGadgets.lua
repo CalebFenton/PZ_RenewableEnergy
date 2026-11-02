@@ -39,11 +39,12 @@ end
 
 -- The menu offers no maintainer to someone without one; it attaches a carried one to a car, on the
 -- server and this client, takes it from the inventory, refuses a second one, and detaching gives it
--- back and leaves nothing to detach.
+-- back and leaves nothing to detach. An older save marks an attached maintainer with the condition
+-- it went on with; detaching one gives back a whole new maintainer all the same.
 test("renewable_energy_gadgets_maintainer_attach_detach", {
     instant = true,
     run = function(self)
-        local car = T.placeVehicle(self, CAR, { battery = T.CAR_BATTERY, charge = 0.5 })
+        local car = T.placeVehicle(self, CAR)
         if not car then return end
         self.car = car
         T.step(function()
@@ -62,18 +63,41 @@ test("renewable_energy_gadgets_maintainer_attach_detach", {
         chooseMaintainerOption(self, car, false)
         T.onVehicle(self, car, "vehicleState", nil, "detached")
         T.count(self, "detached", { SolarMaintainer.ITEM })
+        T.step(function()
+            self.refusesDetach = VehicleJobs.refusal(T.player(), VehicleJobs.DETACH_MAINTAINER, car.vehicle) ~= nil
+        end)
+        T.onVehicle(self, car, "oldMaintainerMark", { condition = 1 })
+        T.waitFor(self, function() return SolarMaintainer.isAttached(car.vehicle) end,
+            "this client's car with the older save's maintainer mark")
+        chooseMaintainerOption(self, car, false)
+        T.onVehicle(self, car, "vehicleState", nil, "oldDetached")
+        T.count(self, "oldDetached", { SolarMaintainer.ITEM })
+        T.waitFor(self, function()
+            return T.player():getInventory():getCountTypeRecurse(SolarMaintainer.ITEM) == 2
+        end, "this client's copies of both detached maintainers")
+        T.step(function()
+            local worst = math.huge
+            local items = T.player():getInventory():getAllTypeRecurse(SolarMaintainer.ITEM)
+            for i = 0, items:size() - 1 do
+                worst = math.min(worst, items:get(i):getCondition())
+            end
+            self.worstCondition = worst
+        end)
     end,
     validate = function(self)
         expect(not self.offeredEmptyHanded, "a car offers a maintainer to someone without one")
         expect(self.reads.attached.state.attached, "the maintainer did not attach on the server")
         expect(self.copyAttached, "this client's copy of the car doesn't show the maintainer attached")
-        expect(self.counts.attached[SolarMaintainer.ITEM] == 0, "the attached maintainer is still in the inventory")
+        expectEqual("maintainers left in the inventory once attached", self.counts.attached[SolarMaintainer.ITEM], 0)
         expect(not self.canAttachTwice, "a second maintainer could attach")
         expect(not self.reads.detached.state.attached, "the maintainer did not detach on the server")
-        expect(not SolarMaintainer.isAttached(self.car.vehicle), "this client's copy of the car still shows the maintainer")
-        expect(VehicleJobs.refusal(T.player(), VehicleJobs.DETACH_MAINTAINER, self.car.vehicle) ~= nil,
-            "a car without a maintainer offers to detach one")
+        expect(self.refusesDetach, "a car without a maintainer offers to detach one")
         expectEqual("maintainers detaching gave back", self.counts.detached[SolarMaintainer.ITEM], 1)
+        expect(not self.reads.oldDetached.state.attached, "an older save's maintainer did not detach on the server")
+        expect(not SolarMaintainer.isAttached(self.car.vehicle), "this client's copy of the car still shows a maintainer")
+        expectEqual("maintainers carried after detaching an older save's", self.counts.oldDetached[SolarMaintainer.ITEM], 2)
+        expectEqual("the worst condition of the detached maintainers", self.worstCondition,
+            instanceItem(SolarMaintainer.ITEM):getConditionMax())
     end,
 })
 
@@ -133,32 +157,6 @@ test("renewable_energy_gadgets_maintainer_charge", {
     end,
 })
 
--- An older save marks an attached maintainer with the condition it went on with. Detaching one
--- still gives back a single whole maintainer, not one at that condition.
-test("renewable_energy_gadgets_maintainer_detach_older_save_mark", {
-    instant = true,
-    run = function(self)
-        local car = T.placeVehicle(self, CAR)
-        if not car then return end
-        T.onVehicle(self, car, "oldMaintainerMark", { condition = 1 })
-        T.waitFor(self, function() return SolarMaintainer.isAttached(car.vehicle) end,
-            "this client's car with the older save's maintainer mark")
-        chooseMaintainerOption(self, car, false)
-        T.onVehicle(self, car, "vehicleState", nil, "detached")
-        T.count(self, "carried", { SolarMaintainer.ITEM })
-        T.waitForCarried(self, SolarMaintainer.ITEM, "this client's copy of the detached maintainer")
-        T.step(function()
-            local item = T.carried(SolarMaintainer.ITEM)
-            self.condition = item and item:getCondition()
-        end)
-    end,
-    validate = function(self)
-        expect(not self.reads.detached.state.attached, "an older save's maintainer did not detach on the server")
-        expectEqual("maintainers detaching gave back", self.counts.carried[SolarMaintainer.ITEM], 1)
-        expectEqual("the detached maintainer's condition", self.condition, instanceItem(SolarMaintainer.ITEM):getConditionMax())
-    end,
-})
-
 -- Solar battery charger --------------------------------------------------------------------------
 
 -- A solar battery charger the character places on a free outdoor square; see T.placeAsPlayer.
@@ -200,8 +198,8 @@ test("renewable_energy_gadgets_solar_battery_charger_container", {
 
 local CELL_HOURS = 2
 
--- A fresh charger per row, the pass row last since the pass charges every charger. "full" holds
--- cells as the game makes them full (their float reads just under 1).
+-- One charger, which each row fills afresh; the pass row last, since the pass charges every
+-- charger. "full" holds cells as the game makes them full (their float reads just under 1).
 local CHARGER_ROWS = {
     { name = "midnight", hour = MIDNIGHT, uses = 0 },
     { name = "full", hour = NOON },
@@ -213,9 +211,9 @@ local CHARGER_ROWS = {
 test("renewable_energy_gadgets_solar_battery_charger_charges", {
     instant = true,
     run = function(self)
+        local charger = placeCharger(self)
+        if not charger then return end
         for _, row in ipairs(CHARGER_ROWS) do
-            local charger = placeCharger(self)
-            if not charger then return end
             T.step(function() T.setTime(self, row.hour) end)
             T.read(self, "cellCharge", T.at(charger,
                 { kind = "charger", count = SolarCellCharger.SLOTS, uses = row.uses, hours = CELL_HOURS, pass = row.pass }), row.name)
@@ -254,27 +252,30 @@ test("renewable_energy_gadgets_solar_battery_charger_charges", {
     end,
 })
 
--- Sets the mechanics window's Lua cheat (no key, hood or walk) for the test, not the character's
--- cheat, which would also make the install instant and skip its isValid.
-local function mechanicsCheat(self)
+-- Sets the mechanics window's Lua cheat (no key, hood or walk) for the test. Not the character's
+-- cheat, which would skip the install's isValid, its check that the slot takes the battery.
+local function mechanicsWindowCheat(self)
     local saved = ISVehicleMechanics.cheat
     T.defer(self, function() ISVehicleMechanics.cheat = saved end)
     ISVehicleMechanics.cheat = true
 end
 
 -- The mechanics menu of an empty battery slot installs a carried deep cycle battery, and doesn't
--- list one the character hasn't got. A real-time action: an instant one fails vanilla's isValid on a
--- multiplayer client when the server's slot change arrives. Uninstalling is vanilla's alone
--- (ISUninstallVehiclePart takes any item).
+-- list one the character hasn't got. Uninstalling is vanilla's alone (ISUninstallVehiclePart takes
+-- any item).
 test("renewable_energy_gadgets_deep_cycle_battery_installs_from_mechanics_menu", {
+    instant = true,
     run = function(self)
         T.setPerk(self, Perks.Mechanics, 10)
+        if isClient() then
+            T.setMechanicsCheat(self, true)
+        end
         local car = T.placeVehicle(self, CAR)
         if not car then return end
         T.onVehicle(self, car, "vehicleBattery", { empty = true })
         T.waitFor(self, function() return T.vehicleBattery(car) == nil end, "this client's car without a battery")
         T.step(function()
-            mechanicsCheat(self)
+            mechanicsWindowCheat(self)
             local context = T.partMenu(car.vehicle, VehicleBattery.partOf(car.vehicle))
             local install = T.subMenu(context, context:getOptionFromName(getText("IGUI_Install")))
             self.installWithout = install ~= nil
@@ -299,6 +300,7 @@ test("renewable_energy_gadgets_deep_cycle_battery_installs_from_mechanics_menu",
                 return
             end
             T.choose(pick)
+            T.shortenQueuedInstalls()
             T.waitFor(self, function() return T.vehicleBattery(car) ~= nil end, "this client's car with the deep cycle battery")
             T.onVehicle(self, car, "vehicleState", nil, "installed")
             T.count(self, "installed", { VehicleBattery.ITEM })
@@ -311,7 +313,7 @@ test("renewable_energy_gadgets_deep_cycle_battery_installs_from_mechanics_menu",
             .. tostring(self.offerProblem)) then return end
         local installed = self.reads.installed.state.battery
         expectEqual("the server's battery slot's battery", installed and installed.type, VehicleBattery.ITEM)
-        expect(self.counts.installed[VehicleBattery.ITEM] == 0, "the installed battery is still in the inventory")
+        expectEqual("deep cycle batteries left in the inventory once installed", self.counts.installed[VehicleBattery.ITEM], 0)
     end,
 })
 
@@ -320,51 +322,49 @@ local function capacityRatio()
     return Specs.batteries[T.CAR_BATTERY].wh / Specs.batteries[VehicleBattery.ITEM].wh
 end
 
--- Queues the server handler `name` on a `script` vehicle each with a car battery and a deep cycle
--- battery, with `args` plus where the vehicle is (T.onVehicle), each answer read under its battery's type.
--- When `full`, only the deep cycle battery's, and a wait for the client's charge to arrive from
--- the initially partial charge.
-local function onBothBatteries(self, script, name, args, full)
-    for _, batteryType in ipairs(full and { VehicleBattery.ITEM } or { T.CAR_BATTERY, VehicleBattery.ITEM }) do
-        local car = T.placeVehicle(self, script, { battery = batteryType, charge = args.uses })
-        if not car then return end
-        T.onVehicle(self, car, name, args, batteryType)
-        if full then
-            T.waitFor(self, function() return T.vehicleBattery(car):getCurrentUsesFloat() == 1 end, "this client's full " .. batteryType)
-        end
-    end
-end
-
--- The same input to each of the mod's wraps of vanilla's battery drain and update moves a car
--- battery and a deep cycle battery by the same watt-hours, so the deep cycle's share changes less
--- by the capacity ratio. The lightbar must be scaled once, though vanilla drains it inside the
--- battery update the mod scales. `change` is the answer field holding that share.
-local VEHICLE_HOURS = {
-    { behavior = "drain_scales_with_capacity", vehicle = CAR, handler = "batteryDrain", uses = 0.8, delta = 0.01,
-        change = "drop", none = "the drain didn't drain the car battery" },
+-- Each of the mod's wraps of vanilla's battery drain and update (the handlers named), given the
+-- same input, moves a car battery and a deep cycle battery by the same watt-hours, so the deep
+-- cycle's share (the answer's `change`) moves less by the capacity ratio.
+local BATTERY_ROWS = {
+    -- One step far larger than a game minute's: the battery keeps whole uses, and rounding a
+    -- minute's scaled drain to them skews the ratio (DrainableComboItem.setCurrentUsesFloat).
+    { what = "drain", handler = "batteryDrain", uses = 0.8, delta = 0.01, change = "drop" },
+    -- Scaled once, though vanilla drains the lightbar inside the battery update the mod scales.
     -- Vanilla's lightbar drain is small; a long run makes it measurable.
-    { behavior = "lightbar_drain_scales_with_capacity", vehicle = "Base.CarLightsPolice", handler = "lightbarDrain",
-        uses = 0.8, minutes = 600, change = "drop", none = "the lightbar didn't drain the car battery" },
-    { behavior = "alternator_charge_scales_with_capacity", vehicle = CAR, handler = "alternatorCharge", uses = 0.2,
-        change = "gain", none = "the alternator didn't charge the car battery" },
-    { behavior = "alternator_fills_near_full_battery", vehicle = CAR, handler = "alternatorCharge", uses = 0.99,
-        change = "gain", full = true },
+    { what = "lightbar drain", handler = "lightbarDrain", uses = 0.8, minutes = 600, change = "drop" },
+    { what = "alternator charge", handler = "alternatorCharge", uses = 0.2, minutes = 60, change = "gain" },
 }
-for _, case in ipairs(VEHICLE_HOURS) do
-    test("renewable_energy_gadgets_deep_cycle_battery_" .. case.behavior, {
-        run = function(self)
-            onBothBatteries(self, case.vehicle, case.handler,
-                { uses = case.uses, minutes = case.minutes or 60, delta = case.delta }, case.full)
-        end,
-        validate = function(self)
-            local car, deepCycle = self.reads[T.CAR_BATTERY], self.reads[VehicleBattery.ITEM]
-            if not expectEqual("the deep cycle car's battery", deepCycle.type, VehicleBattery.ITEM) then return end
-            if case.full then
-                expectNear("the near-full deep cycle battery's final charge", case.uses + deepCycle.gain, 1, 0.0001)
-            elseif expect(car[case.change] > 0, case.none) then
-                expectNear("deep cycle " .. case.change .. " over car battery " .. case.change,
-                    deepCycle[case.change] / car[case.change], capacityRatio(), 0.01)
+-- A charge an hour of the alternator fills, scaled or not: the wrap scales the minutes vanilla
+-- charges for, before vanilla clamps the charge, not the gain after.
+local NEAR_FULL = 0.99
+
+-- The rows on one car with each battery, police cars for the lightbar.
+local BATTERIES = { T.CAR_BATTERY, VehicleBattery.ITEM }
+test("renewable_energy_gadgets_deep_cycle_battery_scales_vanilla_charge_and_drain", {
+    run = function(self)
+        local cars = {}
+        for i, batteryType in ipairs(BATTERIES) do
+            cars[i] = T.placeVehicle(self, "Base.CarLightsPolice", { battery = batteryType })
+            if not cars[i] then return end
+        end
+        for _, row in ipairs(BATTERY_ROWS) do
+            for i, batteryType in ipairs(BATTERIES) do
+                T.onVehicle(self, cars[i], row.handler, { uses = row.uses, minutes = row.minutes, delta = row.delta },
+                    row.what .. " " .. batteryType)
             end
-        end,
-    })
-end
+        end
+        T.onVehicle(self, cars[2], "alternatorCharge", { uses = NEAR_FULL, minutes = 60 }, "near full")
+    end,
+    validate = function(self)
+        for _, row in ipairs(BATTERY_ROWS) do
+            local car, deepCycle = self.reads[row.what .. " " .. T.CAR_BATTERY], self.reads[row.what .. " " .. VehicleBattery.ITEM]
+            if expectEqual("the deep cycle car's battery in the " .. row.what, deepCycle.type, VehicleBattery.ITEM)
+                and expect(car[row.change] > 0, "the " .. row.what .. " didn't move the car battery") then
+                expectNear("deep cycle " .. row.change .. " over car battery " .. row.change .. " in the " .. row.what,
+                    deepCycle[row.change] / car[row.change], capacityRatio(), 0.01)
+            end
+        end
+        expectNear("the near-full deep cycle battery's charge after an hour of the alternator",
+            NEAR_FULL + self.reads["near full"].gain, 1, 0.0001)
+    end,
+})

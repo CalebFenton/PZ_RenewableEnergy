@@ -4,7 +4,7 @@ local GasKit = require "RenewableEnergy/GasLine/GasKit"
 local Specs = require "RenewableEnergy/Specs"
 
 -- What a gas line carries (GasLine/GasLines.lua): a load past its cap stalls the generator on it,
--- and the banks charging from it share what the cap leaves.
+-- the banks charging from it share what the cap leaves, and cutting it hands its load on (Payers).
 
 local T = RenewableEnergyTest
 local test = T.test
@@ -170,9 +170,10 @@ test("renewable_energy_gasline_generator_stalls_on_real_load", {
     end,
 })
 
--- Disconnecting the nearer payer must transfer its appliances' bill in the job itself. The area
--- has native appliances too, so the far generator's solo baseline is taken before adding our fridge.
-test("renewable_energy_settlement_gas_disconnect_pays_surviving_generator", {
+-- Disconnecting the gas line from the generator nearer a fridge hands the fridge's bill to the
+-- surviving generator in the job itself, not at the next rebuild. The area has native appliances
+-- too, so the far generator's solo baseline is taken before adding our fridge.
+test("renewable_energy_gasline_disconnect_moves_bill_to_surviving_generator", {
     instant = true,
     sandbox = { GeneratorFuelConsumption = 0.1 },
     run = function(self)

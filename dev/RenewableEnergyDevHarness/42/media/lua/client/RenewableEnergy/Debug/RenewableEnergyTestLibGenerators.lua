@@ -1,4 +1,5 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
+local Specs = require "RenewableEnergy/Specs"
 
 local T = RenewableEnergyTest
 
@@ -50,6 +51,17 @@ function T.setGenerator(self, generator, fields)
     if fields.rebuild then
         T.serverUntil(self, "PZHarness.worldFrame", {}, function(now) return now.frame > self.server.generatorSet.frame end)
     end
+end
+
+--- Queues the authority billing every running generator its share, as its ten-minute pass does
+--- (Payers.billGenerators), so a read after has the bill of what reaches it now.
+function T.billGenerators(self)
+    T.server(self, "billGenerators", {})
+end
+
+--- The fuel an hour vanilla bills a generator for `watts`, at the GeneratorFuelConsumption option.
+function T.fuelPerHour(watts)
+    return Specs.fuelFromWatts(watts) * SandboxVars.GeneratorFuelConsumption
 end
 
 --- Queues taking `litres` from the generator's fuel, as vanilla's hourly bill and a bank charging

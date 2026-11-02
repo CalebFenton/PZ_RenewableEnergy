@@ -41,15 +41,18 @@ handler("chargerState", function(_, args)
     return { items = Kinds.itemsOf(Kinds.find(args):getContainer()) }
 end)
 
--- Fills the solar battery charger at `args` (Kinds.find) with `args.count` batteries at
--- `args.uses` (full if nil) and charges it for `args.hours` under the sky of the moment, then, with
--- `args.pass`, runs the pass over every charger as long again. One call, since an empty battery
--- leaves its container on its next update (DrainableComboItem.update). Answers the uses added, the
--- batteries after, `full` (every battery at its whole maximum, which the float can't tell), the
--- Wh kept and `flat`, the light the sky gave (Sun.skyNow).
+-- Empties the solar battery charger at `args` (Kinds.find) and what it kept toward a use, fills it
+-- with `args.count` batteries at `args.uses` (full if nil) and charges it for `args.hours` under
+-- the sky of the moment, then, with `args.pass`, runs the pass over every charger as long again.
+-- One call, since an empty battery leaves its container on its next update
+-- (DrainableComboItem.update). Answers the uses added, the batteries after, `full` (every battery
+-- at its whole maximum, which the float can't tell), the Wh kept and `flat`, the light the sky
+-- gave (Sun.skyNow).
 handler("cellCharge", function(_, args)
     local charger = Kinds.find(args)
     local container = charger:getContainer()
+    Helpers.emptyContainer(container)
+    charger:getModData()[SolarCellCharger.STORED_KEY] = nil
     for _ = 1, args.count do
         addAt(container, SolarCellCharger.BATTERY, args.uses)
     end

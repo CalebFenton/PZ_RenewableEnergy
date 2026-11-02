@@ -1,21 +1,17 @@
--- The authority's half of the stash house tests: the mod's stashes, StashSystem and the corpse
--- loot that drops their maps exist only where the authority runs them.
+-- The authority's half of the stash house tests: the mod's stashes and StashSystem exist only
+-- where the authority runs them. The maps' loot is the loot tests' (RenewableEnergyTestServerLoot.lua).
 
 require "PZHarness/ServerHandlers"
 require "PZHarness/ServerChecks"
 require "PZHarness/Fixtures"
-local LibLoot = require "cf_commonlib/Loot"
 require "PZHarness/Rolls"
 local Kinds = require "RenewableEnergy/Debug/RenewableEnergyTestKinds"
-local Loot = require "RenewableEnergy/Debug/RenewableEnergyLoot"
-local Distributions = require "RenewableEnergy/Items/Distributions"
 -- The game's Java class zombie.core.stash.Stash, which the mod's module name would hide.
 local EngineStash = Stash
 local Stash = require "RenewableEnergy/Stash"
 
 local handler, check, need, saveOptions = PZHarness.serverHandler, PZHarness.checkHandler, PZHarness.need, PZHarness.Fixtures.saveOptions
 local deferOnce = PZHarness.Fixtures.deferOnce
-local countPairs = PZHarness.Fixtures.countPairs
 
 -- StashSystem gives up without an error when the stash building isn't a building, and prepares
 -- only a building whose bounds strictly contain the building square (doBuildingStash), so a wrong
@@ -197,50 +193,4 @@ handler("stashKnownOnStart", function(_, _, defer)
     end
     restore()
     return { houses = houses }
-end)
-
--- The prepper's map drops from survivalist and bandit corpses, whichever outfit variant they wear,
--- and every loot list a map names exists.
-check("prepperMapTargets", function(expect)
-    local lists = {}
-    for _, spec in ipairs(Loot.rows(true)) do
-        lists[spec.fullType] = {}
-        for _, entry in ipairs(spec.entries) do
-            expect(LibLoot.resolveItemList(entry[2]) ~= nil, spec.fullType .. ": no loot list " .. entry[2])
-            lists[spec.fullType][entry[2]] = true
-        end
-    end
-    local prepper = lists["RenewableEnergy.CrowcallRoadMap"]
-    if not expect(prepper ~= nil, "no Crowcall Road map in the loot") then
-        return
-    end
-    for key in pairs(SuburbsDistributions.all) do
-        if string.find(key, "^Outfit_Survivalist") or string.find(key, "^Outfit_Bandit") then
-            expect(prepper["sub:all." .. key], "the Crowcall Road map does not drop from " .. key)
-        end
-    end
-end)
-
--- The loot at each Stash Houses option: for every stash map and loot list, how often the map is
--- listed and at what weight, against the weight its row gives it there.
-handler("stashMapsInCorpseLoot", function(_, _, defer)
-    local D = Distributions
-    local options = SandboxVars.RenewableEnergy
-    local restoreOptions = saveOptions(defer, { "StashMode" }, D.apply)
-    local found = {}
-    for _, mode in pairs(Stash.MODE) do
-        options.StashMode = mode
-        D.apply()
-        D.apply()
-        for _, spec in ipairs(Loot.rows(true)) do
-            for _, entry in ipairs(spec.entries) do
-                local count, weight = countPairs(LibLoot.resolveItemList(entry[2]), spec.fullType)
-                table.insert(found, {
-                    mode = mode, where = spec.fullType .. " in " .. entry[2], count = count, weight = weight, rarity = entry[1],
-                })
-            end
-        end
-    end
-    restoreOptions()
-    return { found = found }
 end)

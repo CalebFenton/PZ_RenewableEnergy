@@ -52,28 +52,42 @@ local function stashSpawnTables()
     return tables
 end
 
+-- Corpses roll their outfit's SuburbsDistributions.all.Outfit_<outfit> and, unless that says
+-- otherwise, all.inventorymale or all.inventoryfemale (ItemPickerJava.fillContainer).
+local CORPSE_INVENTORIES = { inventorymale = true, inventoryfemale = true }
+
+-- A "sub:" list is a stash house's or a corpse's container table, or a bag's table, which the game
+-- rolls into a bag of that item type.
 local function checkSubList(expect, where, name, stashTables)
     local room, container = string.match(name, "^([^.]+)%.(.+)$")
-    local containerTable = room and SuburbsDistributions[room] and SuburbsDistributions[room][container]
+    if not room then
+        local bag = SuburbsDistributions[name]
+        expect(type(bag) == "table" and bag.rolls ~= nil and getScriptManager():FindItem(name) ~= nil,
+            where .. ": no bag rolls it")
+        return
+    end
+    local containerTable = SuburbsDistributions[room] and SuburbsDistributions[room][container]
     if not expect(containerTable ~= nil and not containerTable.procedural, where .. ": not a plain container table") then
         return
     end
-    -- Corpses roll SuburbsDistributions.all.Outfit_<outfit> (ItemPickerJava.fillContainer).
-    expect(stashTables[room] or (room == "all" and string.find(container, "^Outfit_") ~= nil),
-        where .. ": neither a stash house nor a corpse rolls it")
+    local corpse = room == "all" and (string.find(container, "^Outfit_") ~= nil or CORPSE_INVENTORIES[container])
+    expect(stashTables[room] or corpse, where .. ": neither a stash house nor a corpse rolls it")
     expect(ItemPickerJava.getItemContainer(room, container, nil, false) ~= nil, where .. ": the game has no " .. name)
 end
 
 -- ItemPickerJava.tryAddItemToContainer hands out nothing for an unknown item or one heavier than
 -- the container holds, and getActualSpawnChance nothing at a loot multiplier of 0. An obsolete,
 -- disabled or debug-only script never loads (ScriptBucket), so it is no item either. The loot
--- multipliers are the default settings', as Loot.MEASURE_OPTIONS sets them.
+-- multipliers are the default settings', as Loot.MEASURE_OPTIONS sets them; a stash map's
+-- multiplier is the Stash Houses option's, which lootOptions checks.
 local function checkHandedOut(expect, spec, capacity)
-    local option = getSandboxOptions():getOptionByName("RenewableEnergy." .. spec.option)
-    if expect(option ~= nil, spec.fullType .. ": no sandbox option " .. tostring(spec.option)) then
-        local multiplier = option:getDefaultValue()
-        for _, entry in ipairs(spec.entries) do
-            expect(entry[1] * multiplier > 0, spec.fullType .. " in " .. entry[2] .. " has no weight at the default options")
+    if spec.option then
+        local option = getSandboxOptions():getOptionByName("RenewableEnergy." .. spec.option)
+        if expect(option ~= nil, spec.fullType .. ": no sandbox option " .. tostring(spec.option)) then
+            local multiplier = option:getDefaultValue()
+            for _, entry in ipairs(spec.entries) do
+                expect(entry[1] * multiplier > 0, spec.fullType .. " in " .. entry[2] .. " has no weight at the default options")
+            end
         end
     end
     local script = getScriptManager():FindItem(spec.fullType)
@@ -84,43 +98,6 @@ local function checkHandedOut(expect, spec, capacity)
         expect(weight <= capacity, spec.fullType .. " weighs " .. weight .. ", more than a crate's " .. capacity)
     end
 end
-
-check("lootListsInUse", function(expect)
-    local rows = Loot.rows(false)
-    local procUsers = PZHarness.Loot.procListUsers()
-    local vehicleTables = vehicleTablesInUse()
-    local stashTables = stashSpawnTables()
-    local capacity = PZHarness.Loot.scratchContainer(nil):getCapacity()
-    PZHarness.Loot.withMeasureOptions(Loot.MEASURE_OPTIONS, function()
-        for _, spec in ipairs(rows) do
-            checkHandedOut(expect, spec, capacity)
-        end
-    end)
-    for _, spec in ipairs(rows) do
-        for _, entry in ipairs(spec.entries) do
-            local reference = entry[2]
-            local where = spec.fullType .. " in " .. reference
-            local items = LibLoot.resolveItemList(reference)
-            expect(items ~= nil, where .. ": no such list")
-            local kind, name = string.match(reference, "^(%a+):(.+)$")
-            if kind == "proc" then
-                local listName = string.gsub(name, "%.junk$", "")
-                local user = procUsers[listName]
-                if expect(user ~= nil, where .. ": no room picks " .. listName) then
-                    expect(ItemPickerJava.getItemContainer(user.room, user.container, listName, false) ~= nil,
-                        where .. ": the game has no " .. user.room .. "." .. user.container .. " -> " .. listName)
-                end
-            elseif kind == "veh" then
-                expect(VehicleDistributions[name] ~= nil and vehicleTables[VehicleDistributions[name]] == true,
-                    where .. ": no vehicle fills from it")
-            elseif kind == "sub" then
-                checkSubList(expect, where, name, stashTables)
-            else
-                expect(false, where .. ": unknown kind of list")
-            end
-        end
-    end
-end)
 
 -- Whether `list` has every vanilla item of `vanilla`; the mod's own entries differ between them.
 local function listsContainAll(list, vanilla)
@@ -133,7 +110,9 @@ local function listsContainAll(list, vanilla)
     return true
 end
 
-check("lootVehicleTables", function(expect)
+-- The utility vans fill like any builder's van, glove box and vanilla truck bed items included,
+-- from truck beds of their own; trailers may roll a camper's trunk, with its vanilla items.
+local function expectVehicleTables(expect)
     local byVehicle = VehicleDistributions[1]
     local vanillaBed = VehicleDistributions.ConstructionWorkerTruckBed
     for vehicle, listName in pairs({ VanKnoxCom = "RenewableEnergyTelecomTruckBed", VanDeerValley = "RenewableEnergyUtilityTruckBed" }) do
@@ -155,26 +134,95 @@ check("lootVehicleTables", function(expect)
     end
     expect(trailerTrunk ~= nil and listsContainAll(trailerTrunk, VehicleDistributions.CamperTruckBed),
         "the camper trailer lacks the camper's vanilla items")
+end
+
+-- The prepper's map drops from survivalist and bandit corpses whichever outfit variant they wear,
+-- a variant a game update adds included.
+local PREPPER_MAP = "RenewableEnergy.CrowcallRoadMap"
+local PREPPER_OUTFITS = { "^Outfit_Survivalist", "^Outfit_Bandit" }
+
+local function expectPrepperMapOnOutfits(expect)
+    local lists
+    for _, spec in ipairs(Distributions.items) do
+        if spec.fullType == PREPPER_MAP then
+            lists = {}
+            for _, entry in ipairs(spec.entries) do
+                lists[entry[2]] = true
+            end
+        end
+    end
+    if not expect(lists ~= nil, "no " .. PREPPER_MAP .. " in the loot") then
+        return
+    end
+    for key in pairs(SuburbsDistributions.all) do
+        for _, pattern in ipairs(PREPPER_OUTFITS) do
+            if string.find(key, pattern) then
+                expect(lists["sub:all." .. key], PREPPER_MAP .. " does not drop from " .. key)
+            end
+        end
+    end
+end
+
+check("lootListsInUse", function(expect)
+    local procUsers = PZHarness.Loot.procListUsers()
+    local vehicleTables = vehicleTablesInUse()
+    local stashTables = stashSpawnTables()
+    local capacity = PZHarness.Loot.scratchContainer(nil):getCapacity()
+    PZHarness.Loot.withMeasureOptions(Loot.MEASURE_OPTIONS, function()
+        for _, spec in ipairs(Distributions.items) do
+            checkHandedOut(expect, spec, capacity)
+        end
+    end)
+    for _, spec in ipairs(Distributions.items) do
+        for _, entry in ipairs(spec.entries) do
+            local reference = entry[2]
+            local where = spec.fullType .. " in " .. reference
+            expect(LibLoot.resolveItemList(reference) ~= nil, where .. ": no such list")
+            local kind, name = string.match(reference, "^(%a+):(.+)$")
+            if kind == "proc" then
+                local listName = string.gsub(name, "%.junk$", "")
+                local user = procUsers[listName]
+                if expect(user ~= nil, where .. ": no room picks " .. listName) then
+                    expect(ItemPickerJava.getItemContainer(user.room, user.container, listName, false) ~= nil,
+                        where .. ": the game has no " .. user.room .. "." .. user.container .. " -> " .. listName)
+                end
+            elseif kind == "veh" then
+                expect(VehicleDistributions[name] ~= nil and vehicleTables[VehicleDistributions[name]] == true,
+                    where .. ": no vehicle fills from it")
+            elseif kind == "sub" then
+                checkSubList(expect, where, name, stashTables)
+            else
+                expect(false, where .. ": unknown kind of list")
+            end
+        end
+    end
+    expectVehicleTables(expect)
+    expectPrepperMapOnOutfits(expect)
 end)
 
--- For each row of `args.rows`, applied twice: see renewable_energy_loot_rarity_options_scale_weights.
-check("lootRarityOptions", function(expect, expectNear, _, args, defer)
-    local D = Distributions
+-- For each row of `args.rows` ({ options, maps }): the mod's loot options set to `options` and its
+-- loot applied twice. Every row other than a stash map's is in each of its lists once, at its
+-- weight × its rarity option, or nowhere at 0; a stash map's is there at its own weight when
+-- `maps` says the Stash Houses option drops maps, else nowhere.
+check("lootOptions", function(expect, expectNear, _, args, defer)
     local options, names = SandboxVars.RenewableEnergy, {}
-    for option in pairs(args.rows[1]) do
+    for option in pairs(args.rows[1].options) do
         table.insert(names, option)
     end
-    local restoreOptions = saveOptions(defer, names, D.apply)
+    local restoreOptions = saveOptions(defer, names, Distributions.apply)
     for _, row in ipairs(args.rows) do
-        local label = string.format("at %s/%s/%s", row.LRMSolarPanels, row.LRMBatteries, row.LRMMisc)
-        for option, value in pairs(row) do
+        local labels = {}
+        for option, value in pairs(row.options) do
             options[option] = value
+            table.insert(labels, option .. " " .. tostring(value))
         end
-        D.apply()
-        D.apply()
+        table.sort(labels)
+        local label = "at " .. table.concat(labels, ", ")
+        Distributions.apply()
+        Distributions.apply()
         local removed = {}
-        for _, spec in ipairs(Loot.rows(false)) do
-            local multiplier = row[spec.option]
+        for _, spec in ipairs(Distributions.items) do
+            local multiplier = spec.stashMap and (row.maps and 1 or 0) or row.options[spec.option]
             if multiplier == 0 then
                 removed[spec.fullType] = true
             else
@@ -202,36 +250,6 @@ check("lootRarityOptions", function(expect, expectNear, _, args, defer)
     restoreOptions()
 end)
 
--- A container type that "all" rolls the mod's batteries into for certain: a weight this high is
--- past the game's 10,000 in 10,000 at any loot multiplier above a tenth.
-local PROBE_CONTAINER = "RenewableEnergyTestBatteries"
-local PROBE_LOOT = { rolls = 2, items = { "RenewableEnergy.DeepCycleBattery", 1000, "RenewableEnergy.L16Battery", 1000 } }
-
--- The items in the container, bags included, that `matches(item)` takes.
-local function itemsIn(container, matches, found)
-    found = found or {}
-    local items = container:getItems()
-    for i = 0, items:size() - 1 do
-        local item = items:get(i)
-        if item:IsInventoryContainer() then
-            itemsIn(item:getInventory(), matches, found)
-        elseif matches(item) then
-            table.insert(found, item)
-        end
-    end
-    return found
-end
-
--- Whether the item is one of the mod's batteries.
-local function isModBattery(item)
-    return string.find(item:getFullType(), "^RenewableEnergy%.") ~= nil and Battery.isBattery(item)
-end
-
--- Whether the item is an inverter or a controller a find wears.
-local function isWornPart(item)
-    return Finds.isWornPart(item:getFullType())
-end
-
 -- A container of type `containerType` on a crate tile on the square, in the world, so that the game
 -- can send its items' charges to the clients that see it. Removed when the test ends.
 local function containerInWorld(square, containerType, defer)
@@ -245,114 +263,94 @@ local function containerInWorld(square, containerType, defer)
     return crate:getContainer()
 end
 
--- Containers filled as the game fills them (ItemPickerJava.fillContainer): one outside any room
--- rolls its type's "all" table, here the probe's, and one of a corpse's type the corpse lists; a bag
--- in each holds a battery. Vehicle fills are the arrow board tests'. `args` is a free outdoor square.
-check("lootFoundBatteries", function(expect, expectNear, _, args, defer)
+-- The two ways the game hands a container's loot to the mod, each fired here with what the game
+-- passes. A room's or corpse's fill fires OnFillContainer for the container once its loot is rolled
+-- (ItemPickerJava.fillContainer). Safehouse and stash house fills (fillContainerType) fire nothing
+-- and mark their containers explored, so the mod readies those when OnSeeNewRoom first shows their
+-- room (IsoCell.ProcessSpottedRooms); here a room whose one square is the test's.
+local HANDOVERS = {
+    {
+        what = "a fill",
+        handOver = function(_, containers)
+            for _, container in ipairs(containers) do
+                triggerEvent("OnFillContainer", "all", container:getType(), container)
+            end
+        end,
+    },
+    {
+        what = "its room seen",
+        seesRoom = true,
+        handOver = function(square)
+            local squares = ArrayList.new()
+            squares:add(square)
+            triggerEvent("OnSeeNewRoom", { getName = function() return "bedroom" end, getSquares = function() return squares end })
+        end,
+    },
+}
+
+-- Each handover readies, once, the mod's finds in the containers it reaches, a bag's contents
+-- included: a battery gets a part charge, an inverter or controller wear at PART_WEAR's mean with
+-- every roll middling, marked as its own. Handed over again, as loot respawn refills a container
+-- or a room is seen again, it passes over a battery or part that has a charge or condition of its
+-- own: a found one, an emptied battery, a crafted controller (its recipe's OnCreate). A part in a
+-- bank, one of the mod's own containers, is never worn. Seeing a room leaves an unexplored
+-- container to its own fill. `args` is a free outdoor square.
+check("lootFindsReadied", function(expect, expectNear, _, args, defer)
     local square = PZHarness.squareAt(args)
-    PZHarness.need(not square:getRoom(), "an outdoor square on the server")
-    local range = Battery.FOUND_CHARGE
-    SuburbsDistributions.all[PROBE_CONTAINER] = PROBE_LOOT
-    ItemPickerJava.Parse()
-    defer(function()
-        SuburbsDistributions.all[PROBE_CONTAINER] = nil
-        ItemPickerJava.Parse()
-    end)
-    for _, fill in ipairs({ { type = PROBE_CONTAINER, what = "a room's crate", rolled = true }, { type = "inventorymale", what = "a corpse" } }) do
-        local container = containerInWorld(square, fill.type, defer)
-        local bag = container:AddItem("Base.Bag_DuffelBag")
-        bag:getInventory():AddItem("RenewableEnergy.DeepCycleBattery")
-        ItemPickerJava.fillContainer(container, nil)
-        local batteries = itemsIn(container, isModBattery)
-        -- The bag's battery and, from the probe table, at least one rolled.
-        expect(#batteries >= (fill.rolled and 2 or 1), #batteries .. " batteries in " .. fill.what .. " after a fill")
+    local range, mean = Battery.FOUND_CHARGE, Finds.PART_WEAR.mean
+    PZHarness.Rolls.force(defer, 0.5)
+    for _, handover in ipairs(HANDOVERS) do
+        local after = " after " .. handover.what
+        local shelf = containerInWorld(square, "metal_shelves", defer)
+        shelf:setExplored(true)
+        local bag = shelf:AddItem("Base.Bag_DuffelBag"):getInventory()
+        local batteries = { bag:AddItem("RenewableEnergy.DeepCycleBattery"), shelf:AddItem("RenewableEnergy.L16Battery") }
+        local parts = { bag:AddItem("RenewableEnergy.PowerInverter"), shelf:AddItem("RenewableEnergy.PlugInInverter"),
+            shelf:AddItem(Specs.controller) }
+        -- Emptied, as unwiring it from a drained bank leaves a battery.
+        local emptied = shelf:AddItem("RenewableEnergy.L16Battery")
+        Battery.setCharge(emptied, 0)
+        local crafted = shelf:AddItem(Specs.controller)
+        Recipes.makeChargeController({ getFirstCreatedItem = function() return crafted end })
+        local bank = containerInWorld(square, Distributions.OWN_CONTAINER_TYPES[1], defer)
+        bank:setExplored(true)
+        local installed = bank:AddItem("RenewableEnergy.PlugInInverter")
+        local unexplored = handover.seesRoom and containerInWorld(square, "crate", defer):AddItem("RenewableEnergy.DeepCycleBattery")
+        handover.handOver(square, { shelf, bank })
         for _, battery in ipairs(batteries) do
             local charge = Battery.getCharge(battery)
-            expect(charge >= range.min and charge <= range.max,
-                battery:getFullType() .. " in " .. fill.what .. " holds " .. charge .. ", expected " .. range.min .. " to " .. range.max)
+            expect(Battery.hasCharge(battery) and charge >= range.min and charge <= range.max, string.format(
+                "a found %s holds %s%s, expected %s to %s", battery:getFullType(), charge, after, range.min, range.max))
         end
-        -- Emptied, as unwiring it from a drained bank or rebuilding it leaves a battery.
-        local own = container:AddItem("RenewableEnergy.L16Battery")
-        Battery.setCharge(own, 0)
-        local stored = batteries[1]
-        if stored then
-            -- Charged past the found range, and not through Battery.setCharge, so only what the fill
-            -- marked on it keeps a refill off it.
-            stored:setCurrentUsesFloat(1)
+        for _, part in ipairs(parts) do
+            expect(part:getCondition() == mean and Wear.hasOwnCondition(part), string.format(
+                "a found %s has condition %d, marked %s%s, not %d and marked", part:getFullType(), part:getCondition(),
+                tostring(Wear.hasOwnCondition(part)), after, mean))
         end
-        ItemPickerJava.fillContainer(container, nil)
-        if stored then
-            expectNear("a stored battery's charge in " .. fill.what .. " after a refill", Battery.getCharge(stored), 1)
+        expectNear("an emptied battery's charge" .. after, Battery.getCharge(emptied), 0)
+        expect(crafted:getCondition() == crafted:getConditionMax(), "a crafted controller has condition " .. crafted:getCondition() .. after)
+        expect(installed:getCondition() == installed:getConditionMax() and not Wear.hasOwnCondition(installed),
+            "an inverter in a bank has condition " .. installed:getCondition() .. after)
+        if unexplored then
+            expect(not Battery.hasCharge(unexplored), "a battery in an unexplored crate was charged" .. after)
         end
-        expectNear("an emptied battery's charge in " .. fill.what .. " after a refill", Battery.getCharge(own), 0)
+        -- Charged past the found range, and not through Battery.setCharge, so only what the first
+        -- handover marked on it keeps the second off it.
+        batteries[1]:setCurrentUsesFloat(1)
+        Wear.setCondition(parts[1], parts[1]:getConditionMax())
+        handover.handOver(square, { shelf, bank })
+        expectNear("a found battery's charge after " .. handover.what .. " again", Battery.getCharge(batteries[1]), 1)
+        expect(parts[1]:getCondition() == parts[1]:getConditionMax(),
+            "a found part as good as new has condition " .. parts[1]:getCondition() .. " after " .. handover.what .. " again")
+        -- The next handover's room is the same square.
+        local placed = { shelf, bank }
+        if unexplored then
+            table.insert(placed, unexplored:getContainer())
+        end
+        for _, container in ipairs(placed) do
+            removePlaced(container:getParent())
+        end
     end
-end)
-
--- With every Chance roll middling, the inverters and controllers a fill readies
--- (Finds.readyFoundItems, which lootFoundBatteries shows a fill reaches), one in a bag
--- included, come at PART_WEAR's mean and marked. A refill leaves alone a found part that came out
--- as new and a crafted controller (its recipe's OnCreate); and a bank's container wears no part in
--- it, marked or not.
-check("lootFoundParts", function(expect, _, _, _, defer)
-    local D = Finds
-    local mean = D.PART_WEAR.mean
-    local restoreRoll = PZHarness.Rolls.force(defer, 0.5)
-    local container = PZHarness.Loot.scratchContainer(nil)
-    container:AddItem("Base.Bag_DuffelBag"):getInventory():AddItem("RenewableEnergy.PowerInverter")
-    container:AddItem("RenewableEnergy.PlugInInverter")
-    container:AddItem(Specs.controller)
-    D.readyFoundItems(container)
-    local found = itemsIn(container, isWornPart)
-    expect(#found == 3, #found .. " parts in the container, not the 3 put there")
-    for _, part in ipairs(found) do
-        expect(part:getCondition() == mean and Wear.hasOwnCondition(part), string.format(
-            "a found %s has condition %d, marked %s, not %d and marked", part:getFullType(), part:getCondition(),
-            tostring(Wear.hasOwnCondition(part)), mean))
-    end
-    local asNew = found[1]
-    if asNew then
-        Wear.setCondition(asNew, asNew:getConditionMax())
-    end
-    local crafted = container:AddItem(Specs.controller)
-    Recipes.makeChargeController({ getFirstCreatedItem = function() return crafted end })
-    D.readyFoundItems(container)
-    if asNew then
-        expect(asNew:getCondition() == asNew:getConditionMax(), "a found part as good as new has condition " .. asNew:getCondition() .. " after a refill")
-    end
-    expect(crafted:getCondition() == crafted:getConditionMax(), "a crafted controller has condition " .. crafted:getCondition() .. " after a refill")
-    local bank = ItemContainer.new("RenewableEnergyBatteryBoxWood", nil, nil)
-    local installed = bank:AddItem("RenewableEnergy.PlugInInverter")
-    D.readyFoundItems(bank)
-    restoreRoll()
-    expect(installed:getCondition() == installed:getConditionMax() and not Wear.hasOwnCondition(installed),
-        "an unmarked inverter in a bank has condition " .. installed:getCondition() .. " after a fill")
-end)
-
--- Safehouse and stash fills (ItemPickerJava.fillContainerType) fire no OnFillContainer, and mark
--- their containers explored before anyone sees the room. A room seen for the first time readies
--- the mod's items in its explored containers: a part charge for a battery, wear for a part; an
--- unexplored container is left to its own fill. Seen again, as a refill would, a battery that has
--- its own charge keeps it. `args` is a free outdoor square, standing in for the room's one square.
-check("lootSeenRoomReadied", function(expect, expectNear, _, args, defer)
-    local range = Battery.FOUND_CHARGE
-    local square = PZHarness.squareAt(args)
-    local filled = containerInWorld(square, "metal_shelves", defer)
-    filled:setExplored(true)
-    local battery = filled:AddItem("RenewableEnergy.DeepCycleBattery")
-    local part = filled:AddItem("RenewableEnergy.PowerInverter")
-    local unrolled = containerInWorld(square, "crate", defer):AddItem("RenewableEnergy.DeepCycleBattery")
-    local squares = ArrayList.new()
-    squares:add(square)
-    local room = { getName = function() return "bedroom" end, getSquares = function() return squares end }
-    triggerEvent("OnSeeNewRoom", room)
-    local charge = Battery.getCharge(battery)
-    expect(Battery.hasCharge(battery) and charge >= range.min and charge <= range.max,
-        "a battery on a filled shelf holds " .. charge .. " once its room is seen, expected " .. range.min .. " to " .. range.max)
-    expect(Wear.hasOwnCondition(part), "an inverter on a filled shelf isn't worn once its room is seen")
-    expect(not Battery.hasCharge(unrolled), "a battery in an unexplored crate was charged before its fill")
-    battery:setCurrentUsesFloat(1)
-    triggerEvent("OnSeeNewRoom", room)
-    expectNear("a found battery's charge once its room is seen again", Battery.getCharge(battery), 1)
 end)
 
 -- Rooms whose own "all" table vanilla rolls into every container in them
@@ -367,9 +365,8 @@ local VANILLA_ALL_ROOMS = { sodatruck = true }
 -- and a stash house is the only place that uses it. `args.sprites` are the Sprites fields of the
 -- tiles a player builds, a bank's in every facing.
 check("lootPlayerContainers", function(expect, _, _, args)
-    local D = Distributions
     local own = {}
-    for _, containerType in ipairs(D.OWN_CONTAINER_TYPES) do
+    for _, containerType in ipairs(Distributions.OWN_CONTAINER_TYPES) do
         own[containerType] = true
         expect(not Finds.CRACKED_MODULE_CONTAINERS[containerType], containerType .. " gets cracked modules")
     end
@@ -385,7 +382,7 @@ check("lootPlayerContainers", function(expect, _, _, args)
             local all = room.all
             expect(VANILLA_ALL_ROOMS[roomName] or all == nil or (not all.procedural and #(all.items or {}) == 0),
                 roomName .. "'s all table fills a player's containers")
-            for _, containerType in ipairs(D.OWN_CONTAINER_TYPES) do
+            for _, containerType in ipairs(Distributions.OWN_CONTAINER_TYPES) do
                 local where = roomName .. "." .. containerType
                 local containerTable = room[containerType]
                 local stashCrate = roomName == Stash.SPAWN_TABLE and containerType == Stash.CRATE_TYPE

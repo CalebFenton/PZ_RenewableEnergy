@@ -14,7 +14,6 @@ local test, expect, expectEqual, player = T.test, T.expect, T.expectEqual, T.pla
 -- isn't; a jolt soon after one, as the hitch brings a trailer up short, is the same crash, and
 -- one after the quiet time a new one.
 test("renewable_energy_world_arrow_board_crash_watch_tells_crashes", {
-    instant = true,
     validate = function()
         local crash = ArrowBoard.CRASH
         local crashMs, frame = crash.kmh / 3.6, 16
@@ -91,16 +90,17 @@ local function crashPair(driver)
     return trailer, car
 end
 
--- The server takes a crash its driver reports for the trailer behind their car, but not the same
--- crash reported again within the quiet time; a crash that snapped the hitch counts while the
--- trailer is close behind, up to CRASH.unhitchedSquares.
-test("renewable_energy_world_arrow_board_crash_command_from_the_driver", {
-    instant = true,
+-- The server takes a crash only from the player driving the car that tows the trailer: anyone
+-- else's report counts for nothing, not even toward the quiet time. It doesn't take the same crash
+-- reported again within the quiet time; a crash that snapped the hitch counts while the trailer is
+-- close behind, up to CRASH.unhitchedSquares.
+test("renewable_energy_world_arrow_board_crash_command_counts_only_from_the_driver", {
     validate = function()
         local p = player()
         local crash = ArrowBoard.CRASH
         local trailer, car = crashPair(p)
         local now = getTimestampMs()
+        expect(not ArrowBoard.takesCrash({}, trailer, car, now), "the server took a crash from a player not driving the car")
         expect(ArrowBoard.takesCrash(p, trailer, car, now), "the server refused a crash from the driver towing the trailer")
         expect(not ArrowBoard.takesCrash(p, trailer, car, now + crash.quietMs - 1), "the server took a crash twice within the quiet time")
         trailer.towed, trailer.behind = false, crash.unhitchedSquares + 0.1
@@ -109,16 +109,5 @@ test("renewable_energy_world_arrow_board_crash_command_from_the_driver", {
         trailer.behind = crash.unhitchedSquares
         expect(ArrowBoard.takesCrash(p, trailer, car, now + crash.quietMs),
             "the server refused a later crash that snapped the hitch " .. trailer.behind .. " squares behind")
-    end,
-})
-
--- The server takes a crash only from the player driving the car that tows the trailer: anyone
--- else's report counts for nothing.
-test("renewable_energy_world_arrow_board_crash_command_needs_the_driver", {
-    instant = true,
-    validate = function()
-        local trailer, car = crashPair("someone else")
-        expect(not ArrowBoard.takesCrash(player(), trailer, car, getTimestampMs()),
-            "the server took a crash from a player not driving the car")
     end,
 })

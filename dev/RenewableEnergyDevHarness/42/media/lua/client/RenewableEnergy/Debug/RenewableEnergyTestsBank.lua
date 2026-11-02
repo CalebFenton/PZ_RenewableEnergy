@@ -2,6 +2,7 @@ require "RenewableEnergy/Debug/RenewableEnergyTestLib"
 local Specs = require "RenewableEnergy/Specs"
 local Sun = require "RenewableEnergy/Sun"
 local BankJobs = require "RenewableEnergy/PowerBank/BankJobs"
+local BankMenu = require "RenewableEnergy/UI/BankMenu"
 require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 local StatusRows = require "RenewableEnergy/UI/StatusRows"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
@@ -119,17 +120,27 @@ test("renewable_energy_bank_stands_by_on_the_grid", {
     end,
 })
 
--- The scan sees what is switched on whether or not the bank powers it, so a cut bank knows when
--- the load fits again; and, as vanilla bills them, a mini fridge with its ice box is a fridge-freezer.
-test("renewable_energy_bank_scan_sees_load_while_off", {
+-- The kind and draw the stand-in for another mod's appliance reports, a Pump House's in generator
+-- fuel an hour; the status lists a kind it doesn't know as other.
+local CONSUMER_KIND, CONSUMER_FUEL = "testConsumer", 0.2
+
+-- The load scan counts what is switched on in its reach whether or not the bank powers it, so a cut
+-- bank knows when the load fits again: a mini fridge with its ice box as a fridge-freezer, as
+-- vanilla bills it; nothing for loot on the floor; and another mod's appliance
+-- (GeneratorReach.addDraw) at the draw its mod reports, under the mod's own kind, but not while it
+-- reports none. Catches a scan that never asks another mod, or bills its appliance switched off.
+test("renewable_energy_bank_scan_counts_what_is_switched_on", {
     run = function(self)
         T.setGrid(self, false)
         local bank = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY, T.PLUG_IN_INVERTER })
         if not bank then return end
-        local squares = T.need(self, T.squares(self, 2, { indoors = true, near = bank.square }), "two free indoor squares for fridges")
+        local squares = T.need(self, T.squares(self, 3, { indoors = true, near = bank.square }),
+            "free indoor squares for two fridges and another mod's appliance")
         if not squares then return end
-        T.read(self, "scanLoad", T.at(bank), "without")
+        local consumer = squares[3]
+        T.server(self, "drawAt", T.at(consumer, { kind = CONSUMER_KIND, fuel = 0 }))
         T.floorItem(self, squares[1], "Base.Nails")
+        T.read(self, "scanLoad", T.at(bank), "without")
         T.step(function()
             T.placeTile(self, squares[1], FRIDGE)
             T.placeTile(self, squares[2], T.MINI_FRIDGE)
@@ -137,45 +148,24 @@ test("renewable_energy_bank_scan_sees_load_while_off", {
             T.floorItem(self, squares[1], "Base.Nails")
             T.read(self, "scanLoad", T.at(bank), "withLoot")
         end)
+        T.server(self, "drawAt", T.at(consumer, { kind = CONSUMER_KIND, fuel = CONSUMER_FUEL }))
+        T.read(self, "scanLoad", T.at(bank), "withConsumer")
     end,
     validate = function(self)
-        local with, without = self.reads.with, self.reads.without
+        local without, with, withLoot, withConsumer = self.reads.without, self.reads.with, self.reads.withLoot,
+            self.reads.withConsumer
         local function count(load, kind)
             return load.counts[kind] or 0
         end
         expectEqual("fridge-freezers found, the mini fridge among them",
             count(with, "fridgeFreezer") - count(without, "fridgeFreezer"), 2)
-        expect(with.watts > without.watts, "the fridges added no watts to the scan's load")
+        expectNear("the watts the two fridges add to the scan's load", with.watts - without.watts, 2 * T.fridgeW(), 0.01)
         expectEqual("fridge-freezers with loot before and after the appliance",
-            count(self.reads.withLoot, "fridgeFreezer"), count(with, "fridgeFreezer"))
-        expectNear("the load with additional ground loot", self.reads.withLoot.watts, with.watts, 0.01)
-    end,
-})
-
--- The kind and draw the stand-in for another mod's appliance reports, a Pump House's in generator
--- fuel an hour; the status lists a kind it doesn't know as other.
-local CONSUMER_KIND, CONSUMER_FUEL = "testConsumer", 0.2
-
--- Another mod's appliance in a bank's reach (GeneratorReach.addDraw) is in the bank's load at the
--- draw its mod reports, under the mod's own kind, and not while it reports none. Catches a scan
--- that never asks another mod, or bills its appliance switched off.
-test("renewable_energy_bank_bills_another_mods_appliance", {
-    run = function(self)
-        T.setGrid(self, false)
-        local bank = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY, T.PLUG_IN_INVERTER })
-        local square = bank and T.square(self, { indoors = true, near = bank.square }, "a free indoor square for the appliance")
-        if not square then return end
-        T.server(self, "drawAt", T.at(square, { kind = CONSUMER_KIND, fuel = 0 }))
-        T.floorItem(self, square, "Base.Nails")
-        T.read(self, "scanLoad", T.at(bank), "off")
-        T.server(self, "drawAt", T.at(square, { kind = CONSUMER_KIND, fuel = CONSUMER_FUEL }))
-        T.read(self, "scanLoad", T.at(bank), "on")
-    end,
-    validate = function(self)
-        local on, off = self.reads.on, self.reads.off
-        expectEqual("times the scan bills the appliance drawing nothing", off.counts[CONSUMER_KIND] or 0, 0)
-        expectEqual("times the scan lists the drawing appliance", on.counts[CONSUMER_KIND], 1)
-        expectNear("the watts it adds", on.watts - off.watts, Specs.wattsFromFuel(CONSUMER_FUEL), 0.01)
+            count(withLoot, "fridgeFreezer"), count(with, "fridgeFreezer"))
+        expectNear("the load with additional ground loot", withLoot.watts, with.watts, 0.01)
+        expectEqual("times the scan bills the appliance drawing nothing", count(withLoot, CONSUMER_KIND), 0)
+        expectEqual("times the scan lists the drawing appliance", count(withConsumer, CONSUMER_KIND), 1)
+        expectNear("the watts it adds", withConsumer.watts - withLoot.watts, Specs.wattsFromFuel(CONSUMER_FUEL), 0.01)
     end,
 })
 
@@ -310,8 +300,8 @@ test("renewable_energy_bank_overload_cuts_and_returns", {
     end,
 })
 
--- Turn On without a working inverter is refused by every layer: the window's switch, the action
--- and the authority's command.
+-- Turn On without a working inverter is refused by every layer: the bank's menu, the window's
+-- switch, the action and the authority's command.
 test("renewable_energy_bank_turn_on_refused_without_inverter", {
     run = function(self)
         self.bank = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY })
@@ -321,13 +311,15 @@ test("renewable_energy_bank_turn_on_refused_without_inverter", {
         T.readRecord(self, self.bank)
     end,
     validate = function(self)
-        local bank, button, why = self.bank.object, self.window.switchButton, getText("Tooltip_RenewableEnergy_NoInverter")
+        local bank, button, key = self.bank.object, self.window.switchButton, "Tooltip_RenewableEnergy_NoInverter"
+        T.noteOption(self, "Turn On", T.menuOption(BankMenu.addBankOptions, bank, getText("ContextMenu_Turn_On")))
+        T.expectOptionRefused(self, "Turn On", key)
         expect(not RenewableEnergyAction:new(player(), "bank", BankJobs.TURN_ON, bank):canPerform(),
             "Turn On can start on a bank without an inverter")
-        T.expectRefused(self.reads.refused, "Tooltip_RenewableEnergy_NoInverter", "the authority switched on a bank without an inverter")
+        T.expectRefused(self.reads.refused, key, "the authority switched on a bank without an inverter")
         expect(not self.bank.state.on, "the bank without an inverter is on")
         expect(not button.enable, "the window's switch isn't greyed out without an inverter")
-        expectEqual("the tooltip of the window's switch", button.tooltip, why)
+        expectEqual("the tooltip of the window's switch", button.tooltip, getText(key))
     end,
 })
 

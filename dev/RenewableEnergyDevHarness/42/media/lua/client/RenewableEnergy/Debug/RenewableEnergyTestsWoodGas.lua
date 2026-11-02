@@ -201,7 +201,8 @@ test("renewable_energy_woodgas_gasifier_idles_as_a_generator", {
 -- Gas through a filter with no clean packing wears the generator it runs beyond vanilla's own wear:
 -- each hour, a chance of its wear factor less one times vanilla's chance, which the generator's
 -- item script gives (ConditionLowerChanceOneIn, IsoGenerator.update). The rolls are set either side
--- of that chance; clean gas wears nothing extra even on a roll every chance takes.
+-- of that chance; the same line once its filter is packed wears nothing extra even on a roll every
+-- chance takes. A pass moves no clock, so vanilla bills nothing and no wood burns between them.
 test("renewable_energy_woodgas_dirty_gas_wears_generator", {
     instant = true,
     run = function(self)
@@ -209,38 +210,32 @@ test("renewable_energy_woodgas_dirty_gas_wears_generator", {
         -- Vanilla's chance, set so the dirty one lies well inside 0 to 1.
         local oneIn = 2 * Gasifier.WEAR_DIRTY
         self.chance = (Gasifier.WEAR_DIRTY - 1) / oneIn
-        local dirtyGenerator, dirty = T.gasifierBeside(self, "standard")
-        if not dirty then return end
-        local cleanGenerator, clean = T.gasifierBeside(self, "standard")
-        if not clean then return end
-        local lines = { { name = "dirty", generator = dirtyGenerator, gasifier = dirty, filter = {} },
-            { name = "clean", generator = cleanGenerator, gasifier = clean, filter = PACKING } }
-        for _, line in ipairs(lines) do
-            T.fillRecord(self, line.gasifier, { hopper = WOOD, filter = line.filter })
-            T.setRecord(self, line.gasifier, { lit = true })
-            T.fitAndConnect(self, line.generator, line.gasifier)
+        local generator, gasifier = T.gasifierBeside(self, "standard")
+        if not gasifier then return end
+        T.fillRecord(self, gasifier, { hopper = WOOD })
+        T.setRecord(self, gasifier, { lit = true })
+        T.fitAndConnect(self, generator, gasifier)
+        T.server(self, "generatorWearChance", T.at(generator, { oneIn = oneIn }))
+        local function pass(label, roll)
+            T.forceRoll(self, roll)
+            T.readGenerator(self, generator, label .. "Before")
+            T.gasPass(self, generator, self.hours)
+            T.readGenerator(self, generator, label .. "After")
         end
-        T.server(self, "generatorWearChance", T.at(dirtyGenerator, { oneIn = oneIn }))
-        local passes = { { "dirtyHit", dirtyGenerator, self.chance - 0.01 }, { "dirtyMiss", dirtyGenerator, self.chance + 0.01 },
-            { "clean", cleanGenerator, 0 } }
         T.batch(function()
-            for _, line in ipairs(lines) do
-                T.setGenerator(self, line.generator, { running = true })
-                T.readRecord(self, line.gasifier, line.name .. "Gasifier")
-            end
-            for _, pass in ipairs(passes) do
-                local label, generator, roll = pass[1], pass[2], pass[3]
-                T.forceRoll(self, roll)
-                T.readGenerator(self, generator, label .. "Before")
-                T.gasPass(self, generator, self.hours)
-                T.readGenerator(self, generator, label .. "After")
-            end
+            T.setGenerator(self, generator, { running = true })
+            T.readRecord(self, gasifier, "dirtyGasifier")
+            pass("dirtyHit", self.chance - 0.01)
+            pass("dirtyMiss", self.chance + 0.01)
+            T.fillRecord(self, gasifier, { filter = PACKING })
+            T.readRecord(self, gasifier, "cleanGasifier")
+            pass("clean", 0)
         end)
     end,
     validate = function(self)
         local reads = self.reads
         T.expectEqual("the dirty gasifier's wear factor", reads.dirtyGasifier.summary.wear, Gasifier.WEAR_DIRTY)
-        T.expectEqual("the clean gasifier's wear factor", reads.cleanGasifier.summary.wear, 1)
+        T.expectEqual("the packed gasifier's wear factor", reads.cleanGasifier.summary.wear, 1)
         local function lost(label)
             T.expect(reads[label .. "After"].running, "the generator of the " .. label .. " pass stalled or stopped")
             return reads[label .. "Before"].condition - reads[label .. "After"].condition

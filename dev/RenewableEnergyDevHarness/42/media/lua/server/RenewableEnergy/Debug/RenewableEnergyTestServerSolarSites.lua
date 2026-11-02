@@ -347,13 +347,13 @@ handler("siteSpots", function(_, args)
 end)
 
 -- Open ground a wind charger may stand on (RuralFinds.canPlace) within reach of the bank's
--- square, nearest first, or nil.
-local function chargerSquareFor(bank)
+-- square, other than `taken`'s, nearest first, or nil.
+local function chargerSquareFor(bank, taken)
     local position = { x = bank:getX(), y = bank:getY(), z = bank:getZ() }
     for r = 1, PowerBank.sourceReach().tiles do
         for x, y in PZHarness.Fixtures.ring(position.x, position.y, r) do
             local square = getSquare(x, y, 0)
-            if RuralFinds.canPlace("wind", square)
+            if square ~= taken and RuralFinds.canPlace("wind", square)
                 and PowerBank.inSourceReach(position, x, y, 0) then
                 return square
             end
@@ -362,39 +362,40 @@ local function chargerSquareFor(bank)
     return nil
 end
 
--- A test site armed near the character: a stock tank pump's rack on the square at `args.at`, or
--- a wind farm whose bank stands on the square at `args.bank` and its charger on open ground in
--- reach of it. With `args.block` a work table, as a player's things would, stands on the rack's
--- or the charger's square first. Answers the armed spots and that square; what the site placed is
--- removed when the test ends.
+local function ends(square)
+    return { square:getX(), square:getY(), square:getZ() }
+end
+
+-- Two test sites armed near the character: a stock tank pump's rack on the square at `args.at`,
+-- and a wind farm whose bank stands on the square at `args.bank` and its charger on open ground in
+-- reach of it, where a work table stands first, as a player's things would. Answers each site's
+-- armed spots, `tank` and `wind`, and the charger's square; what the sites placed, and the table,
+-- are removed when the test ends.
 handler("siteArm", function(_, args, defer)
-    local bank = args.bank and PZHarness.squareAt(args.bank)
-    local at = bank and need(chargerSquareFor(bank), "open ground for a wind charger by the bank") or PZHarness.squareAt(args.at)
-    local ends = { at:getX(), at:getY(), at:getZ() }
-    local site
-    if bank then
-        site = { kind = "windFarm", name = "test wind farm", windCharger = ends, bank = { bank:getX(), bank:getY(), bank:getZ() } }
-    else
-        site = { kind = "stockTank", name = "test stock tank", panels = { { ends[1], ends[2], ends[3], "rackMetal", "S" } } }
-    end
+    local rack, bank = PZHarness.squareAt(args.at), PZHarness.squareAt(args.bank)
+    local charger = need(chargerSquareFor(bank, rack), "open ground for a wind charger by the bank")
     -- By position: the trips away load the chunk again with new squares and objects.
-    for _, square in ipairs({ at, bank }) do
+    for _, square in ipairs({ rack, bank, charger }) do
         local x, y, z = square:getX(), square:getY(), square:getZ()
         defer(function()
             local now = getSquare(x, y, z)
+            local blocker = now and objectWithSprite(now, PZHarness.Fixtures.WORK_TABLE_SPRITE)
+            if blocker then
+                removePlaced(blocker)
+            end
             if now then
                 clearSquare(now)
-                local blocker = objectWithSprite(now, PZHarness.Fixtures.WORK_TABLE_SPRITE)
-                if blocker and args.block then
-                    removePlaced(blocker)
-                end
             end
         end)
     end
-    if args.block then
-        PZHarness.Fixtures.newTile(at, PZHarness.Fixtures.WORK_TABLE_SPRITE)
-    end
-    return { spots = armSite(site, defer), at = { x = ends[1], y = ends[2], z = ends[3] } }
+    PZHarness.Fixtures.newTile(charger, PZHarness.Fixtures.WORK_TABLE_SPRITE)
+    local rackEnd, chargerEnd = ends(rack), ends(charger)
+    return {
+        tank = armSite({ kind = "stockTank", name = "test stock tank",
+            panels = { { rackEnd[1], rackEnd[2], rackEnd[3], "rackMetal", "S" } } }, defer),
+        wind = armSite({ kind = "windFarm", name = "test wind farm", windCharger = chargerEnd, bank = ends(bank) }, defer),
+        charger = { x = chargerEnd[1], y = chargerEnd[2], z = chargerEnd[3] },
+    }
 end)
 
 -- The armed spots `args.spots` were placed by the world, each as its kind leaves it.

@@ -137,16 +137,16 @@ handler("setTrailer", function(_, args)
     return { state = vehicleState(vehicle) }
 end)
 
--- ArrowBoard[args.call] on the trailer with the arguments `args.with`, or with the panel
--- `args.part`, as the clock, the switch action or a storm runs it; the charging calls take the
--- sky after them, as the clock's pass gives it. Answers what it returned, the panels' rating
--- before it, what a flat watt of panel makes in an hour under that sky, and the trailer's state.
+-- ArrowBoard[args.call] on the trailer with the arguments `args.with`, as the clock, the switch
+-- action, a storm or a crash runs it; the charging calls take the sky after them, as the clock's
+-- pass gives it. Answers what it returned, the panels' rating before it, what a flat watt of panel
+-- makes in an hour under that sky, and the trailer's state.
 local TAKES_SKY = { charge = true, update = true }
 handler("arrowBoardRun", function(_, args)
     local vehicle = PZHarness.vehicleAt(args)
     local watts = ArrowBoard.panelWatts(vehicle)
     local sky = Sun.skyNow()
-    local with = args.part and { vehicle:getPartById(args.part) } or args.with
+    local with = args.with or {}
     if TAKES_SKY[args.call] then
         with = { with[1], sky }
     end
@@ -215,12 +215,6 @@ handler("arrowBoardOldFrame", function(_, args)
     end
     local script = vehicle:getScript()
     return { state = vehicleState(vehicle), forcedSat = script:getForcedSat(), forcedVal = script:getForcedVal() }
-end)
-
--- Gives the character a key to the vehicle `args`, which no arrow board ever spawns with, so a
--- test can show what a key holder could do to its lid.
-handler("arrowBoardKey", function(player, args)
-    return { given = { PZHarness.giveItem(player, PZHarness.vehicleAt(args):createVehicleKey()) } }
 end)
 
 -- Makes the trailer's lid as its part `create` does (ArrowBoard.createLid) for each trial

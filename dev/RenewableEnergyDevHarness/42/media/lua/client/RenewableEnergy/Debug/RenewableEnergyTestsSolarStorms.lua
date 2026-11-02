@@ -4,7 +4,6 @@ local Panel = require "RenewableEnergy/PowerBank/Panel"
 local ModuleRepair = require "RenewableEnergy/PowerBank/ModuleRepair"
 local Items = require "cf_commonlib/Items"
 local Chance = require "RenewableEnergy/Chance"
-local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local SourceJobs = require "RenewableEnergy/PowerBank/SourceJobs"
 local Sprites = require "RenewableEnergy/Sprites"
 local Wind = require "RenewableEnergy/Wind"
@@ -33,38 +32,48 @@ local function stormTrial(mount, hours, condition, roll)
         hours = hours, roll = roll }
 end
 
--- Storms crack modules by mount: wall panels never, wooden racks most, metal racks least, and the
--- more the longer the storm. The Storm Damage options are Chance.stormDamage's (chance_by_hours_and_rate).
-test("renewable_energy_solar_storms_crack_by_mount", {
+-- How likely a storm is to crack a module, and what a crack does. By mount: wall panels never,
+-- wooden racks most, metal racks least, and the more the longer the storm. At the Storm Damage
+-- options (Chance.stormDamage): a chance an hour compounds over the hours, the rate scales the
+-- chance an hour, a chance scaled past certain stays certain, and no hours or Storm Damage off is
+-- no chance; those expected chances are worked by hand. A roll under a panel's chance cracks a
+-- module by Specs.storm.crack, never below 0, and a roll at it doesn't.
+test("renewable_energy_solar_storms_crack_chance", {
     sandbox = { StormDamage = true, StormDamageRate = 100 },
     run = function(self)
-        -- PanelSource.stormChance for each trial.
-        T.read(self, "stormChances", { trials = { stormTrial("wall", 20), stormTrial("woodRack", 20), stormTrial("flat", 20),
-            stormTrial("metalRack", 20), stormTrial("flat", 40), stormTrial("flat", 0) } }, "mounts")
+        T.batch(function()
+            -- PanelStorms.stormChance for each trial.
+            T.read(self, "stormChances", { trials = { stormTrial("wall", 20), stormTrial("woodRack", 20), stormTrial("flat", 20),
+                stormTrial("metalRack", 20), stormTrial("flat", 40), stormTrial("flat", 0) } }, "mounts")
+            -- The last module has less than a crack left, so a crack would take it below 0.
+            T.read(self, "stormCrack", { trials = { stormTrial("flat", 20, 100, "under"), stormTrial("flat", 20, 100, "at"),
+                stormTrial("flat", 20, math.floor(Specs.storm.crack / 2), 0) } }, "rolls")
+        end)
+        local stormDamage = Chance.stormDamage
+        T.step(function()
+            self.normal = { stormDamage(0.1, 1), stormDamage(0.1, 2), stormDamage(0.1, 0) }
+            T.setSandbox(self, "StormDamageRate", 200)
+        end)
+        T.step(function()
+            self.doubled = { stormDamage(0.1, 2), stormDamage(0.6, 1) }
+            T.setSandbox(self, "StormDamage", false)
+        end)
+        T.step(function() self.off = stormDamage(0.1, 2) end)
     end,
     validate = function(self)
-        local mounts = self.reads.mounts.chances
-        local wall, woodRack, flat, metalRack, longer, none = mounts[1], mounts[2], mounts[3], mounts[4], mounts[5], mounts[6]
+        local wall, woodRack, flat, metalRack, longer, none = unpack(self.reads.mounts.chances)
         expectEqual("a wall panel's chance of a crack", wall, 0)
         expect(woodRack > flat and flat > metalRack and metalRack > 0,
             string.format("chances of a crack in 20 hours of storm: wooden rack %g, flat %g, metal rack %g", woodRack, flat, metalRack))
         expect(longer > flat, string.format("a flat panel's chance in 40 hours of storm %g, in 20 %g", longer, flat))
         expectEqual("a flat panel's chance in no storm", none, 0)
-    end,
-})
-
--- A storm cracks a module on a roll under its chance and not on one at it, taking Specs.storm.crack
--- condition, never below 0.
-test("renewable_energy_solar_storms_crack_under_the_chance", {
-    sandbox = { StormDamage = true, StormDamageRate = 100 },
-    run = function(self)
-        local under, at = stormTrial("flat", 20, 100, "under"), stormTrial("flat", 20, 100, "at")
-        -- Less than a crack left, so a crack would take it below 0.
-        T.read(self, "stormCrack", { trials = { under, at, stormTrial("flat", 20, math.floor(Specs.storm.crack / 2), 0) } }, "on")
-    end,
-    validate = function(self)
-        local results = self.reads.on.results
-        local under, at, floor = results[1], results[2], results[3]
+        expectNear("10% an hour over an hour", self.normal[1], 0.1, 1e-9)
+        expectNear("10% an hour over two hours", self.normal[2], 0.19, 1e-9)
+        expectEqual("10% an hour over no hours", self.normal[3], 0)
+        expectNear("10% an hour over two hours at rate 200", self.doubled[1], 0.36, 1e-9)
+        expectNear("60% an hour over an hour at rate 200", self.doubled[2], 1, 1e-9)
+        expectEqual("10% an hour over two hours with Storm Damage off", self.off, 0)
+        local under, at, floor = unpack(self.reads.rolls.results)
         expect(under.cracked, "a roll just under a flat panel's chance didn't crack it")
         expectEqual("a module at 100 after a crack", under.modules[1].condition, 100 - Specs.storm.crack)
         expect(not at.cracked, "a roll at a flat panel's chance cracked it")
@@ -73,41 +82,12 @@ test("renewable_energy_solar_storms_crack_under_the_chance", {
     end,
 })
 
--- A crack reaches the panel's own record and its tile in the same bank pass: a new panel's first
--- crack shows light cracks, on this client too.
-test("renewable_energy_solar_storms_crack_shows_on_the_panel", {
-    sandbox = { StormDamage = true, StormDamageRate = 100 },
-    run = function(self)
-        local bank = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY }, { charge = 0.5 })
-        local whole = Items.conditionMaxOf(T.FACTORY_MODULE)
-        self.crackedTo = whole - Specs.storm.crack
-        local panel = bank and T.panel(self, Sprites.flat, { near = bank, modules = T.factoryModules(whole), connect = true })
-        if not panel then return end
-        self.panel = panel
-        T.step(function() self.before = table.concat(T.overlaysOf(panel.object), ",") end)
-        T.forceRoll(self, 0)
-        T.bankPass(self, bank, 1000, { stormHours = 1 })
-        T.read(self, "panelState", T.at(panel), "panel")
-        T.waitFor(self, function()
-            return recordedCondition(panel.object) == self.crackedTo
-                and table.concat(T.overlaysOf(panel.object), ",") == table.concat(self.reads.panel.overlays, ",")
-        end, "this client's copy of the storm-cracked panel")
-        T.step(function() self.copyOverlays = table.concat(T.overlaysOf(panel.object), ",") end)
-    end,
-    validate = function(self)
-        if not T.expectConnected(self.panel) then return end
-        expectEqual("the whole panel's overlays before the storm", self.before, "")
-        local modules = self.reads.panel.modules
-        expectEqual("the panel's recorded condition after a crack", modules and modules[1] and modules[1].condition, self.crackedTo)
-        expectEqual("this client's copy of the panel's recorded condition", recordedCondition(self.panel.object), self.crackedTo)
-        local after = table.concat(self.reads.panel.overlays, ",")
-        expectEqual("the storm-cracked panel's overlays", after, Sprites.cracks.light.flat[1])
-        expectEqual("this client's copy of the storm-cracked panel's overlays", self.copyOverlays, after)
-    end,
-})
-
 -- Pending damage wins over the older object on reload, even when a repair precedes the next
 -- simulation pass. The repair must then become the bank's truth, without removing its snow.
+-- The module, sealed once, is left heavily cracked by the storm, so the seal is the one sealing
+-- in hand gives it (ModuleRepair.sealed) and its glass still shows cracks.
+local STORMED = 20
+
 test("renewable_energy_solar_storms_unloaded_damage_then_immediate_seal", {
     spOnly = T.CHUNK_RELOAD_SP_ONLY,
     timeoutSeconds = T.CHUNK_RELOAD_SECONDS,
@@ -115,7 +95,7 @@ test("renewable_energy_solar_storms_unloaded_damage_then_immediate_seal", {
     run = function(self)
         local bank = T.bank(self, "batteryBoxWood", {}, { outdoors = true })
         local panel = bank and T.panel(self, Sprites.flat, { near = bank, connect = true,
-            modules = { { type = T.FACTORY_MODULE, condition = 20 + Specs.storm.crack, repaired = 1, mounted = true } } })
+            modules = { { type = T.FACTORY_MODULE, condition = STORMED + Specs.storm.crack, repaired = 1, mounted = true } } })
         if not panel then return end
         self.bank, self.panel = bank, panel
         T.trackSquare(self, panel)
@@ -142,84 +122,80 @@ test("renewable_energy_solar_storms_unloaded_damage_then_immediate_seal", {
         if not T.expectConnected(self.panel) or not T.expectOk(self.reads.sealed, "sealing after the unloaded storm") then return end
         local away = self.reads.away
         expectEqual("bank items while its chunk was unloaded", #away.items, 0)
-        expectEqual("module condition after the unloaded storm", away.status.sources[1].modules[1].condition, 20)
+        expectEqual("module condition after the unloaded storm", away.status.sources[1].modules[1].condition, STORMED)
         expect(away.status.sources[1].snow > 0.5, "the panel lost its snow cover before the repair")
+        local condition, seals = ModuleRepair.sealed(T.FACTORY_MODULE, STORMED, 1)
         local module = self.reads.panel.modules[1]
-        expectEqual("sealed module condition", module.condition, 40)
-        expectEqual("seals after repairing the storm damage", module.repaired, 2)
+        expectEqual("sealed module condition", module.condition, condition)
+        expectEqual("seals after repairing the storm damage", module.repaired, seals)
         expect(module.mounted and module.connected, "the repair lost the module's earned-XP markers")
-        expectEqual("bank's module immediately after repair", self.reads.sealedBank.status.sources[1].modules[1].condition, 40)
-        expectEqual("bank's module after another pass", self.reads.later.status.sources[1].modules[1].condition, 40)
+        expectEqual("bank's module immediately after repair", self.reads.sealedBank.status.sources[1].modules[1].condition, condition)
+        expectEqual("bank's module after another pass", self.reads.later.status.sources[1].modules[1].condition, condition)
+        local look = ModuleRepair.crackLookOf(T.FACTORY_MODULE, condition)
         expectEqual("cracks below the snow after repair", table.concat(self.reads.panel.overlays, ","),
-            Sprites.cracks.heavy.flat[1] .. "," .. Sprites.snow.flat)
+            tostring(look and Sprites.cracks[look].flat[1]) .. "," .. Sprites.snow.flat)
     end,
 })
 
 -- A storm cracks a panel out in the weather whether or not it feeds a bank: a loose panel outdoors
--- cracks, one indoors doesn't, and a connected one is its bank's to crack, at the bank's next pass;
--- once disconnected, the next storm cracks it loose. A pass weathers every storm hour since the
--- last at once, so the bank's pass is explicit to keep the count of passes fixed.
+-- cracks, one indoors doesn't, and a connected one is its bank's to crack, at the bank's next pass,
+-- which takes the crack to the panel's own record and tile: a new module's first crack shows light
+-- cracks, on this client too. Once disconnected, the next storm cracks it loose. A pass weathers
+-- every storm hour since the last at once, so the bank's pass is explicit to keep the count of
+-- passes fixed.
 test("renewable_energy_solar_storms_crack_loose_panels", {
     sandbox = { StormDamage = true, StormDamageRate = 100 },
     run = function(self)
+        local whole = Items.conditionMaxOf(T.FACTORY_MODULE)
+        self.whole = whole
         local bank = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY }, { charge = 0.5 })
-        local connected = bank and T.panel(self, Sprites.flat, { near = bank, modules = T.factoryModules(100), connect = true })
-        local outdoors = connected and T.panel(self, Sprites.flat, { near = bank, modules = T.factoryModules(100) })
+        local connected = bank and T.panel(self, Sprites.flat, { near = bank, modules = T.factoryModules(whole), connect = true })
+        local outdoors = connected and T.panel(self, Sprites.flat, { near = bank, modules = T.factoryModules(whole) })
         local indoorSquare = outdoors and T.square(self, { indoors = true, near = bank }, "a free indoor square for a panel")
-        local indoors = indoorSquare and T.panel(self, Sprites.flat, { square = indoorSquare, modules = T.factoryModules(100) })
+        local indoors = indoorSquare and T.panel(self, Sprites.flat, { square = indoorSquare, modules = T.factoryModules(whole) })
         if not indoors then return end
         self.connected = connected
         local panels = { T.at(connected), T.at(outdoors), T.at(indoors) }
+        T.step(function() self.before = table.concat(T.overlaysOf(connected.object), ",") end)
         -- Every roll the lowest: each panel at risk cracks.
         T.forceRoll(self, 0)
-        T.read(self, "panelStorm", { hours = 1, panels = panels }, "first")
-        T.bankPass(self, bank, 0, { hours = 1, label = "banked" })
-        T.job(self, "source", SourceJobs.DISCONNECT, connected, nil, "disconnected")
-        T.read(self, "panelStorm", { hours = 1, panels = panels }, "second")
+        T.batch(function()
+            T.read(self, "panelStorm", { hours = 1, panels = panels }, "first")
+            T.bankPass(self, bank, 0, { hours = 1, label = "banked" })
+            T.read(self, "panelState", T.at(connected), "cracked")
+        end)
+        T.waitFor(self, function()
+            local cracked = self.reads.cracked
+            return cracked ~= nil and recordedCondition(connected.object) == whole - Specs.storm.crack
+                and table.concat(T.overlaysOf(connected.object), ",") == table.concat(cracked.overlays, ",")
+        end, "this client's copy of the storm-cracked panel")
+        T.step(function() self.copyOverlays = table.concat(T.overlaysOf(connected.object), ",") end)
+        T.batch(function()
+            T.job(self, "source", SourceJobs.DISCONNECT, connected, nil, "disconnected")
+            T.read(self, "panelStorm", { hours = 1, panels = panels }, "second")
+        end)
     end,
     validate = function(self)
         if not T.expectConnected(self.connected) then return end
-        local crack = Specs.storm.crack
+        local whole, crack = self.whole, Specs.storm.crack
         local function condition(label, i)
             local modules = self.reads[label].modules
             return modules[i] and modules[i][1] and modules[i][1].condition
         end
-        expectEqual("the connected panel after a storm its bank didn't run", condition("first", 1), 100)
-        expectEqual("the loose outdoor panel after a storm", condition("first", 2), 100 - crack)
-        expectEqual("the loose indoor panel after a storm", condition("first", 3), 100)
+        expectEqual("the connected panel after a storm its bank didn't run", condition("first", 1), whole)
+        expectEqual("the loose outdoor panel after a storm", condition("first", 2), whole - crack)
+        expectEqual("the loose indoor panel after a storm", condition("first", 3), whole)
         expectEqual("the connected panel after its bank's pass", self.reads.banked.status.sources[1].modules[1].condition,
-            100 - crack)
+            whole - crack)
+        local cracked = self.reads.cracked
+        expectEqual("the connected panel's recorded condition after its bank's pass", cracked.modules[1].condition, whole - crack)
+        expectEqual("the whole panel's overlays before the storm", self.before, "")
+        expectEqual("the storm-cracked panel's overlays", table.concat(cracked.overlays, ","), Sprites.cracks.light.flat[1])
+        expectEqual("this client's copy of the storm-cracked panel's overlays", self.copyOverlays, table.concat(cracked.overlays, ","))
         T.expectOk(self.reads.disconnected, "disconnecting the panel")
-        expectEqual("the disconnected panel after the next storm", condition("second", 1), 100 - 2 * crack)
-        expectEqual("the loose outdoor panel after a second storm", condition("second", 2), 100 - 2 * crack)
-        expectEqual("the loose indoor panel after a second storm", condition("second", 3), 100)
-    end,
-})
-
--- Storm damage over hours at the Storm Damage options (Chance.stormDamage): a chance an hour
--- compounds over the hours, the rate scales the chance an hour, and a chance scaled past certain
--- stays certain; no hours, or Storm Damage off, is no chance. The expected chances are worked by hand.
-test("renewable_energy_solar_storms_chance_by_hours_and_rate", {
-    sandbox = { StormDamage = true, StormDamageRate = 100 },
-    run = function(self)
-        local stormDamage = Chance.stormDamage
-        T.step(function()
-            self.normal = { stormDamage(0.1, 1), stormDamage(0.1, 2), stormDamage(0.1, 0) }
-            T.setSandbox(self, "StormDamageRate", 200)
-        end)
-        T.step(function()
-            self.doubled = { stormDamage(0.1, 2), stormDamage(0.6, 1) }
-            T.setSandbox(self, "StormDamage", false)
-        end)
-        T.step(function() self.off = stormDamage(0.1, 2) end)
-    end,
-    validate = function(self)
-        expectNear("10% an hour over an hour", self.normal[1], 0.1, 1e-9)
-        expectNear("10% an hour over two hours", self.normal[2], 0.19, 1e-9)
-        expectEqual("10% an hour over no hours", self.normal[3], 0)
-        expectNear("10% an hour over two hours at rate 200", self.doubled[1], 0.36, 1e-9)
-        expectNear("60% an hour over an hour at rate 200", self.doubled[2], 1, 1e-9)
-        expectEqual("10% an hour over two hours with Storm Damage off", self.off, 0)
+        expectEqual("the disconnected panel after the next storm", condition("second", 1), whole - 2 * crack)
+        expectEqual("the loose outdoor panel after a second storm", condition("second", 2), whole - 2 * crack)
+        expectEqual("the loose indoor panel after a second storm", condition("second", 3), whole)
     end,
 })
 

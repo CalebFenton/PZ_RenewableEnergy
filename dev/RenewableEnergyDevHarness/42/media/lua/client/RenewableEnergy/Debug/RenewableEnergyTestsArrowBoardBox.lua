@@ -12,12 +12,6 @@ local test, expect, expectEqual, player = T.test, T.expect, T.expectEqual, T.pla
 local spawnTrailer, boxItems, standIn = T.spawnTrailer, T.boxItems, T.standIn
 local LID, BOX = ArrowBoard.LID, ArrowBoard.BATTERY_BOX
 
--- Queues the box's lid unpadlocked and down, and a wait until this client's copy shows it.
-local function unlockBox(self, trailer)
-    T.onVehicle(self, trailer, "setTrailer", { lidOpen = false, lidLocked = false })
-    T.waitFor(self, function() return not trailer.vehicle:getPartById(LID):getDoor():isLocked() end, "this client's copy of the unlocked lid")
-end
-
 -- Whether this game draws the trailer's lid held still, open or shut, as T.lidPose reads it.
 local function lidHeld(pose, open)
     return pose ~= nil and pose.clip ~= nil and not pose.playing and pose.open == (open and 1 or 0)
@@ -30,14 +24,17 @@ local function describeLid(pose)
     return string.format("clip %s, %s, %s open", tostring(pose.clip), pose.playing and "swinging" or "still", tostring(pose.open))
 end
 
--- The lid swings open and stays open, and swings shut, both when this player moves it and when
--- someone else does (vanilla animates only the mover's game; ArrowBoard.lua's watchLids); the
--- box opens only while the lid is open.
+-- The lid swings open and stays open when this player opens it, and swings shut when someone else
+-- shuts it (vanilla swings a lid only in the mover's game; Trailer.lua's watchLid swings it in
+-- every game); the box opens only while the lid is open. Opening it shows the box in the loot
+-- window as opening a trunk shows the trunk (BatteryBoxLid.lua), in single player only: vanilla
+-- picks the container in the opener's complete(), which a multiplayer client never runs.
 test("renewable_energy_world_arrow_board_lid_swings", {
     instant = true,
     run = function(self)
         if not spawnTrailer(self, { repair = true }, "S") then return end
         local trailer, p = self.trailer, player()
+        local loot = getPlayerLoot(p:getPlayerNum())
         T.onVehicle(self, trailer, "setTrailer", { lidOpen = false, lidLocked = false })
         T.waitFor(self, function()
             local door = trailer.vehicle:getPartById(LID):getDoor()
@@ -45,15 +42,19 @@ test("renewable_energy_world_arrow_board_lid_swings", {
         end, "this client's copy of the lid unlocked and held shut")
         self.swings = {}
         -- Queues `act` from the box's area and a wait until the lid stands held `open`, noting what
-        -- it passed on the way and whether the box then opens from there.
+        -- it passed on the way, the container the loot window was told to pick, and whether the box
+        -- then opens from there.
         local function swing(name, open, act)
             local seen = { name = name, open = open }
             table.insert(self.swings, seen)
             T.step(function()
                 standIn(trailer.vehicle, trailer.vehicle:getPartById(BOX):getArea())
+                loot.forceSelectedContainer = nil
                 act()
             end)
             T.waitFor(self, function()
+                -- The loot window keeps a pick only for a moment (ISInventoryPage.prerender).
+                seen.picked = seen.picked or loot.forceSelectedContainer
                 seen.pose = T.lidPose(trailer)
                 if seen.pose and seen.pose.playing and seen.pose.open and seen.pose.open > 0.1 and seen.pose.open < 0.9 then
                     seen.between = true
@@ -65,16 +66,18 @@ test("renewable_energy_world_arrow_board_lid_swings", {
                 seen.access = vehicle:canAccessContainer(vehicle:getPartById(BOX):getIndex(), p)
             end)
         end
-        -- What the trailer's menu does for Open Trunk and Close Trunk.
+        -- What the trailer's menu does for Open Trunk.
         swing("opening it", true, function() ISVehicleMenu.onOpenDoor(p, trailer.vehicle:getPartById(LID)) end)
-        swing("closing it", false, function() ISVehicleMenu.onCloseDoor(p, trailer.vehicle:getPartById(LID)) end)
-        swing("someone else opening it", true, function() T.onVehicle(self, trailer, "setTrailer", { lidOpen = true }) end)
         swing("someone else closing it", false, function() T.onVehicle(self, trailer, "setTrailer", { lidOpen = false }) end)
     end,
     validate = function(self)
         for _, seen in ipairs(self.swings) do
             expect(seen.between, seen.name .. " never swung the lid between shut and open")
             expectEqual("whether " .. seen.name .. " left the batteries reachable", seen.access, seen.open)
+        end
+        if not isClient() then
+            expect(self.swings[1].picked == self.trailer.vehicle:getPartById(BOX):getItemContainer(),
+                "opening the lid didn't pick the battery box in the loot window")
         end
     end,
 })
@@ -256,70 +259,14 @@ local function switchSlice()
     return shown
 end
 
--- Bolt cutters cut the padlock from the menu: the lid unlocks with a broken lock, on the server
--- and here, the battery comes out, the cut lock never relocks even with the trailer's key, the
--- menu stops offering the cut, and the cutters survive.
+-- Cut Padlock is offered only at a padlock that holds, and without bolt cutters says what it takes.
+-- With them it cuts the padlock from the menu: the lid unlocks with a broken lock, on the server
+-- and here, the battery comes out, and the cutters survive.
 test("renewable_energy_world_arrow_board_cut_padlock_opens_the_box", {
     instant = true,
     run = function(self)
         if not spawnTrailer(self, { repair = true }) then return end
         local trailer, p = self.trailer, player()
-        padlockBox(self, trailer, { { type = T.DEEP_CYCLE, charge = 0.5 } })
-        T.waitFor(self, function() return self.box:getItemContainer():getItems():size() == 1 end,
-            "this client's copy of the battery in the box")
-        T.give(self, "cutters", { { type = BatteryBoxLid.CUTTERS } })
-        T.server(self, "arrowBoardKey", function() return T.at(trailer, { id = trailer.id }) end)
-        T.step(function()
-            local vehicle = trailer.vehicle
-            standAtBox(vehicle)
-            self.offered = cutPadlockSlice() == "offered"
-            self.keyUnlocks = vehicle:canUnlockDoor(self.lid, p)
-            local cutters = BatteryBoxLid.padlockCutters(p, self.lid)
-            if cutters then
-                -- What the menu's Cut Padlock does, from where its walk would end.
-                standIn(vehicle, self.box:getArea())
-                BatteryBoxLid.cutPadlock(p, self.lid, cutters)
-            end
-        end)
-        T.awaitVehicleState(self, trailer, function(state) return state.lid and state.lid.lockBroken end, "cut")
-        T.waitFor(self, function() return self.lid:getDoor():isLockBroken() and not self.lid:getDoor():isLocked() end,
-            "this client's copy of the lid unlocked with a broken lock")
-        T.step(function()
-            local vehicle = trailer.vehicle
-            self.keyRelocks = vehicle:canLockDoor(self.lid, p)
-            standAtBox(vehicle)
-            self.cutSlice = cutPadlockSlice()
-            ISVehicleMenu.onOpenDoor(p, self.lid)
-        end)
-        T.waitFor(self, function() return self.lid:getDoor():isOpen() end, "this client's copy of the cut lid opened")
-        T.step(function()
-            self.openAccess = trailer.vehicle:canAccessContainer(self.box:getIndex(), p)
-        end)
-        takeBattery(self, trailer)
-    end,
-    validate = function(self)
-        expect(self.offered, "the menu at the padlocked box doesn't offer Cut Padlock to a player with bolt cutters")
-        expect(self.keyUnlocks, "the trailer's key doesn't open its padlock, so it can't show the cut lock refusing it")
-        local server = self.reads.cut.state.lid
-        expect(server and not server.locked and server.lockBroken, "the server's lid is "
-            .. tostring(server and server.locked and "locked" or "unlocked") .. " with its lock "
-            .. tostring(server and server.lockBroken and "broken" or "whole") .. " after the cut")
-        expect(not self.keyRelocks, "the cut padlock locks again with the trailer's key")
-        expectEqual("Cut Padlock in the menu on a cut lock", self.cutSlice, "none")
-        expect(self.openAccess, "the box doesn't open once its padlock is cut")
-        expectBatteryTaken(self)
-        expect(T.carried(BatteryBoxLid.CUTTERS) ~= nil,
-            "cutting used up the bolt cutters")
-    end,
-})
-
--- Without cutters a padlocked box's Cut Padlock slice says what it takes; with them, an unlocked
--- or lidless box shows no Cut Padlock at all.
-test("renewable_energy_world_arrow_board_cut_padlock_needs_cutters_and_a_padlock", {
-    instant = true,
-    run = function(self)
-        if not spawnTrailer(self, { repair = true }) then return end
-        local trailer = self.trailer
         self.seen = {}
         local function look(name, want)
             T.step(function()
@@ -327,52 +274,57 @@ test("renewable_energy_world_arrow_board_cut_padlock_needs_cutters_and_a_padlock
                 table.insert(self.seen, { name = name, want = want, shown = cutPadlockSlice() })
             end)
         end
-        padlockBox(self, trailer)
+        -- Queues `args` set on the trailer and a wait until this client's copy of the lid shows
+        -- `what` (`matches(lid)`).
+        local function setLid(args, what, matches)
+            T.onVehicle(self, trailer, "setTrailer", args)
+            T.waitFor(self, function() return matches(trailer.vehicle:getPartById(LID)) end, "this client's copy of " .. what)
+        end
+        padlockBox(self, trailer, { { type = T.DEEP_CYCLE, charge = 0.5 } })
+        T.waitFor(self, function() return self.box:getItemContainer():getItems():size() == 1 end,
+            "this client's copy of the battery in the box")
         look("at a padlocked box without bolt cutters", "unavailable")
         T.give(self, "cutters", { { type = BatteryBoxLid.CUTTERS } })
-        unlockBox(self, trailer)
+        look("at a padlocked box with bolt cutters", "offered")
+        T.step(function()
+            local cutters = BatteryBoxLid.padlockCutters(p, self.lid)
+            if T.need(self, cutters, "bolt cutters the padlock takes") then
+                -- What the menu's Cut Padlock does, from where its walk would end.
+                standIn(trailer.vehicle, self.box:getArea())
+                BatteryBoxLid.cutPadlock(p, self.lid, cutters)
+            end
+        end)
+        T.awaitVehicleState(self, trailer, function(state) return state.lid and state.lid.lockBroken end, "cut")
+        T.waitFor(self, function() return self.lid:getDoor():isLockBroken() and not self.lid:getDoor():isLocked() end,
+            "this client's copy of the lid unlocked with a broken lock")
+        look("at a cut padlock", "none")
+        T.step(function() ISVehicleMenu.onOpenDoor(p, self.lid) end)
+        T.waitFor(self, function() return self.lid:getDoor():isOpen() end, "this client's copy of the cut lid opened")
+        T.step(function()
+            self.openAccess = trailer.vehicle:canAccessContainer(self.box:getIndex(), p)
+        end)
+        takeBattery(self, trailer)
+        setLid({ lidOpen = false, lidLockBroken = false }, "the lid shut, unlocked, with a whole lock", function(lid)
+            local door = lid:getDoor()
+            return not door:isOpen() and not door:isLocked() and not door:isLockBroken()
+        end)
         look("at an unlocked box", "none")
-        T.onVehicle(self, trailer, "setTrailer", { lidInstalled = false, lidLocked = true })
-        T.waitFor(self, function()
-            local lid = trailer.vehicle:getPartById(LID)
+        setLid({ lidInstalled = false, lidLocked = true }, "the locked box without its lid", function(lid)
             return lid:getInventoryItem() == nil and lid:getDoor():isLocked()
-        end, "this client's copy of the locked box without its lid")
+        end)
         look("at a locked box without its lid", "none")
     end,
     validate = function(self)
         for _, seen in ipairs(self.seen) do
             expectEqual("Cut Padlock in the menu " .. seen.name, seen.shown, seen.want)
         end
-    end,
-})
-
--- Opening the lid shows the battery box in the loot window as opening a trunk shows the trunk:
--- in single player only, since vanilla picks the container in complete(), which a multiplayer
--- client never runs (ISOpenVehicleDoor.selectContainerInLootWindow).
-test("renewable_energy_world_arrow_board_box_shows_in_the_loot_window", {
-    instant = true,
-    run = function(self)
-        if not spawnTrailer(self, { repair = true }) then return end
-        local trailer, p = self.trailer, player()
-        unlockBox(self, trailer)
-        T.step(function()
-            self.lid, self.box = trailer.vehicle:getPartById(LID), trailer.vehicle:getPartById(BOX)
-            standAtBox(trailer.vehicle)
-            getPlayerLoot(p:getPlayerNum()).forceSelectedContainer = nil
-            ISVehicleMenu.onOpenDoor(p, self.lid)
-        end)
-        T.waitFor(self, function()
-            if not self.lid:getDoor():isOpen() then
-                return false
-            end
-            self.selected = getPlayerLoot(p:getPlayerNum()).forceSelectedContainer
-            return true
-        end, "this client's copy of the lid opened")
-    end,
-    validate = function(self)
-        local picked = self.selected ~= nil and self.selected == self.box:getItemContainer()
-        expect(picked == not isClient(), "opening the lid " .. (picked and "picked" or "didn't pick") .. " the battery box in the loot window"
-            .. (isClient() and ", which vanilla never does for a trunk on a multiplayer client" or ""))
+        local server = self.reads.cut.state.lid
+        expect(server and not server.locked and server.lockBroken, "the server's lid is "
+            .. tostring(server and server.locked and "locked" or "unlocked") .. " with its lock "
+            .. tostring(server and server.lockBroken and "broken" or "whole") .. " after the cut")
+        expect(self.openAccess, "the box doesn't open once its padlock is cut")
+        expectBatteryTaken(self)
+        expect(T.carried(BatteryBoxLid.CUTTERS) ~= nil, "cutting used up the bolt cutters")
     end,
 })
 

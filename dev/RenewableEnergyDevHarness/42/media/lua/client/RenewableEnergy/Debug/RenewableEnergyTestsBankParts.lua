@@ -264,32 +264,33 @@ test("renewable_energy_bank_homemade_inverter_wastes_and_wears_more", {
     end,
 })
 
--- A crafted inverter comes out short of its cap at the recipe's Electricity level: the Makeshift
--- Inverter's 80 less 20.
+-- A crafted inverter comes out short of its cap at the recipe's Electricity level, crafted as a
+-- player crafts it; each level past the recipe's makes up part of the shortfall, never past the cap
+-- (Wear.craftedInverterCondition, which the craft's OnCreate asks).
 local MAKESHIFT_RECIPE, MAKESHIFT = "RenewableEnergy_MakeMakeshiftInverter", "RenewableEnergy.MakeshiftInverter"
-T.craftTest(T.craftName("bank", MAKESHIFT_RECIPE, "at_recipe_level"), {
+local function makeshiftLevel()
+    return getScriptManager():getCraftRecipe(MAKESHIFT_RECIPE):getRequiredSkill(0):getLevel()
+end
+T.craftTest(T.craftName("bank", MAKESHIFT_RECIPE, "condition_by_level"), {
     recipe = MAKESHIFT_RECIPE,
     from = Specs.charger,
     prefer = { Specs.charger },
     setup = function(self)
-        T.setPerk(self, Perks.Electricity, getScriptManager():getCraftRecipe(MAKESHIFT_RECIPE):getRequiredSkill(0):getLevel())
+        T.setPerk(self, Perks.Electricity, makeshiftLevel())
     end,
     counts = { [MAKESHIFT] = 1 },
     after = function(self) T.readCarried(self, { MAKESHIFT }) end,
     validate = function(self)
         local inverter = T.carriedFirst(self, MAKESHIFT)
         if not expect(inverter ~= nil, "no makeshift inverter was made") then return end
-        expectEqual("the condition of an inverter made at the recipe's Electricity level", inverter.condition, 60)
-    end,
-})
-
--- Each Electricity level past the recipe's makes up 5 of the shortfall, up to the cap.
-test("renewable_energy_bank_crafted_inverter_condition_by_level", {
-    run = function(self)
-        self.twoPast, self.sevenPast = Wear.craftedInverterCondition(80, 5, 3), Wear.craftedInverterCondition(80, 10, 3)
-    end,
-    validate = function(self)
-        expectEqual("an 80-cap inverter made two levels past the recipe's", self.twoPast, 70)
-        expectEqual("an 80-cap inverter made seven levels past the recipe's", self.sevenPast, 80)
+        local cap, level = instanceItem(MAKESHIFT):getConditionMax(), makeshiftLevel()
+        expectEqual("the condition of an inverter made at the recipe's Electricity level", inverter.condition,
+            cap - Wear.CRAFTED_SHORTFALL)
+        local function past(levels)
+            return Wear.craftedInverterCondition(cap, level + levels, level)
+        end
+        expectEqual("the condition a level past the recipe's makes up", past(1) - past(0), Wear.CRAFTED_PER_LEVEL)
+        expectEqual("the condition of an inverter made a level past making up the whole shortfall",
+            past(math.ceil(Wear.CRAFTED_SHORTFALL / Wear.CRAFTED_PER_LEVEL) + 1), cap)
     end,
 })

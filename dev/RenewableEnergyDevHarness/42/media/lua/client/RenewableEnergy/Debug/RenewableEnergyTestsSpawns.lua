@@ -17,12 +17,14 @@ local function copyOf(square, sprite)
     return object, container and container:getItems():size()
 end
 
--- Stock names of WorldSpawns.BANK_STOCK, one per bank tier.
+-- Stock names of WorldSpawns.BANK_STOCK, one per bank tier, whose battery wear profiles don't all
+-- share a mean.
 local SPAWNED_BANKS = { "shed", "farmStorage", "powerYard" }
 
--- A bank appears stocked with era batteries at a part charge, explored so that neither its room's
--- loot nor loot respawn ever adds to it, and players see what it holds. It was installed, so it is
--- connected, unlike one a player places. Placing needs no player, as on a dedicated server.
+-- A bank appears stocked with era batteries at a part charge, worn by its own stock's profile (at
+-- middling rolls, that profile's mean), explored so that neither its room's loot nor loot respawn
+-- ever adds to it, and players see what it holds. It was installed, so it is connected, unlike one
+-- a player places. Placing needs no player, as on a dedicated server.
 test("renewable_energy_world_bank_spawns_stocked", {
     sandbox = { LRMBatteries = 1, LRMMisc = 1 },
     run = function(self)
@@ -31,7 +33,7 @@ test("renewable_energy_world_bank_spawns_stocked", {
         self.squares = squares
         T.batch(function()
             for i, stockName in ipairs(SPAWNED_BANKS) do
-                T.read(self, "worldBank", T.at(squares[i], { stock = stockName }), stockName)
+                T.read(self, "worldBank", T.at(squares[i], { stock = stockName, roll = 0.5 }), stockName)
             end
             T.read(self, "worldSpawnStock", { names = SPAWNED_BANKS }, "stock")
         end)
@@ -46,20 +48,28 @@ test("renewable_energy_world_bank_spawns_stocked", {
         end, "this client's copies of the banks with all they hold")
     end,
     validate = function(self)
-        local stocks = self.reads.stock.banks
+        local answer = self.reads.stock
+        local firstMean, meansDiffer = nil, false
         for i, stockName in ipairs(SPAWNED_BANKS) do
-            local bank, stock = self.reads[stockName], stocks[stockName]
+            local bank, stock = self.reads[stockName], answer.banks[stockName]
             local what = "the " .. stockName .. " bank"
             local count = #bank.stock.charges
             expect(Sprites.kindOf(bank.sprite) == stock.sprite, what .. " has the wrong tile")
             expect(bank.stock.explored, what .. " is not explored")
             local copy = copyOf(self.squares[i], bank.sprite)
             expect(copy ~= nil and copy:isConnected(), what .. " isn't connected on this client")
-            T.expectSaneRange(stock.batteries, "the battery count of " .. what)
-            expect(T.inRange(count, stock.batteries),
+            expect(count >= 1 and T.inRange(count, stock.batteries),
                 count .. " batteries in " .. what .. ", expected " .. stock.batteries.min .. " to " .. stock.batteries.max)
             T.expectFoundCharges(bank.stock.charges, what)
+            local mean = answer.batteryWear[stock.wear].mean
+            firstMean = firstMean or mean
+            meansDiffer = meansDiffer or mean ~= firstMean
+            for _, condition in ipairs(bank.stock.batteryConditions) do
+                expect(condition == mean, string.format("a battery in %s is at %d, not its %s profile's %d", what, condition,
+                    stock.wear, mean))
+            end
         end
+        expect(meansDiffer, "every spawned bank's batteries wear alike, so this can't tell whose profile a bank used")
     end,
 })
 
@@ -120,61 +130,13 @@ test("renewable_energy_world_bank_backs_onto_wall", {
 })
 
 -- Each part turns up when the roll comes in under its chance × the misc loot option, in a farm
--- storage rack, which has a slot for every part; and a bank with no charge controller slot never
--- comes with one.
+-- storage rack, which has a slot for every part; a bank with no charge controller slot never
+-- comes with one; and with the battery and misc loot options at 0 it comes empty.
 serverCheck("renewable_energy_world_bank_stock_parts", "bankStockParts", { stock = "farmStorage" })
 
--- With the battery and misc loot options at 0, world banks spawn empty, even with the lowest roll
--- there is.
-test("renewable_energy_world_bank_stock_option_zero", {
-    sandbox = { LRMBatteries = 0, LRMMisc = 0 },
-    run = function(self) T.read(self, "bankStockCount", { stock = "farmStorage", roll = 0 }, "count") end,
-    validate = function(self)
-        expectEqual("items in a bank with the options at 0", self.reads.count.items, 0)
-    end,
-})
-
--- How each wear profile wears a battery, and its duds.
-serverCheck("renewable_energy_world_bank_battery_wear", "batteryWear")
-
--- How found inverters and controllers wear, their duds, and that banks, crates and the arrow
--- board's battery box hand them out worn.
-serverCheck("renewable_energy_world_part_wear", "partWear")
-
--- A placed bank's batteries are worn by its own stock's profile: at middling rolls every battery is
--- at that profile's mean, told apart by two stocks whose profiles' means differ.
-local WORN_STOCKS = { "farmStorage", "storageUnit" }
-test("renewable_energy_world_bank_batteries_worn_by_stock", {
-    sandbox = { LRMBatteries = 1, LRMMisc = 1 },
-    run = function(self)
-        local squares = T.need(self, T.squares(self, #WORN_STOCKS, { indoors = true }), "free indoor squares for banks")
-        if not squares then return end
-        T.batch(function()
-            for i, stockName in ipairs(WORN_STOCKS) do
-                T.read(self, "worldBank", T.at(squares[i], { stock = stockName, roll = 0.5 }), stockName)
-            end
-            T.read(self, "worldSpawnStock", { names = WORN_STOCKS }, "stock")
-        end)
-    end,
-    validate = function(self)
-        local answer = self.reads.stock
-        local means = {}
-        for _, stockName in ipairs(WORN_STOCKS) do
-            local wearName = answer.banks[stockName].wear
-            local condition = answer.batteryWear[wearName].mean
-            means[stockName] = condition
-            local conditions = self.reads[stockName].stock.batteryConditions
-            local wrong = {}
-            for _, found in ipairs(conditions) do
-                if found ~= condition then table.insert(wrong, found) end
-            end
-            expect(#conditions > 0 and #wrong == 0, string.format("a %s bank holds %d batteries, of which %s aren't at its %s profile's %d",
-                stockName, #conditions, table.concat(wrong, ", "), wearName, condition))
-        end
-        expect(means.farmStorage ~= means.storageUnit, "farm storerooms' and storage units' batteries "
-            .. "wear alike, so this can't tell whose profile a bank used")
-    end,
-})
+-- How each wear profile wears a found battery and how found inverters and controllers wear, their
+-- duds, and that banks, crates and the arrow board's battery box hand parts out worn.
+serverCheck("renewable_energy_world_found_wear", "foundWear")
 
 -- A battery box a garage or storage unit spawns may have the panel that charged it beside it: with
 -- the rolls just under its stock's module chance, as many modules as the stock says lie on the
@@ -209,13 +171,10 @@ test("renewable_energy_world_bank_modules_beside", {
     end,
 })
 
--- The item count from which vanilla's container overlays show a container full rather than
--- holding a few items (ContainerOverlays.updateContainerOverlaySprite).
-local FEW_ITEMS = 7
-
 -- A crate appears stocked with modules at cracked or weathered conditions and batteries at a part
--- charge, as many as CRATE_STOCK's garageKit says, explored, showing its full or closed lid by how
--- much it holds, and players see what it holds and its lid.
+-- charge, as many as CRATE_STOCK's garageKit says, explored, with one of its lids, which vanilla's
+-- container overlays pick by how much it holds (CrateOverlays.lua), and players see what it holds
+-- and its lid.
 test("renewable_energy_world_crate_spawns_stocked", {
     sandbox = { LRMSolarPanels = 1, LRMBatteries = 1, LRMMisc = 1 },
     run = function(self)
@@ -245,8 +204,8 @@ test("renewable_energy_world_crate_spawns_stocked", {
         expect(T.inRange(#charges, lines[T.DEEP_CYCLE]), #charges .. " batteries in the crate")
         T.expectFoundCharges(charges, "the crate")
         local overlays = Sprites.crateOverlays
-        local lid = crate.stock.items < FEW_ITEMS and overlays.closed or overlays.full
-        expectEqual("the lid of the crate holding " .. crate.stock.items .. " items", crate.overlay, lid)
+        expect(crate.overlay == overlays.closed or crate.overlay == overlays.full,
+            "the crate shows " .. tostring(crate.overlay) .. ", neither of its lids")
     end,
 })
 

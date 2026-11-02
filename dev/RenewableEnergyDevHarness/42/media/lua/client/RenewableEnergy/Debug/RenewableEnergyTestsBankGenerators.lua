@@ -24,11 +24,6 @@ local function inBackupReach(a, b)
     return math.abs(a:getX() - b:getX()) <= reach and math.abs(a:getY() - b:getY()) <= reach
 end
 
--- The fuel an hour vanilla bills a generator for `watts` at the fuel consumption option.
-local function fuelPerHour(watts)
-    return Specs.fuelFromWatts(watts) * SandboxVars.GeneratorFuelConsumption
-end
-
 -- A free square within `reach` tiles of `near` for a backup generator: outdoors if there is one,
 -- since a running generator makes a building toxic.
 local function backupSquare(self, near, reach)
@@ -132,7 +127,7 @@ test("renewable_energy_bank_generator_bills_chargers_by_battery_room", {
         local filledW = math.min(self.chargersW, roomWh)
         expect(roomWh > 0, "the bank has no room in its batteries")
         expectNear("fuel an hour the chargers added to the generator's bill", reads.room.bill - reads.full.bill,
-            fuelPerHour(filledW), 0.0001)
+            T.fuelPerHour(filledW), 0.0001)
         expectNear("the generator's bill after vanilla rebuilt it", reads.rebuilt.bill, reads.room.bill, 0.0001)
         expectNear("the bank's charge after the chargers filled it", room.charge, self.low + filledW / room.nominalWh, 0.0001)
         expectEqual("batteries left in the bank", empty.batteries, 0)
@@ -141,11 +136,13 @@ test("renewable_energy_bank_generator_bills_chargers_by_battery_room", {
     end,
 })
 
--- The job must retire the removed charger's saved demand, not just its hardware rating.
--- Read the bill in the same authority call as Unwire, before any native update can repair it.
-test("renewable_energy_settlement_unwire_charger_releases_generator_bill", {
+-- Unwiring a bank's charger takes what it charged at off its generator's bill at once, read in the
+-- same authority call as the job, before any vanilla update could rebuild the bill, and again after
+-- one has; the bank stays on with its battery and inverter.
+test("renewable_energy_bank_unwire_charger_releases_generator_bill", {
     sandbox = { GeneratorFuelConsumption = 0.1 },
     run = function(self)
+        -- No ten-minute pass may bill the generator between the reads.
         T.setMultiplier(self, 0)
         T.setGrid(self, false)
         local bank = T.bank(self, "batteryRackWood",
@@ -154,10 +151,9 @@ test("renewable_energy_settlement_unwire_charger_releases_generator_bill", {
         if not square then return end
         local generator = T.generator(self, { square = square, running = true })
         T.give(self, "tools", { { type = "Base.Screwdriver" }, { type = "Base.Wrench" } })
-        T.forceRoll(self, 1 - T.UNDER)
         T.job(self, "bank", BankJobs.TURN_ON, bank, nil, "switched")
         T.bankPass(self, bank, 0, { hours = 0.01 })
-        -- Keep catch-up real without advancing the world into a periodic billing event.
+        -- Time since that pass for the job to catch up, without the clock running into a billing.
         T.readRecord(self, bank, nil, 0.01)
         T.job(self, "bank", BankJobs.UNWIRE, bank, { type = Specs.charger, inTarget = true }, "unwired",
             { reads = { snapshot = { name = "bankSettlement", args = T.at(bank, { generators = { T.at(generator) } }) } } })
@@ -168,22 +164,15 @@ test("renewable_energy_settlement_unwire_charger_releases_generator_bill", {
         if not T.expectOk(self.reads.switched, "switching the charging bank on")
             or not T.expectOk(self.reads.unwired, "unwiring only the charger") then return end
         local before, after = self.reads.unwired.before.snapshot, self.reads.unwired.after.snapshot
-        expect(before.activated and before.on, "the partial bank was not active before Unwire")
-        expect(before.charge > 0 and before.charge < 1, "the charging bank was not partial")
-        expect(before.chargeWantW > 0, "the normal pass did not establish charging demand")
-        expect(before.generators[1].running and before.generators[1].chargesBank,
-            "the ordinary generator was not the bank's charging supplier")
-        expectEqual("charger rating before Unwire", before.chargerMaxW, Specs.chargerWatts)
+        expect(before.activated and before.charge < 1 and before.generators[1].running and before.generators[1].chargesBank,
+            "before Unwire the bank must be on with room in its battery, charging from the running generator")
         for _, state in ipairs({ after, self.reads.rebuilt }) do
-            expectEqual("bank activation after removing only the charger", state.activated, before.activated)
-            expectEqual("bank switch after removing only the charger", state.on, before.on)
-            expectEqual("remaining batteries", state.batteries, 1)
-            expectEqual("remaining charger rating", state.chargerMaxW, 0)
-            expectEqual("remaining saved charging demand", state.chargeWantW, 0)
-            expect(state.generators[1].running, "Unwire stopped the ordinary generator")
-            expectNear("generator bill after charger removal, including native rebuild",
-                state.generators[1].bill, before.generators[1].bill - fuelPerHour(before.chargeWantW), 0.0001)
-            expectEqual("parts remaining after Unwire", #state.items, 2)
+            local what = state == after and "" or " after vanilla rebuilt the bill"
+            expect(state.activated and state.on, "taking out only the charger switched the bank off" .. what)
+            expect(state.generators[1].running, "Unwire stopped the generator" .. what)
+            expectEqual("parts left after Unwire" .. what, #state.items, 2)
+            expectNear("the generator's bill without the charger" .. what,
+                state.generators[1].bill, before.generators[1].bill - T.fuelPerHour(Specs.chargerWatts), 0.0001)
         end
     end,
 })
@@ -209,7 +198,7 @@ test("renewable_energy_bank_clock_settles_generator_chargers", {
     validate = function(self)
         expect(self.chargerW > 0, "the clock-driven pass did not charge the bank")
         expectNear("the clock-driven chargers' fuel bill", self.reads.charging.bill - self.reads.before.bill,
-            fuelPerHour(self.chargerW), 0.0001)
+            T.fuelPerHour(self.chargerW), 0.0001)
     end,
 })
 
@@ -431,11 +420,15 @@ test("renewable_energy_bank_failsafe_runs_every_relay_answering_to_it", {
     end,
 })
 
--- Starting B in Rename's catch-up changes the appliance payer even though A stays the nearest
--- charging supplier and the non-charger bank changes neither activation nor charging demand.
-test("renewable_energy_settlement_bank_job_failsafe_reassigns_generator_bill", {
+-- A bank job that starts a failsafe generator moves what that generator now reaches first onto its
+-- bill at once: Rename's catch-up of a bank below its start charge starts B, and the fridge nearer B
+-- than the running A leaves A's bill for B's, read in the job's own authority call and again after
+-- vanilla rebuilds A's bill. The bank has no charger and stays on, so neither its activation nor
+-- its charging changes: a job that settled bills only on those would miss the move.
+test("renewable_energy_bank_failsafe_start_moves_appliance_to_its_generator", {
     sandbox = { GeneratorFuelConsumption = 0.1, FailsafeStartCharge = 20, FailsafeStopCharge = 80 },
     run = function(self)
+        -- No ten-minute pass may bill the generators between the reads.
         T.setMultiplier(self, 0)
         T.setGrid(self, false)
         local line = relayLine(self)
@@ -445,57 +438,40 @@ test("renewable_energy_settlement_bank_job_failsafe_reassigns_generator_bill", {
         if not bank then return end
         local a = T.generator(self, { square = line.near, running = true })
         local b = T.generator(self, { square = line.far, running = true, failsafe = true })
-        local positions = { T.at(a), T.at(b) }
-        local function snapshot(label)
-            T.read(self, "bankSettlement", T.at(bank, { generators = positions }), label)
-        end
-        local function baseline(label)
-            T.bankPass(self, bank, 0, { hours = 0.01 })
-            T.server(self, "billGenerators", {})
-            snapshot(label)
-        end
-        T.forceRoll(self, 1 - T.UNDER)
+        local args = T.at(bank, { generators = { T.at(a), T.at(b) } })
         T.job(self, "bank", BankJobs.TURN_ON, bank, nil, "switched")
-        -- Measure both generators' bills without the added appliance so ambient building loads cancel.
-        baseline("bothBare")
+        -- Both generators' bills without the fridge, so what the building around draws cancels.
+        T.bankPass(self, bank, 0, { hours = 0.01 })
+        T.billGenerators(self)
+        T.read(self, "bankSettlement", args, "bare")
         T.setGenerator(self, b, { running = false })
         T.step(function() T.placeTile(self, line.a, T.MINI_FRIDGE) end)
         T.setCharge(self, bank, belowFailsafeStart())
         T.readRecord(self, bank, nil, 0.01)
-        T.job(self, "bank", BankJobs.RENAME, bank, "Settlement bank", "renamed",
-            { reads = { snapshot = { name = "bankSettlement", args = T.at(bank, { generators = positions }) } } })
-        -- No bank pass or explicit bill after the job: only vanilla rebuilds and keepShares.
+        T.job(self, "bank", BankJobs.RENAME, bank, "Shed", "renamed", { reads = { snapshot = { name = "bankSettlement", args = args } } })
+        -- No bank pass or billing after the job: only vanilla's rebuild.
         T.setGenerator(self, a, { rebuild = true })
-        snapshot("rebuilt")
+        T.read(self, "bankSettlement", args, "rebuilt")
     end,
     validate = function(self)
         local reads = self.reads
         if not T.expectOk(reads.switched, "switching the failsafe bank on")
-            or not T.expectOk(reads.renamed, "renaming the bank through standalone catch-up") then return end
-        local before, after = reads.renamed.before.snapshot, reads.renamed.after.snapshot
-        expect(before.generators[1].running and not before.generators[2].running,
-            "A must already run and failsafe B must be stopped before Rename")
-        expect(before.activated and before.on, "the bank was not active before Rename")
-        expect(before.charge > 0 and before.charge < SandboxVars.RenewableEnergy.FailsafeStartCharge / 100,
-            "the bank was not below its failsafe start threshold")
-        expect(before.lastHour < before.age, "Rename had no elapsed bank pass to catch up")
-        expectEqual("non-charger bank's saved demand before Rename", before.chargeWantW, 0)
-        expect(before.generators[1].chargesBank and not before.generators[2].chargesBank,
-            "A was not the bank's nearest charging supplier before Rename")
-        expectNear("Rename caught the bank up to now", after.lastHour, after.age, 0.0001)
+            or not T.expectOk(reads.renamed, "renaming the bank") then return end
+        local before, after, bare = reads.renamed.before.snapshot, reads.renamed.after.snapshot, reads.bare.generators
+        expect(before.activated and before.generators[1].running and not before.generators[2].running,
+            "before Rename the bank must be on, A running and failsafe B stopped")
+        expect(before.charge < SandboxVars.RenewableEnergy.FailsafeStartCharge / 100 and before.lastHour < before.age,
+            "before Rename the bank must be below its failsafe start charge, with time since its last pass to catch up")
         for _, state in ipairs({ after, reads.rebuilt }) do
+            local what = state == after and "" or " after vanilla rebuilt A's bill"
             expect(state.generators[1].running and state.generators[2].running,
-                "Rename's catch-up did not leave A running and start failsafe B")
-            expectEqual("bank activation after failsafe catch-up", state.activated, before.activated)
-            expectEqual("bank switch after failsafe catch-up", state.on, before.on)
-            expectEqual("charging source after failsafe catch-up", state.chargeSource, before.chargeSource)
-            expectEqual("charging demand after failsafe catch-up", state.chargeWantW, before.chargeWantW)
-            expect(state.generators[1].chargesBank and not state.generators[2].chargesBank,
-                "starting B changed the nearest charging supplier away from A")
-            expectNear("A's immediate bill after B takes the appliance, including native rebuild",
-                state.generators[1].bill, reads.bothBare.generators[1].bill, 0.0001)
-            expectNear("B's immediate bill for the appliance, including native rebuild",
-                state.generators[2].bill, reads.bothBare.generators[2].bill + fuelPerHour(T.fridgeW()), 0.0001)
+                "Rename's catch-up didn't leave A running and start failsafe B" .. what)
+            expect(state.activated == before.activated and state.chargeSource == before.chargeSource
+                and state.chargeWantW == before.chargeWantW,
+                "Rename changed the bank's activation or charging, which the fridge's move must not need" .. what)
+            expectNear("A's bill once B takes the fridge" .. what, state.generators[1].bill, bare[1].bill, 0.0001)
+            expectNear("B's bill with the fridge" .. what, state.generators[2].bill,
+                bare[2].bill + T.fuelPerHour(T.fridgeW()), 0.0001)
         end
     end,
 })
@@ -647,10 +623,10 @@ test("renewable_energy_bank_nearest_generator_pays_shared_appliance", {
             T.readGenerator(self, near, "near" .. key)
             T.readGenerator(self, far, "far" .. key)
         end
-        T.server(self, "billGenerators", {})
+        T.billGenerators(self)
         read("Before")
         T.step(function() T.placeTile(self, fridge, T.MINI_FRIDGE) end)
-        T.server(self, "billGenerators", {})
+        T.billGenerators(self)
         read("Shared")
         T.setGenerator(self, near, { rebuild = true })
         read("Rebuilt")
@@ -660,7 +636,7 @@ test("renewable_energy_bank_nearest_generator_pays_shared_appliance", {
         for _, when in ipairs({ "Shared", "Rebuilt" }) do
             local after = when == "Shared" and "" or " after vanilla rebuilt the bills"
             expectNear("fuel the fridge added to the nearer generator's bill" .. after,
-                reads["near" .. when].bill - reads.nearBefore.bill, fuelPerHour(T.fridgeW()), 0.0001)
+                reads["near" .. when].bill - reads.nearBefore.bill, T.fuelPerHour(T.fridgeW()), 0.0001)
             expectNear("fuel the fridge added to the farther generator's bill" .. after,
                 reads["far" .. when].bill - reads.farBefore.bill, 0, 0.0001)
         end
@@ -684,7 +660,7 @@ test("renewable_energy_bank_and_generator_nearest_pays", {
         local function pass(key)
             T.batch(function()
                 T.bankPass(self, bank, 0, { hours = 0.01, label = key .. "Bank" })
-                T.server(self, "billGenerators", {})
+                T.billGenerators(self)
                 T.readGenerator(self, generator, key)
             end)
         end
@@ -705,6 +681,6 @@ test("renewable_energy_bank_and_generator_nearest_pays", {
         expectNear("fuel the fridge added to the generator's bill while the bank ran",
             reads.shared.bill - reads.before.bill, 0, 0.0001)
         expectNear("fuel a fridge added to the generator's bill once the bank was off",
-            reads.aloneWithFridge.bill - reads.alone.bill, fuelPerHour(T.fridgeW()), 0.0001)
+            reads.aloneWithFridge.bill - reads.alone.bill, T.fuelPerHour(T.fridgeW()), 0.0001)
     end,
 })

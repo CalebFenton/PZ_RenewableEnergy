@@ -32,22 +32,21 @@ local function lightsAround(def)
     return found
 end
 
--- The house near the character, its roll forgotten (its chunk loading rolled it), is rolled for
--- garden lights the way the world rolls it, then again: with `args.promise`, after promising it
--- lights as a solar site does; else with the roll set to `args.roll`. Answers its chance, how many
--- lights each roll gave, whether the first roll was kept, and the new lights: their squares,
--- whether each stands outdoors on the ground, and their charge. They are removed when the test
--- ends.
+-- The house near the character, its roll forgotten until the test ends, is rolled for garden
+-- lights the way the world rolls it, every roll at `args.roll`, a number or "under" for just under
+-- the house's chance, then again. Answers whether it was rolled before (its chunk loading rolls
+-- it), its chance, how many lights each roll gave, whether the first roll was kept, the range of
+-- lights a roll gives, and the new lights: their squares, whether each stands outdoors on the
+-- ground, and their charge. They are removed when the test ends.
 handler("gardenLightsRoll", function(player, args, defer)
     local def = need(PZHarness.Fixtures.buildingNear(math.floor(player:getX()), math.floor(player:getY()), 60, isHouse),
         "a house near the character on the server")
+    local rolledBefore = GardenLights.isRolled(def)
     Helpers.forgetBuildingRoll(GardenLights.MOD_DATA, def, defer)
     local before = lightsAround(def)
-    if args.promise then
-        GardenLights.promise(def)
-    end
-    local first = args.promise and GardenLights.roll(def) or PZHarness.Rolls.with(defer, { args.roll }, GardenLights.roll, def)
-    local answer = { chance = GardenLights.chanceFor(def), first = first, rolled = GardenLights.isRolled(def),
+    local chance = GardenLights.chanceFor(def)
+    local first = PZHarness.Rolls.with(defer, PZHarness.Rolls.trialRoll(args.roll, chance), GardenLights.roll, def)
+    local answer = { rolledBefore = rolledBefore, chance = chance, first = first, rolled = GardenLights.isRolled(def),
         second = GardenLights.roll(def), lights = {}, count = GardenLights.COUNT }
     for i, light in ipairs(PZHarness.Fixtures.newSince(before, lightsAround(def))) do
         defer(function() removePlaced(light) end)
@@ -61,17 +60,9 @@ handler("gardenLightsRoll", function(player, args, defer)
     return answer
 end)
 
--- At the square at `args`: whether it is loaded, the house nearest it within `args.radius`, whether
--- that house was rolled for garden lights, and the neighbourhood.
+-- Whether the square at `args` is loaded, and its neighbourhood.
 handler("gardenLightsAt", function(_, args)
-    local loaded = getSquare(args.x, args.y, 0) ~= nil
-    local def = loaded and PZHarness.Fixtures.buildingNear(args.x, args.y, args.radius, isHouse)
-    return {
-        loaded = loaded,
-        house = def and BuildingWatch.key(def) or nil,
-        rolled = def and GardenLights.isRolled(def) or false,
-        neighbourhood = GardenLights.neighbourhood(args.x, args.y),
-    }
+    return { loaded = getSquare(args.x, args.y, 0) ~= nil, neighbourhood = GardenLights.neighbourhood(args.x, args.y) }
 end)
 
 -- The building of the map at x, y, loaded or not, or the handler ends as missing it.
