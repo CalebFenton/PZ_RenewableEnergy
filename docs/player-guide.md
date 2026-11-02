@@ -293,6 +293,10 @@ Sealing in place follows the crafting window's item protections: favorite adhesi
 
 A **Homemade Solar Module** is 16 solar cells under glass. Cells come from taking apart calculators, garden lights, solar battery chargers, maintainers, and shattered modules (only at zero condition). A homemade module tops out at 60% of a factory one, so its glass cracks at 51 and 30.
 
+### Glass
+
+Reglazing and homemade modules each take a pane of glass, and a car window taken off in the mechanics window does as well, as long as it isn't shattered. Panes are hard to make, but houses are full of them: pick up a window with a crowbar (that takes a little carpentry), then **Take Out Window Glass** with a screwdriver or a sharp knife digs out the putty and gives you its two panes. Taking the glass out needs nothing learned, but a window can break as you pick it up, and then there is nothing to take out.
+
 ## Wind chargers
 
 Wind blows day and night, and hardest in winter, just when the panels give the least. Wind chargers are built on the **Welding** page of the build menu, and each needs a generator: a treadmill's motor, a car's alternator, or an alternator you make yourself. Every charger but the scoop rotor also takes a set of blades, wooden, pipe or steel, and stands with whichever set the build used. Those bladed chargers take 3 inputs, so their bank needs a charge controller.

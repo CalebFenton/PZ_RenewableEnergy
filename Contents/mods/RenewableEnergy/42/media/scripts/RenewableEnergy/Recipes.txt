@@ -22,7 +22,8 @@
     As in vanilla, every learnable recipe also comes with skill (AutoLearnAny), so a magazine
     is a shortcut, not the only door. ResearchAny names the skills that let a player research
     the recipe from its output, as vanilla's MakeBarbedWire does.
-    Unmounting a panel, taking gadgets apart and servicing a battery need no learning.
+    Unmounting a panel, taking gadgets apart, servicing a battery and taking a window's glass out
+    need no learning.
 */
 module Base
 {
@@ -501,7 +502,9 @@ module Base
     }
 
     /* A new pane over the cracked cells. The cells stay cracked, so it can't bring a module back
-       to new. Like vanilla car glass, a trailer panel is replaced in hand, not fixed in place. */
+       to new. Like vanilla car glass, a trailer panel is replaced in hand, not fixed in place.
+       A car window serves as the pane: vanilla makes panes only with a rare magazine or trait,
+       while cars are everywhere. A shattered one is broken, which inputs refuse. */
     craftRecipe RenewableEnergy_ReglazeModule
     {
         timedAction = MakingElectrical,
@@ -519,7 +522,7 @@ module Base
         {
             item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],
             item 1 [RenewableEnergy.SolarModule;RenewableEnergy.HomemadeSolarModule] mode:keep,
-            item 1 [Base.GlassPanel],
+            item 1 [Base.GlassPanel;Base.Windshield1;Base.Windshield2;Base.Windshield3;Base.RearWindshield1;Base.RearWindshield2;Base.RearWindshield3;Base.FrontWindow1;Base.FrontWindow2;Base.FrontWindow3;Base.RearWindow1;Base.RearWindow2;Base.RearWindow3],
             item 1 [Base.Epoxy;2:Base.Glue],
             item 1 [Base.ElectricWire],
         }
@@ -528,7 +531,8 @@ module Base
         }
     }
 
-    /* Salvaged cells under a pane of glass, the self-sufficient way to a panel. */
+    /* Salvaged cells under a pane of glass, the self-sufficient way to a panel. A car window
+       serves as the pane, as for Reglaze Module. */
     craftRecipe RenewableEnergy_MakeHomemadeSolarModule
     {
         timedAction = MakingElectrical,
@@ -544,7 +548,7 @@ module Base
             item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],
             item 1 tags[base:pliers] mode:keep flags[MayDegradeLight],
             item 16 [RenewableEnergy.SolarCells],
-            item 1 [Base.GlassPanel],
+            item 1 [Base.GlassPanel;Base.Windshield1;Base.Windshield2;Base.Windshield3;Base.RearWindshield1;Base.RearWindshield2;Base.RearWindshield3;Base.FrontWindow1;Base.FrontWindow2;Base.FrontWindow3;Base.RearWindow1;Base.RearWindow2;Base.RearWindow3],
             item 1 [Base.SmallSheetMetal;4:Base.Plank],
             item 1 [Base.Epoxy;2:Base.Glue],
             item 2 [Base.ElectricWire],
@@ -552,6 +556,30 @@ module Base
         outputs
         {
             item 1 RenewableEnergy.HomemadeSolarModule,
+        }
+    }
+
+    /* The other way to panes: a window holds its glass in the sash with glazing putty, which a
+       screwdriver or a knife digs out, so the glass lifts out whole; a double-hung window holds
+       two. Every picked-up tile is the one script item Moveable, so OnTest lets only windows
+       through. A picked-up Moveable is used up only under mode:destroy (DEVELOPMENT.md). */
+    craftRecipe RenewableEnergy_TakeOutWindowGlass
+    {
+        timedAction = Making,
+        time = 150,
+        Tags = AnySurfaceCraft;Carpentry,
+        category = Carpentry,
+        xpAward = Woodwork:3,
+        Tooltip = Tooltip_RenewableEnergy_TakeOutWindowGlass,
+        OnTest = RenewableEnergy.Recipes.isWindow,
+        inputs
+        {
+            item 1 tags[base:screwdriver;base:sharpknife] mode:keep flags[Prop1;MayDegradeLight],
+            item 1 [Base.Moveable] mode:destroy,
+        }
+        outputs
+        {
+            item 2 Base.GlassPanel,
         }
     }
 

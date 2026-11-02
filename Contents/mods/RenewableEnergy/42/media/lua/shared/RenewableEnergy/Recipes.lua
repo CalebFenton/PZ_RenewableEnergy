@@ -145,6 +145,19 @@ function Recipes.isShatteredModule(item, character)
     return item:getFullType() ~= Specs.factoryModule or item:getCondition() <= 0
 end
 
+-- OnTest of Take Out Window Glass. Whatever tile was picked up is the same script item, told apart
+-- only by its world sprite, whose MoveType the game's own moveables code reads to treat it as a
+-- window (ISMoveableSpriteProps). Pickup makes an item only of a whole window
+-- (ISMoveableSpriteProps:instanceItem), so every window item still has its glass.
+function Recipes.isWindow(item, character)
+    if not instanceof(item, "Moveable") then
+        return true
+    end
+    local spriteName = item:getWorldSprite()
+    local sprite = spriteName and getSprite(spriteName)
+    return sprite ~= nil and sprite:getProperties():get("MoveType") == "Window"
+end
+
 local function inputBattery(craftRecipeData)
     return Items.firstInput(craftRecipeData, Battery.isBattery)
 end

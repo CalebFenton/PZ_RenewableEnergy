@@ -109,7 +109,8 @@ local GROUP_TYPES = {
     solar = {
         "RenewableEnergy.SolarModule", "RenewableEnergy.HomemadeSolarModule", "RenewableEnergy.SolarCells",
         "RenewableEnergy.SolarFlat", "RenewableEnergy.SolarWall*", "RenewableEnergy.SolarRack*",
-        "Base.GlassPanel", "Base.Epoxy", "Base.Glue", "Base.Calculator", "Base.Broom", "Base.SnowShovel",
+        "Base.GlassPanel", "Moveables.fixtures_windows_01_0", "Base.Epoxy", "Base.Glue", "Base.Calculator", "Base.Broom",
+        "Base.SnowShovel",
     },
     -- Blades and alternators for the wind chargers.
     wind = {
@@ -284,6 +285,10 @@ local function addJobMaterials(stock, player, summary)
     end
 end
 
+-- What stands in for a recipe need that names only the script item every picked-up tile shares:
+-- Take Out Window Glass takes a picked-up window.
+local PICKED_UP = { ["Base.Moveable"] = "Moveables.fixtures_windows_01_0" }
+
 -- Everything the scenario hands out: every item of the mod a player can hold, what the recipes
 -- take, the batteries and modules among them worn, and what the menu jobs take and work on.
 local function collectStock(player, summary)
@@ -296,7 +301,7 @@ local function collectStock(player, summary)
     local needs
     needs, summary.unmatched = HarnessQA.materials(HarnessQA.modRecipeNames(), Debug.PREFERRED_INPUTS)
     for _, need in ipairs(needs) do
-        addStock(stock, need.type, need.used, need.kept, need.fluid, true)
+        addStock(stock, PICKED_UP[need.type] or need.type, need.used, need.kept, need.fluid, true)
     end
     addJobMaterials(stock, player, summary)
     for _, entry in ipairs(WORKED_ON) do

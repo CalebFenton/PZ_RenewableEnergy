@@ -7,8 +7,8 @@ local ModuleRepair = require "RenewableEnergy/PowerBank/ModuleRepair"
 local Items = require "cf_commonlib/Items"
 local Sprites = require "RenewableEnergy/Sprites"
 
--- Solar crafting: what a module shows through its life (Sprites.lua) and mount and module recipes
--- (Recipes.lua, ModuleRepair.lua).
+-- Solar crafting: what a module shows through its life (Sprites.lua) and mount, module and glass
+-- recipes (Recipes.lua, ModuleRepair.lua).
 
 local T = RenewableEnergyTest
 local test, craftTest, expect, expectNear, expectEqual, player = T.test, T.craftTest, T.expect, T.expectNear, T.expectEqual,
@@ -346,5 +346,49 @@ for _, entry in ipairs({ { nil, 0 }, { "refuses_working_module", 1 } }) do
             T.changeItem(self, T.inputsOf(self, T.FACTORY_MODULE)[1], { condition = condition })
         end,
         counts = condition > 0 and { [T.FACTORY_MODULE] = 1, ["RenewableEnergy.SolarCells"] = 0 } or { [T.FACTORY_MODULE] = 0 },
+    })
+end
+
+-- Glass -----------------------------------------------------------------------------------------
+
+-- A car window does for the pane, in both recipes that take one, and goes as the pane would.
+local CAR_WINDOW = "Base.FrontWindow1"
+T.repairCraftTest(craftName("RenewableEnergy_ReglazeModule", "with_car_window"), "RenewableEnergy_ReglazeModule",
+    T.FACTORY_MODULE, {
+        before = light(T.FACTORY_MODULE),
+        repaired = 0,
+        after = new(T.FACTORY_MODULE),
+        repairedAfter = 0,
+        prefer = { CAR_WINDOW },
+        counts = { [T.FACTORY_MODULE] = 1, [CAR_WINDOW] = 0 },
+    })
+craftTest(craftName("RenewableEnergy_MakeHomemadeSolarModule", "with_car_window"), {
+    recipe = "RenewableEnergy_MakeHomemadeSolarModule",
+    from = "RenewableEnergy.SolarCells",
+    prefer = { CAR_WINDOW },
+    counts = { [T.HOMEMADE_MODULE] = 1, [CAR_WINDOW] = 0 },
+})
+
+-- Take Out Window Glass gives a picked-up window's panes, with a screwdriver or a sharp knife, and
+-- refuses any other picked-up tile, which is the same script item as the window. A picked-up
+-- tile's full type is its sprite's name in module Base (InventoryItemFactory), which `from` finds
+-- the item by. Each row: the behaviour, the tile, and the tool.
+local TAKE_OUT, WINDOW = "RenewableEnergy_TakeOutWindowGlass", "fixtures_windows_01_0"
+for _, entry in ipairs({
+    { "with_screwdriver", WINDOW, "Base.Screwdriver" },
+    { "with_knife", WINDOW, "Base.KitchenKnife" },
+    { "refuses_chair", "furniture_seating_indoor_02_0", "Base.Screwdriver" },
+}) do
+    local behavior, sprite, tool = entry[1], entry[2], entry[3]
+    local picked, refused = "Base." .. sprite, sprite ~= WINDOW
+    craftTest(craftName(TAKE_OUT, behavior), {
+        recipe = TAKE_OUT,
+        from = picked,
+        refused = refused,
+        -- The harness's own pick for the input would be a Moveable of no tile at all.
+        prepare = function(self)
+            T.give(self, "inputs", { { type = tool }, { type = "Moveables." .. sprite } })
+        end,
+        counts = { [picked] = refused and 1 or 0, ["Base.GlassPanel"] = refused and 0 or 2, [tool] = 1 },
     })
 end
