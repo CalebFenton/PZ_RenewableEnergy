@@ -281,9 +281,7 @@ local HANDOVERS = {
         what = "its room seen",
         seesRoom = true,
         handOver = function(square)
-            local squares = ArrayList.new()
-            squares:add(square)
-            triggerEvent("OnSeeNewRoom", { getName = function() return "bedroom" end, getSquares = function() return squares end })
+            triggerEvent("OnSeeNewRoom", PZHarness.Fixtures.fakeRoom("bedroom", { square }))
         end,
     },
 }

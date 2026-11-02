@@ -120,8 +120,8 @@ handler("seenRoom", function(_, args, defer)
     end
     local results = PZHarness.Rolls.eachTrial(defer, args.trials, rollOf, function(trial)
         SandboxVars.RenewableEnergy.BatteryBankSpawn = trial.setting
-        local room = { getName = function() return trial.room end, getRandomFreeSquare = function() return square end,
-            getSquares = function() return ArrayList.new() end }
+        -- No squares to walk, so the mod's finds leave the test's square alone.
+        local room = PZHarness.Fixtures.fakeRoom(trial.room, {}, { square })
         local tilesBefore, itemsBefore = tilesOn(square), PZHarness.Fixtures.worldItems(squaresAround(square))
         triggerEvent("OnSeeNewRoom", room)
         local tiles = PZHarness.Fixtures.newSince(tilesBefore, tilesOn(square))
