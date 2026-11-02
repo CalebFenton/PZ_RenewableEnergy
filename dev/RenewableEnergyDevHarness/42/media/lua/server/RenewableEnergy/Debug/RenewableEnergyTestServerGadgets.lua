@@ -158,22 +158,18 @@ local function drain(vehicle, args, switch, update)
     return { drop = args.uses - battery:getCurrentUsesFloat(), type = battery:getFullType() }
 end
 
--- The mod's wrap of the drain every engine-off load goes through (VehicleUtils.chargeBattery),
--- taking `args.delta` of a car battery's charge from a battery at `args.uses`: the share of a full
--- charge it took.
-handler("batteryDrain", function(_, args)
-    local vehicle = PZHarness.vehicleAt(args)
-    return drain(vehicle, args, nil, function() VehicleUtils.chargeBattery(vehicle, -args.delta) end)
-end)
-
--- The battery update the mod wraps (Vehicles.Update.Battery) for `args.minutes` with the engine
--- off and the lightbar on, from a battery at `args.uses`: the update drains the lightbar, there
--- being no lightbar part. Answers the share of a full charge it took.
+-- The battery update the mod wraps (Vehicles.Update.Battery), `args.updates` times for
+-- `args.minutes` each, with the engine off and the lightbar on, from a battery at `args.uses`: the
+-- update drains the lightbar, there being no lightbar part. Answers the share of a full charge it
+-- took.
 handler("lightbarDrain", function(_, args)
     local vehicle = PZHarness.vehicleAt(args)
     need(vehicle:hasLightbar(), "a lightbar on the vehicle on the server")
-    return drain(vehicle, args, function(on) vehicle:setLightbarLightsMode(on and 1 or 0) end,
-        function(part) Vehicles.Update.Battery(vehicle, part, args.minutes) end)
+    return drain(vehicle, args, function(on) vehicle:setLightbarLightsMode(on and 1 or 0) end, function(part)
+        for _ = 1, args.updates do
+            Vehicles.Update.Battery(vehicle, part, args.minutes)
+        end
+    end)
 end)
 
 -- The battery update the mod wraps (Vehicles.Update.Battery) for `args.minutes` with the engine

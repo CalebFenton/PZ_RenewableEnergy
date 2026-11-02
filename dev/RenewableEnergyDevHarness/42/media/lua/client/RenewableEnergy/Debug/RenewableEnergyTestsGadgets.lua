@@ -326,12 +326,11 @@ end
 -- same input, moves a car battery and a deep cycle battery by the same watt-hours, so the deep
 -- cycle's share (the answer's `change`) moves less by the capacity ratio.
 local BATTERY_ROWS = {
-    -- One step far larger than a game minute's: the battery keeps whole uses, and rounding a
-    -- minute's scaled drain to them skews the ratio (DrainableComboItem.setCurrentUsesFloat).
-    { what = "drain", handler = "batteryDrain", uses = 0.8, delta = 0.01, change = "drop" },
-    -- Scaled once, though vanilla drains the lightbar inside the battery update the mod scales.
-    -- Vanilla's lightbar drain is small; a long run makes it measurable.
-    { what = "lightbar drain", handler = "lightbarDrain", uses = 0.8, minutes = 600, change = "drop" },
+    -- A game minute an update, as the game updates parts (VehicleParts.updatePart), for an hour:
+    -- the battery keeps whole uses and a minute's scaled drain is a few, so the scale holds over
+    -- the hour only if what rounding leaves of each minute carries on. Vanilla drains the
+    -- lightbar inside the battery update the mod scales for the alternator: scaled once.
+    { what = "lightbar drain", handler = "lightbarDrain", uses = 0.8, minutes = 1, updates = 60, change = "drop" },
     { what = "alternator charge", handler = "alternatorCharge", uses = 0.2, minutes = 60, change = "gain" },
 }
 -- A charge an hour of the alternator fills, scaled or not: the wrap scales the minutes vanilla
@@ -349,7 +348,7 @@ test("renewable_energy_gadgets_deep_cycle_battery_scales_vanilla_charge_and_drai
         end
         for _, row in ipairs(BATTERY_ROWS) do
             for i, batteryType in ipairs(BATTERIES) do
-                T.onVehicle(self, cars[i], row.handler, { uses = row.uses, minutes = row.minutes, delta = row.delta },
+                T.onVehicle(self, cars[i], row.handler, { uses = row.uses, minutes = row.minutes, updates = row.updates },
                     row.what .. " " .. batteryType)
             end
         end
