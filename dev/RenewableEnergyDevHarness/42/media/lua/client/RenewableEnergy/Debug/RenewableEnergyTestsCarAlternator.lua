@@ -77,7 +77,8 @@ test("renewable_energy_gadgets_car_alternator_take_out_once", {
     end,
 })
 
--- An hour of vanilla's alternator charging (the alternatorCharge handler, RenewableEnergyTestServerGadgets.lua)
+-- An hour of the battery update the mod wraps with the engine running (the alternatorCharge
+-- handler, RenewableEnergyTestServerGadgets.lua)
 -- adds nothing to the battery of a car whose alternator is out, and charges it again once the
 -- alternator is back, which takes it from the inventory.
 test("renewable_energy_gadgets_car_alternator_out_stops_charging", {

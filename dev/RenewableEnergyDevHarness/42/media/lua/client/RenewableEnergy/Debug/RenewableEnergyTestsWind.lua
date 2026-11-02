@@ -293,40 +293,46 @@ test("renewable_energy_wind_power_curve_rule", {
 })
 
 -- This client draws each wind charger as its turning model, once the charger is added to the map
--- (OnObjectAdded, which the placePanel handler fires as placing does): each bladed kind's by its
--- blades and facing, with its kind's texture for those blades (scripts SpriteModels.txt).
+-- (OnObjectAdded, which the placePanel handler fires as placing does): one of the steps of the
+-- sprite model Sprites.windModelOf names for each bladed kind's blades and facing, which
+-- SpriteModels.txt must define under that name.
 local DRAWN = {
-    scoop = { sprite = Sprites.windScoop, texture = "WorldItems/RenewableEnergy_ScoopRotor" },
-    propellerPipeE = { sprite = Sprites.windCharger.propeller.pipe.E, texture = "WorldItems/RenewableEnergy_PropellerPipe" },
-    propellerWoodN = { sprite = Sprites.windCharger.propeller.wood.N, texture = "WorldItems/RenewableEnergy_PropellerWood" },
-    propellerSteelS = { sprite = Sprites.windCharger.propeller.steel.S, texture = "WorldItems/RenewableEnergy_PropellerSteel" },
-    carAlternatorWoodE = { sprite = Sprites.windCharger.carAlternator.wood.E,
-        texture = "WorldItems/RenewableEnergy_CarAlternatorWood" },
-    carAlternatorPipeN = { sprite = Sprites.windCharger.carAlternator.pipe.N,
-        texture = "WorldItems/RenewableEnergy_CarAlternatorPipe" },
-    carAlternatorSteelW = { sprite = Sprites.windCharger.carAlternator.steel.W,
-        texture = "WorldItems/RenewableEnergy_CarAlternatorSteel" },
-    turbineWoodS = { sprite = Sprites.windCharger.alternator.wood.S, texture = "WorldItems/RenewableEnergy_AlternatorWood" },
-    turbinePipeE = { sprite = Sprites.windCharger.alternator.pipe.E, texture = "WorldItems/RenewableEnergy_AlternatorPipe" },
-    turbineSteelW = { sprite = Sprites.windCharger.alternator.steel.W, texture = "WorldItems/RenewableEnergy_AlternatorSteel" },
+    scoop = Sprites.windScoop,
+    propellerPipeE = Sprites.windCharger.propeller.pipe.E,
+    propellerWoodN = Sprites.windCharger.propeller.wood.N,
+    propellerSteelS = Sprites.windCharger.propeller.steel.S,
+    carAlternatorWoodE = Sprites.windCharger.carAlternator.wood.E,
+    carAlternatorPipeN = Sprites.windCharger.carAlternator.pipe.N,
+    carAlternatorSteelW = Sprites.windCharger.carAlternator.steel.W,
+    turbineWoodS = Sprites.windCharger.alternator.wood.S,
+    turbinePipeE = Sprites.windCharger.alternator.pipe.E,
+    turbineSteelW = Sprites.windCharger.alternator.steel.W,
 }
+
+-- Whether `drawn`, a sprite model, is one of the steps of the model `sprite` is drawn as.
+local function isStepOf(drawn, sprite)
+    local prefix, model = Sprites.windModelOf(sprite)
+    for step = 0, (model and model.steps or 0) - 1 do
+        if drawn == getScriptManager():getSpriteModel(prefix .. step) then return true end
+    end
+    return false
+end
 
 test("renewable_energy_wind_charger_drawn_as_model", {
     run = function(self)
         self.chargers = {}
         T.batch(function()
-            for label, drawn in pairs(DRAWN) do
-                self.chargers[label] = T.panel(self, drawn.sprite)
+            for label, sprite in pairs(DRAWN) do
+                self.chargers[label] = T.panel(self, sprite)
             end
         end)
     end,
     validate = function(self)
-        for label, drawn in pairs(DRAWN) do
+        for label, sprite in pairs(DRAWN) do
             local charger = self.chargers[label]
-            local object = charger and charger.object
-            local model = object and object:getSpriteModel()
-            T.expectEqual("the texture this client draws the " .. label .. " charger's model with",
-                model and model:getTextureName(), drawn.texture)
+            local model = charger and charger.object and charger.object:getSpriteModel()
+            expect(model ~= nil and isStepOf(model, sprite),
+                "this client doesn't draw the " .. label .. " charger as a step of its kind's model")
         end
     end,
 })

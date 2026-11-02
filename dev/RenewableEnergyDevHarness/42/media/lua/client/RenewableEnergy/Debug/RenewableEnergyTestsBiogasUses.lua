@@ -266,8 +266,7 @@ test("renewable_energy_biogas_compressor_fills_past_pump_with_scrubber", {
 })
 
 -- A tire pump fills a welding torch straight from the digester, to the pump's share of the torch,
--- at what vanilla's Refill Blow Torch takes of a tank for it, so a torch costs the same gas filled
--- directly as through a tank.
+-- taking the torch's fill share of a tank's gas for a full torch.
 test("renewable_energy_biogas_pump_fills_torch", {
     instant = true,
     run = function(self)
@@ -289,8 +288,7 @@ test("renewable_energy_biogas_pump_fills_torch", {
         local script = getScriptManager():FindItem("Base.BlowTorch")
         local uses = round(Digester.PUMP_FILL / script:getUseDelta()) * script:getUseDelta()
         T.expectNear("torch after pumping", torch.uses, uses, 0.001)
-        -- Vanilla's refill: 70 tank uses of a 5000-use tank per torch use.
-        local m3 = uses / script:getUseDelta() * 70 / 5000 * Digester.M3_PER_TANK
+        local m3 = uses * Digester.FILL_SHARES[Digester.TORCH] * Digester.M3_PER_TANK
         T.expectNear("gas the torch took", self.gas - self.reads.after.gas, m3, 0.02)
     end,
 })

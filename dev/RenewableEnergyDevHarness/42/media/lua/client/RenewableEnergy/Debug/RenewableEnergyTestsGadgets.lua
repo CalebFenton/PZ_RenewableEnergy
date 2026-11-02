@@ -335,13 +335,13 @@ local function onBothBatteries(self, script, name, args, full)
     end
 end
 
--- The same run of each vanilla vehicle update on a car battery and on a deep cycle battery moves the
--- same watt-hours, so the deep cycle's share changes less by the capacity ratio. The lightbar must
--- be scaled once, though vanilla drains it inside the battery update the mod scales. `change` is
--- the answer field holding that share.
+-- The same input to each of the mod's wraps of vanilla's battery drain and update moves a car
+-- battery and a deep cycle battery by the same watt-hours, so the deep cycle's share changes less
+-- by the capacity ratio. The lightbar must be scaled once, though vanilla drains it inside the
+-- battery update the mod scales. `change` is the answer field holding that share.
 local VEHICLE_HOURS = {
-    { behavior = "headlight_drain_scales_with_capacity", vehicle = CAR, handler = "headlightDrain", uses = 0.8,
-        change = "drop", none = "the headlight didn't drain the car battery" },
+    { behavior = "drain_scales_with_capacity", vehicle = CAR, handler = "batteryDrain", uses = 0.8, delta = 0.01,
+        change = "drop", none = "the drain didn't drain the car battery" },
     -- Vanilla's lightbar drain is small; a long run makes it measurable.
     { behavior = "lightbar_drain_scales_with_capacity", vehicle = "Base.CarLightsPolice", handler = "lightbarDrain",
         uses = 0.8, minutes = 600, change = "drop", none = "the lightbar didn't drain the car battery" },
@@ -353,7 +353,8 @@ local VEHICLE_HOURS = {
 for _, case in ipairs(VEHICLE_HOURS) do
     test("renewable_energy_gadgets_deep_cycle_battery_" .. case.behavior, {
         run = function(self)
-            onBothBatteries(self, case.vehicle, case.handler, { uses = case.uses, minutes = case.minutes or 60 }, case.full)
+            onBothBatteries(self, case.vehicle, case.handler,
+                { uses = case.uses, minutes = case.minutes or 60, delta = case.delta }, case.full)
         end,
         validate = function(self)
             local car, deepCycle = self.reads[T.CAR_BATTERY], self.reads[VehicleBattery.ITEM]

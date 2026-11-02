@@ -1,5 +1,5 @@
 -- The authority's half of the gadget, vehicle and clock tests: the solar battery charger, garden
--- light and maintainer passes, and vanilla's vehicle battery updates they are weighed against.
+-- light and maintainer passes, and the mod's wraps of vanilla's vehicle battery updates.
 
 require "PZHarness/ServerHandlers"
 require "PZHarness/Fixtures"
@@ -144,38 +144,36 @@ handler("chargeVehicles", function(_, args)
     return { before = before, after = battery:getCurrentUsesFloat() }
 end)
 
--- Runs `update(part)` of the vehicle's battery part with its lights switched on by `switch(true)`,
--- from a battery at `args.uses`, then switches them off: the share of a full charge it took.
-local function lightDrain(vehicle, args, switch, update)
+-- Runs `update(part)` of the vehicle's battery part from a battery at `args.uses`, with its lights
+-- switched on by `switch(true)` if given and off after: the share of a full charge it took.
+local function drain(vehicle, args, switch, update)
     local part, battery = batteryOf(vehicle)
     battery:setCurrentUsesFloat(args.uses)
-    switch(true)
+    if switch then switch(true) end
     update(part)
-    switch(false)
+    if switch then switch(false) end
     return { drop = args.uses - battery:getCurrentUsesFloat(), type = battery:getFullType() }
 end
 
--- Vanilla's headlight update (Vehicles.Update.Headlight) for `args.minutes` with the engine off,
--- from a battery at `args.uses`: the share of a full charge it took.
-handler("headlightDrain", function(_, args)
+-- The mod's wrap of the drain every engine-off load goes through (VehicleUtils.chargeBattery),
+-- taking `args.delta` of a car battery's charge from a battery at `args.uses`: the share of a full
+-- charge it took.
+handler("batteryDrain", function(_, args)
     local vehicle = PZHarness.vehicleAt(args)
-    local headlight = vehicle:getPartById("HeadlightLeft")
-    need(headlight and headlight:getInventoryItem(), "a left headlight on the vehicle on the server")
-    return lightDrain(vehicle, args, function(on) vehicle:setHeadlightsOn(on) end,
-        function() Vehicles.Update.Headlight(vehicle, headlight, args.minutes) end)
+    return drain(vehicle, args, nil, function() VehicleUtils.chargeBattery(vehicle, -args.delta) end)
 end)
 
--- Vanilla's lightbar drain for `args.minutes` with the engine off, from a battery at `args.uses`:
--- the battery's update runs it, there being no lightbar part (Vehicles.Update.Battery calls
--- Vehicles.Update.Lightbar). Answers the share of a full charge it took.
+-- The battery update the mod wraps (Vehicles.Update.Battery) for `args.minutes` with the engine
+-- off and the lightbar on, from a battery at `args.uses`: the update drains the lightbar, there
+-- being no lightbar part. Answers the share of a full charge it took.
 handler("lightbarDrain", function(_, args)
     local vehicle = PZHarness.vehicleAt(args)
     need(vehicle:hasLightbar(), "a lightbar on the vehicle on the server")
-    return lightDrain(vehicle, args, function(on) vehicle:setLightbarLightsMode(on and 1 or 0) end,
+    return drain(vehicle, args, function(on) vehicle:setLightbarLightsMode(on and 1 or 0) end,
         function(part) Vehicles.Update.Battery(vehicle, part, args.minutes) end)
 end)
 
--- Vanilla's alternator charging (Vehicles.Update.Battery) for `args.minutes` with the engine
+-- The battery update the mod wraps (Vehicles.Update.Battery) for `args.minutes` with the engine
 -- running, from a battery at `args.uses`: the share of a full charge it added. The engine is
 -- repaired and fuelled first, since it shuts down without fuel and stalls at random when worn.
 handler("alternatorCharge", function(_, args)

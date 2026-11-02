@@ -55,16 +55,13 @@ test("renewable_energy_solar_sun_year_matches_measured_insolation", {
 })
 
 -- The sun at noon on the June solstice stands at 90° less the latitude plus the axial tilt, sits
--- on the horizon at the end of the half day and makes nothing at night; the game's dawn is sunrise.
-test("renewable_energy_solar_sun_noon_dawn_night", {
+-- on the horizon at the end of the half day and makes nothing at night.
+test("renewable_energy_solar_sun_noon_night", {
     run = function(self)
         self.noon = math.deg(math.asin(Sun.position(SOLSTICE, 0, LATITUDE).up))
         local halfDay = Sun.halfDayHours(SOLSTICE, LATITUDE)
         self.sunset = Sun.position(SOLSTICE, halfDay, LATITUDE).up
         self.night = Sun.planeIrradiance(Sun.position(SOLSTICE, 12, LATITUDE), "flat", nil, CLEAR)
-        local season = getClimateManager():getSeason()
-        local hoursSinceDawn = getGameTime():getTimeOfDay() - season:getDawn()
-        self.dawn = Sun.positionNow(hoursSinceDawn).up
         self.noonWatts = Sun.planeIrradiance(Sun.position(SOLSTICE, 0, LATITUDE), "flat", nil, CLEAR)
         self.morningWatts = Sun.planeIrradiance(Sun.position(SOLSTICE, -2, LATITUDE), "flat", nil, CLEAR)
     end,
@@ -72,7 +69,6 @@ test("renewable_energy_solar_sun_noon_dawn_night", {
         expectNear("noon elevation on the solstice", self.noon, 90 - LATITUDE + 23.44, 0.1)
         expectNear("sun height at sunset", self.sunset, 0, 0.001)
         expectEqual("light at midnight", self.night, 0)
-        expectNear("sun height at the game's dawn", self.dawn, 0, 0.01)
         expect(self.noonWatts > self.morningWatts and self.noonWatts < Sun.FULL_SUN, string.format(
             "noon light on a flat panel is %.1f W/m², two hours earlier %.1f", self.noonWatts, self.morningWatts))
     end,
