@@ -265,8 +265,9 @@ test("renewable_energy_biogas_compressor_fills_past_pump_with_scrubber", {
     end,
 })
 
--- A tire pump fills a welding torch straight from the digester, to the pump's share of the torch,
--- taking the torch's fill share of a tank's gas for a full torch.
+-- A tire pump fills a welding torch straight from the digester, as close to the pump's share of
+-- the torch as its whole uses come without passing it, taking the torch's fill share of a tank's
+-- gas for each use. The torch's few uses put the share between two of them.
 test("renewable_energy_biogas_pump_fills_torch", {
     instant = true,
     run = function(self)
@@ -285,10 +286,10 @@ test("renewable_energy_biogas_pump_fills_torch", {
     validate = function(self)
         local torch = T.carriedFirst(self, "Base.BlowTorch")
         if not T.expect(torch ~= nil, "the torch is gone") then return end
-        local script = getScriptManager():FindItem("Base.BlowTorch")
-        local uses = round(Digester.PUMP_FILL / script:getUseDelta()) * script:getUseDelta()
-        T.expectNear("torch after pumping", torch.uses, uses, 0.001)
-        local m3 = uses * Digester.FILL_SHARES[Digester.TORCH] * Digester.M3_PER_TANK
+        local delta = getScriptManager():FindItem("Base.BlowTorch"):getUseDelta()
+        T.expect(torch.uses <= Digester.PUMP_FILL + 0.001 and torch.uses > Digester.PUMP_FILL - delta,
+            "the pump filled the torch to " .. torch.uses .. ", not the last use up to its share")
+        local m3 = torch.uses * Digester.FILL_SHARES[Digester.TORCH] * Digester.M3_PER_TANK
         T.expectNear("gas the torch took", self.gas - self.reads.after.gas, m3, 0.02)
     end,
 })
