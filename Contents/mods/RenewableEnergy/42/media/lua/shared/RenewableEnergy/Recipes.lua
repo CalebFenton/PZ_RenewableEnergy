@@ -142,7 +142,7 @@ end
 
 -- OnTest of Take Apart Shattered Module: a module that still makes power stays whole.
 function Recipes.isShatteredModule(item, character)
-    return item:getFullType() ~= Specs.factoryModule or item:getCondition() <= 0
+    return item:getFullType() ~= Specs.factoryModule or item:isBroken()
 end
 
 -- OnTest of Take Out Window Glass. Whatever tile was picked up is the same script item, told apart
