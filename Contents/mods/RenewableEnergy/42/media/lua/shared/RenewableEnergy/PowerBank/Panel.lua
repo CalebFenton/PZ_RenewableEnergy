@@ -3,6 +3,7 @@
 
 local Specs = require "RenewableEnergy/Specs"
 local Sources = require "RenewableEnergy/PowerBank/Sources"
+local Items = require "cf_commonlib/Items"
 
 local Panel = {}
 
@@ -33,7 +34,7 @@ function Panel.modulesOf(holder, mount)
     local modules = type(recorded) == "table" and Panel.copyModules(recorded) or {}
     if #modules == 0 then
         for i = 1, Specs.mounts[mount].modules do
-            modules[i] = { type = Specs.factoryModule, condition = 100 }
+            modules[i] = { type = Specs.factoryModule, condition = Items.conditionMaxOf(Specs.factoryModule) }
         end
     end
     return modules
