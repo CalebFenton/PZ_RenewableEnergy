@@ -69,7 +69,11 @@ test("renewable_energy_battery_depth_of_discharge_wears_batteries", {
         T.switchOn(self, bank)
         -- The clock stands still, and both times lie the same minutes past the hour, so neither
         -- the clock nor its jump fires the bank system's ten-minute pass (GameTime.update): the
-        -- test's pass is the one that crosses midnight.
+        -- test's pass is the one that crosses midnight. That holds only once the clock has stepped
+        -- at 23:30. A server serves commands between its world updates, so without a server frame
+        -- between them the evening's passes and the jump could all come before that step; the
+        -- jump would then find the tens of minutes changed since the clock's last step, and the
+        -- ten-minute pass would cross midnight before the test's.
         T.step(function()
             T.setMultiplier(self, 0)
             T.setTime(self, 23.5)
@@ -79,6 +83,8 @@ test("renewable_energy_battery_depth_of_discharge_wears_batteries", {
             T.setCharge(self, bank, EVENING_CHARGE)
             T.bankPass(self, bank, 0, { hours = 0.1, label = "evening" })
         end)
+        T.read(self, "PZHarness.worldFrame", {}, "eveningFrame")
+        T.serverUntil(self, "PZHarness.worldFrame", {}, function(now) return now.frame > self.reads.eveningFrame.frame end)
         -- Past midnight: the clock's next step turns the day (GameTime.update).
         T.step(function() T.setTime(self, 24 + PAST_MIDNIGHT) end)
         T.serverUntil(self, "PZHarness.readRecord", T.at(bank, { kind = "bank" }), function(state)
