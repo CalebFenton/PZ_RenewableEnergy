@@ -185,18 +185,27 @@ function Battery.today()
     return time:getYear() * 1000 + Sun.dayOfYear(time:getMonth(), time:getDay())
 end
 
+--- How many of the last `hours`, up to now, fell on today: all of them unless they began before
+--- midnight.
+function Battery.hoursToday(hours)
+    return math.min(hours, getGameTime():getTimeOfDay())
+end
+
 --- A day's discharge cycle after a reading of `charge` (0 to 1) on `day` (Battery.today), given the
 --- cycle so far: its day `cycleDay`, `high`, the highest charge in it, and `depth`, the deepest draw
 --- from that high (each nil before the first reading). Returns the cycle's new high and depth, and,
 --- when `day` moves on from `cycleDay`, the finished day's depth, to wear the batteries by
---- (Battery.wearAll); the new day's cycle then starts at `charge`. The caller keeps `day`.
-function Battery.trackCycle(cycleDay, high, depth, charge, day)
-    high = math.max(high or charge, charge)
-    depth = math.max(depth or 0, high - charge)
+--- (Battery.wearAll). The finished day ends at `midnight`, the charge when the day turned (`charge`
+--- if nil), and the new day's cycle runs from there to `charge`. The caller keeps `day`.
+function Battery.trackCycle(cycleDay, high, depth, charge, day, midnight)
     if cycleDay == nil or cycleDay == day then
-        return high, depth, nil
+        high = math.max(high or charge, charge)
+        return high, math.max(depth or 0, high - charge), nil
     end
-    return charge, 0, depth
+    midnight = midnight or charge
+    local _, finished = Battery.trackCycle(cycleDay, high, depth, midnight, cycleDay)
+    high, depth = Battery.trackCycle(day, midnight, 0, charge, day)
+    return high, depth, finished
 end
 
 --- Fraction of its life `item` loses to one discharge `depth` deep (0 to 1) of what it holds now.

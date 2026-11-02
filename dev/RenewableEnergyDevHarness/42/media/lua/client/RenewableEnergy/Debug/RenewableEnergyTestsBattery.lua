@@ -2,6 +2,7 @@ require "RenewableEnergy/Debug/RenewableEnergyTestLib"
 require "RenewableEnergy/Debug/RenewableEnergyTestLibCraft"
 local Wear = require "RenewableEnergy/PowerBank/Wear"
 local Battery = require "RenewableEnergy/PowerBank/Battery"
+local Specs = require "RenewableEnergy/Specs"
 
 -- Battery tests: battery wear in a bank (PowerBank/Battery.lua, Wear.lua) and the battery recipes
 -- that run the mod's Lua (Recipes.lua): repair, rebuild and the jar battery. See
@@ -49,45 +50,62 @@ test("renewable_energy_battery_wear", {
 })
 
 -- A day's deepest discharge wears the batteries at the bank's first pass of the next day, on this
--- client's copies too: a car battery charged full, run down to a tenth, then a pass across
--- midnight.
+-- client's copies too: a rack of jar batteries charged full and run down, then a pass across
+-- midnight with the inverter carrying the load in reach. What it draws before midnight deepens the
+-- day that ends, and what it draws after starts the next. Batteries enough that the pass leaves
+-- them some charge.
+local EVENING_CHARGE, PASS_HOURS, PAST_MIDNIGHT = 0.3, 0.6, 0.5
 test("renewable_energy_battery_depth_of_discharge_wears_batteries", {
     sandbox = { BatteryWear = 100 },
     run = function(self)
-        local bank = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY })
+        T.setGrid(self, false)
+        local parts = { T.INVERTER_CHARGER }
+        for _ = 1, Specs.banks["RenewableEnergy.BatteryRackWood"].maxBatteries do
+            table.insert(parts, T.JAR_BATTERY)
+        end
+        local bank = T.bank(self, "batteryRackWood", parts)
         if not bank then return end
         self.bank = bank
-        T.step(function() T.setTime(self, 23.5) end)
+        T.switchOn(self, bank)
+        -- The clock stands still, and both times lie the same minutes past the hour, so neither
+        -- the clock nor its jump fires the bank system's ten-minute pass (GameTime.update): the
+        -- test's pass is the one that crosses midnight.
+        T.step(function()
+            T.setMultiplier(self, 0)
+            T.setTime(self, 23.5)
+        end)
         T.batch(function()
             T.bankPass(self, bank, 0, { hours = 0.1 })
-            T.setCharge(self, bank, 0.1)
+            T.setCharge(self, bank, EVENING_CHARGE)
             T.bankPass(self, bank, 0, { hours = 0.1, label = "evening" })
         end)
         -- Past midnight: the clock's next step turns the day (GameTime.update).
-        T.step(function() T.setTime(self, 24.01) end)
+        T.step(function() T.setTime(self, 24 + PAST_MIDNIGHT) end)
         T.serverUntil(self, "PZHarness.readRecord", T.at(bank, { kind = "bank" }), function(state)
             return state ~= nil and state.calendarDay ~= self.reads.evening.calendarDay
         end)
-        T.bankPass(self, bank, 0, { hours = 0.1 })
+        T.bankPass(self, bank, 0, { hours = PASS_HOURS })
         T.waitFor(self, function()
-            local battery = T.copyItem(bank, T.CAR_BATTERY)
-            local served = stateItem(bank.state, T.CAR_BATTERY)
+            local battery = T.copyItem(bank, T.JAR_BATTERY)
+            local served = stateItem(bank.state, T.JAR_BATTERY)
             return battery ~= nil and served ~= nil and battery:getCondition() == served.condition
         end, "this client's copy of the worn battery")
     end,
     validate = function(self)
         local evening, morning = self.reads.evening, self.bank.state
         expect(morning.calendarDay ~= evening.calendarDay, "the day never turned")
-        -- The charge comes back from whole battery uses, a hair off the tenth it was set to.
-        expectNear("the evening's cycle depth", evening.cycleDepth, 0.9, 0.01)
-        local max = instanceItem(T.CAR_BATTERY):getConditionMax()
-        local expected = T.conditionAfterDischarge(T.CAR_BATTERY, evening.cycleDepth)
-        if not expect(expected < max, "a " .. evening.cycleDepth .. " deep day wears a car battery less than a point,"
+        local drawn = evening.charge - morning.charge
+        if not (expect(drawn > 0, "the bank drew nothing across midnight")
+            and expect(morning.charge > 0, "the batteries ran out across midnight")) then return end
+        local afterMidnight = drawn * PAST_MIDNIGHT / PASS_HOURS
+        local max = instanceItem(T.JAR_BATTERY):getConditionMax()
+        local expected = T.conditionAfterDischarge(T.JAR_BATTERY, evening.cycleDepth + drawn - afterMidnight)
+        if not expect(expected < max, "a " .. evening.cycleDepth .. " deep day wears a jar battery less than a point,"
             .. " so its wear can't show") then return end
-        local battery = stateItem(morning, T.CAR_BATTERY)
-        expectEqual("car battery condition after the deep day", battery and battery.condition, expected)
+        local battery = stateItem(morning, T.JAR_BATTERY)
+        expectEqual("jar battery condition after the deep day", battery and battery.condition, expected)
         -- The run's last wait already failed the test if this client's copy differs.
-        expectEqual("cycle depth on the new day", morning.cycleDepth, 0)
+        expectNear("cycle depth on the new day, the draw after midnight", morning.cycleDepth, afterMidnight, 0.001)
     end,
 })
 

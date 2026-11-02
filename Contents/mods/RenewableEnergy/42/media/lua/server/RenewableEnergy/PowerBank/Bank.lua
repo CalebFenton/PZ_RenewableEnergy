@@ -361,12 +361,13 @@ function Bank:powerUp()
     self:switchGenerator()
 end
 
--- Follows the day's discharge cycle (Battery.trackCycle). A new day wears the batteries by the
--- depth of yesterday's deepest discharge: now, or while the bank is unloaded, when it next loads.
-function Bank:trackCycle(container)
+-- Follows the day's discharge cycle (Battery.trackCycle), the charge at midnight `midnight` closing
+-- the day a pass crossed. A new day wears the batteries by the depth of yesterday's deepest
+-- discharge: now, or while the bank is unloaded, when it next loads.
+function Bank:trackCycle(container, midnight)
     local day, finished = Battery.today()
     self.cycleHigh, self.cycleDepth, finished = Battery.trackCycle(self.day, self.cycleHigh, self.cycleDepth,
-        self.charge, day)
+        self.charge, day, midnight)
     if finished then
         if container then
             Battery.wearAll(container, finished)
@@ -431,8 +432,14 @@ function Bank:advance(hours, context)
     local chargerW = self:chargeFrom(generators, hours, roomWh)
     local inW = sourcesW + chargerW
     local availableWh = before + inW * hours
-    local stored = math.max(0, math.min(capacity, availableWh - drawW * hours))
+    -- The pass's flows are steady, so the stored watt-hours run straight until the batteries fill or
+    -- run out.
+    local function storedAfter(passHours)
+        return math.max(0, math.min(capacity, before + (inW - drawW) * passHours))
+    end
+    local stored = storedAfter(hours)
     self.charge = capacity > 0 and stored / capacity or 0
+    local midnight = capacity > 0 and storedAfter(hours - Battery.hoursToday(hours)) / capacity or 0
     -- The share of the pass the batteries carried the load: all of it, or until they ran out.
     local carried = drawW > 0 and math.min(1, availableWh / (drawW * hours)) or 0
     -- An empty bank's inverters cut out, and come back once a pass of load is stored, so
@@ -452,7 +459,7 @@ function Bank:advance(hours, context)
     end
     self.loadWhToday = self.loadWhToday + self.loadW * hours * carried
     self.backupWhToday = (self.backupWhToday or 0) + backupW * hours
-    self:trackCycle(container)
+    self:trackCycle(container, midnight)
     if container then
         self:writeBatteries(container, false)
         self:recount()
