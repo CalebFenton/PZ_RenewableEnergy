@@ -17,9 +17,10 @@ FireAsh.CLEAN_ASH = GasifierJobs.CLEAN_ASH
 FireAsh.MINUTES_PER_ASH = 60
 local FUEL_KEY = "RenewableEnergy_ashFuel"
 
--- A vanilla campfire's tile, by vanilla's own test (CCampfireSystem.isValidIsoObject).
+-- A vanilla campfire's tile, by vanilla's own test. Each side has the campfire system it runs: a
+-- client the client's, a dedicated server the server's, single player both; they test alike.
 local function isCampfire(object)
-    return object:getName() == "Campfire"
+    return (CCampfireSystem or SCampfireSystem):isValidIsoObject(object)
 end
 
 --- Whether `object` is a vanilla fire that burns wood.
