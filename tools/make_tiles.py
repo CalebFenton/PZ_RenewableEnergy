@@ -4,10 +4,10 @@ renewable_energy_02, tileGeometry.txt, and SpriteTiles.lua, every tile by meanin
     python3 tools/make_tiles.py
 
 Tile numbers come from art/models/tile_numbers.py, which art/models/tiles.py renders from too.
-Overlay tiles (snow, cracked glass, batteries, the charge meter, the crate's contents and lid, the
-digesters' gas holders, scrubbers and sour foam, the generator's gas kit, the gasifiers' glow and
-gas pipes, and all of renewable_energy_02) are only ever attached to another tile, so they have no
-properties. Property names and values follow the vanilla tile definitions
+Overlay tiles (snow, cracked glass, homemade modules, batteries, the charge meter, the crate's
+contents and lid, the digesters' gas holders, scrubbers and sour foam, the generator's gas kit, the
+gasifiers' glow and gas pipes, and all of renewable_energy_02) are only ever attached to another
+tile, so they have no properties. Property names and values follow the vanilla tile definitions
 (newtiledefinitions.tiles); ISMoveableSpriteProps reads the moveable ones:
 
 - CustomItem: the item that picking the tile up gives, instead of a generic Moveables item.
@@ -35,15 +35,15 @@ from tile_numbers import (BARREL_DIGESTERS, BARREL_HOLDERS, BATTERY_LOOKS, CRACK
                           DIGESTERS, DIRECTIONS, DOME_DIGESTER, DRUM_HOLDER, DRUM_LEVELS, FACINGS, FLAT_SNOW,
                           GARDEN_LIGHT, GARDEN_LIGHT_LIT, GAS_KIT, GASIFIER_PIPE, GASIFIERS, GENERATOR_BODIES,
                           GENERATOR_KIT_FIRST, GENERATOR_PIPE, GENERATOR_PIPE_FIRST, GENERATOR_TILESET, HEATER,
-                          HEATER_LIT, HOLDER_FILLS, INSULATED_DIGESTER, METER_LEVELS, MOUNTS, RACK_SLOTS, ROTOR_SPIN,
-                          SCOOP_ROTOR, SCOOP_SPIN, SCRUBBERS, SOLAR_CELL_CHARGER, SOLAR_CRATE, SOLAR_FAILSAFE,
+                          HEATER_LIT, HOLDER_FILLS, HOMEMADE_MODULES, INSULATED_DIGESTER, METER_LEVELS, MOUNTS, RACK_SLOTS,
+                          ROTOR_SPIN, SCOOP_ROTOR, SCOOP_SPIN, SCRUBBERS, SOLAR_CELL_CHARGER, SOLAR_CRATE, SOLAR_FAILSAFE,
                           SOLAR_FLAT, SOUR_FOAM, SPENT_SCRUBBERS, STORAGE_CAPACITY, STORAGE_TILES, TURNED_HEATER_FIRST,
                           TURNED_STORAGE_FIRST, TURNED_STORAGE_OVERLAYS, WIND_TILES)
 
 MEDIA = os.path.join(HERE, "..", "Contents", "mods", "RenewableEnergy", "common", "media")
 # Each tileset's name and rows, tilefile.COLUMNS tiles to a row; the file numbers them from 1 in
 # this order.
-TILESETS = (("renewable_energy_01", 53), ("renewable_energy_02", 56))
+TILESETS = (("renewable_energy_01", 56), ("renewable_energy_02", 56))
 
 
 def moveable(item, level=None, tool="Electrician", **props):
@@ -229,16 +229,17 @@ def sprite_tiles():
         chargers.setdefault(_field(model), {})[blades] = _by(first, DIRECTIONS)
         models.setdefault(_field(model), _wind_model(model, ROTOR_SPIN, True))
 
-    # Every mount's cracks are a list by module slot: a flat or wall panel has one slot.
-    cracks = {}
-    for look, flat, mounts in CRACKS:
-        cracks[look] = {
+    # Every mount's cracks and homemade modules are a list by module slot: a flat or wall panel has
+    # one slot.
+    def by_slot(flat, mounts):
+        return {
             "flat": [_name(flat)],
             "wall": {material: {facing: [name] for facing, name in _by(wall, "SE").items()}
                      for material, (wall, _) in mounts.items()},
             "rack": {material: {facing: _run(rack + RACK_SLOTS * f, RACK_SLOTS) for f, facing in enumerate(FACINGS)}
                      for material, (_, rack) in mounts.items()},
         }
+    cracks = {look: by_slot(flat, mounts) for look, flat, mounts in CRACKS}
 
     fills = {}
     for item, _, first_batteries, first_meter in STORAGE_TILES:
@@ -280,6 +281,7 @@ def sprite_tiles():
         "windModels": models,
         "snow": {"flat": _name(FLAT_SNOW), "rack": {material: _by(snow, FACINGS) for material, _, _, snow in MOUNTS}},
         "cracks": cracks,
+        "homemadeModules": by_slot(*HOMEMADE_MODULES),
         "bankFill": fills,
     }
 

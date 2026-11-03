@@ -11,6 +11,7 @@ local Sprites = require "RenewableEnergy/Sprites"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local Sources = require "RenewableEnergy/PowerBank/Sources"
 local Panel = require "RenewableEnergy/PowerBank/Panel"
+local Recipes = require "RenewableEnergy/Recipes"
 local Treadmill = require "RenewableEnergy/PowerBank/Treadmill"
 local SolarGardenLight = require "RenewableEnergy/Gadgets/SolarGardenLight"
 local Digester = require "RenewableEnergy/Biogas/Digester"
@@ -244,8 +245,8 @@ end
 
 -- Copies the keys, and a digester's or gasifier's record (cf_commonlib's Object:carryOn), before
 -- vanilla adds the item to the inventory and sends it to the client; placing the item gives them
--- to the tile it puts down. Save compatibility: a fixed tile (Sprites.fixedTiles) picks up as its
--- turnable twin, so its item turns.
+-- to the tile it puts down. A mount's item shows the modules it now holds. Save compatibility: a
+-- fixed tile (Sprites.fixedTiles) picks up as its turnable twin, so its item turns.
 local vanillaInstanceItem = ISMoveableSpriteProps.instanceItem
 function ISMoveableSpriteProps:instanceItem(spriteNameOverride)
     local from = pickingUp
@@ -259,6 +260,9 @@ function ISMoveableSpriteProps:instanceItem(spriteNameOverride)
         for _, key in ipairs(CARRIED_KEYS) do
             to[key] = fromData[key]
         end
+    end
+    if Recipes.MOUNTS[item:getFullType()] then
+        Recipes.showMountModules(item)
     end
     local record = recordOf(from)
     if record then

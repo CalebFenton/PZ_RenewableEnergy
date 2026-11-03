@@ -100,14 +100,36 @@ def solar_module(col, name="Module", snow=False, cracked=False, cracks=False, li
     return parts
 
 
-def solar_flat(col, snow=False, cracks=False, light_cracks=False):
+# A homemade module on a mount's overlay tile is drawn over the factory module the mount's own tile
+# shows in that slot, so it is this much bigger every way and lies in front of it from any side.
+COVER = 0.002
+
+
+def _mount_module(col, name, homemade=False, cover=False):
+    """The module in one of a mount's slots, lying glass up: a factory module, or a homemade one in
+    its place (`homemade`); `cover` gives the homemade one that covers a factory module, for overlay
+    tiles."""
+    if not (homemade or cover):
+        return solar_module(col, name)
+    grow = COVER if cover else 0
+    parts = homemade_module(col, name, size=tuple(side + 2 * grow for side in MODULE), leads=False)
+    for obj in parts:
+        obj.location.z -= grow
+    return parts
+
+
+def solar_flat(col, snow=False, cracks=False, light_cracks=False, homemade=False, cover=False):
     """One module on two low rails, for a roof or the ground at 0 degrees. `snow` and `cracks` give
-    only the snow on it or the cracks in its glass, for overlay tiles; `light_cracks` the light ones."""
-    module = solar_module(col, "Flat", snow=snow, cracks=cracks, light_cracks=light_cracks)
+    only the snow on it or the cracks in its glass, for overlay tiles; `light_cracks` the light ones.
+    `homemade` makes the module homemade, and `cover` gives only a homemade one over it."""
+    if snow or cracks:
+        module = solar_module(col, "Flat", snow=snow, cracks=cracks, light_cracks=light_cracks)
+    else:
+        module = _mount_module(col, "Flat", homemade, cover)
     lift = 0.045
     for obj in module:
         obj.location.z += lift
-    if snow or cracks:
+    if snow or cracks or cover:
         return
     for sign in (-1, 1):
         box(col, "Flat_Rail", M("aluminium"), (MODULE[0] - 0.12, 0.03, lift), at=(0, sign * 0.13, 0), bevel=0.002)
@@ -118,17 +140,20 @@ def solar_flat(col, snow=False, cracks=False, light_cracks=False):
 WALL_STANDOFF = 0.05
 
 
-def solar_wall(col, material="metal", lying=False, cracks=False, light_cracks=False):
+def solar_wall(col, material="metal", lying=False, cracks=False, light_cracks=False, homemade=False, cover=False):
     """One module upright, its back WALL_STANDOFF in front of y = 0 (the wall), its bottom edge at
     z = 0: on two galvanised channel brackets lagged to the wall, or on two pine battens with a
     ledger board under it and cleats nailed over its top edge. `lying` lays it glass up on its
     brackets, as it lies on the ground. `cracks` gives only the cracks in its glass, `light_cracks`
-    the light ones."""
-    # Turning +90 degrees about X takes glass up to glass to the front (-Y).
-    module = group(col, "Wall_Module", solar_module(col, "Wall", cracks=cracks, light_cracks=light_cracks),
-                   at=(0, -WALL_STANDOFF, MODULE[1] / 2),
-                   rotate=(90, 0, 0))
+    the light ones. `homemade` makes the module homemade, and `cover` gives only a homemade one over
+    it."""
     if cracks:
+        module = solar_module(col, "Wall", cracks=cracks, light_cracks=light_cracks)
+    else:
+        module = _mount_module(col, "Wall", homemade, cover)
+    # Turning +90 degrees about X takes glass up to glass to the front (-Y).
+    module = group(col, "Wall_Module", module, at=(0, -WALL_STANDOFF, MODULE[1] / 2), rotate=(90, 0, 0))
+    if cracks or cover:
         return
     parts = [module]
     if material == "metal":
@@ -156,22 +181,27 @@ RACK_TILT = 38
 RACK_FRONT = 0.25  # height of the lower edge
 
 
-def solar_rack(col, material="metal", snow=False, cracks=None, light_cracks=False):
+def solar_rack(col, material="metal", snow=False, cracks=None, light_cracks=False, homemade=(), cover=None):
     """Two modules, one above the other, tilted RACK_TILT degrees to the front on a galvanised pipe
     frame or a frame of pine 2 x 4s on skids. Both hold the modules in the same place, so the
     snow on them is the same. `cracks`, a module slot (1 the lower module, 2 the upper), gives only
-    the cracks in that module's glass, `light_cracks` the light ones."""
+    the cracks in that module's glass, `light_cracks` the light ones. The modules in the slots
+    `homemade` lists are homemade, and `cover`, a slot, gives only a homemade module over that one."""
     tilt = math.radians(RACK_TILT)
     gap = 0.01
     span = 2 * MODULE[1] + gap
     panels = []
+    only = cracks or cover
     for i, offset in enumerate((-(MODULE[1] + gap) / 2, (MODULE[1] + gap) / 2)):
-        if cracks and cracks != i + 1:
+        if only and only != i + 1:
             continue
-        module = solar_module(col, "Rack%d" % i, snow=snow, cracks=bool(cracks), light_cracks=light_cracks)
+        if snow or cracks:
+            module = solar_module(col, "Rack%d" % i, snow=snow, cracks=bool(cracks), light_cracks=light_cracks)
+        else:
+            module = _mount_module(col, "Rack%d" % i, i + 1 in homemade, bool(cover))
         panels.append(group(col, "Rack_Module%d" % i, module, at=(0, offset, 0)))
     group(col, "Rack_Panels", panels, at=(0, 0, RACK_FRONT + span / 2 * math.sin(tilt)), rotate=(RACK_TILT, 0, 0))
-    if snow or cracks:
+    if snow or only:
         return
     front_y, back_y = -span / 2 * math.cos(tilt), span / 2 * math.cos(tilt)
     top = RACK_FRONT + span * math.sin(tilt)
@@ -252,18 +282,21 @@ def solar_crate(col, frame=True, contents=False, closed=False):
 HOMEMADE = (0.92, 0.42, 0.04)
 
 
-def homemade_module(col):
+def homemade_module(col, name="Homemade", size=HOMEMADE, leads=True):
     """A module built at home from salvaged cells: a plywood back in a frame of pine strips, window
     glass held down by clips, and 12 big cells of two kinds, uneven and a little askew, a strip of
-    tabbing along each row, its leads out through the frame."""
-    width, depth, height = HOMEMADE
+    tabbing along each row, its leads out through the frame (without `leads`, as it is wired on a
+    mount). `size` makes it as big as a factory module, to take one's place on a mount. Returns
+    its parts."""
+    width, depth, height = size
     strip = 0.032
     rng = random.Random(42)
-    box(col, "Homemade_Back", M("plywood"), (width, depth, 0.012), bevel=0.002)
+    parts = [box(col, name + "_Back", M("plywood"), (width, depth, 0.012), bevel=0.002)]
     for sign in (-1, 1):
-        box(col, "Homemade_FrameLong", M("pine"), (width, strip, height), at=(0, sign * (depth - strip) / 2, 0), bevel=0.004)
-        box(col, "Homemade_FrameShort", M("pinedark"), (strip, depth - 2 * strip, height),
-            at=(sign * (width - strip) / 2, 0, 0), bevel=0.004)
+        parts.append(box(col, name + "_FrameLong", M("pine"), (width, strip, height), at=(0, sign * (depth - strip) / 2, 0),
+                         bevel=0.004))
+        parts.append(box(col, name + "_FrameShort", M("pinedark"), (strip, depth - 2 * strip, height),
+                         at=(sign * (width - strip) / 2, 0, 0), bevel=0.004))
     inner_w, inner_d = width - 2 * strip, depth - 2 * strip
     columns, rows = 6, 2
     pitch_x, pitch_y = inner_w / columns, inner_d / rows
@@ -272,17 +305,20 @@ def homemade_module(col):
         for column in range(columns):
             x = -inner_w / 2 + pitch_x * (column + 0.5)
             # Thin enough to bake into the back's texture, as the factory module's cells do.
-            box(col, "Homemade_Cell", M("mono" if rng.random() < 0.25 else "cells"),
-                (pitch_x * rng.uniform(0.84, 0.93), pitch_y * rng.uniform(0.84, 0.93), 0.002),
-                at=(x + rng.uniform(-0.006, 0.006), y + rng.uniform(-0.005, 0.005), 0.012), rotate=(0, 0, rng.uniform(-4, 4)))
-        box(col, "Homemade_Tab", M("busbar"), (inner_w - 0.02, 0.003, 0.0008), at=(0, y, 0.0142))
+            parts.append(box(col, name + "_Cell", M("mono" if rng.random() < 0.25 else "cells"),
+                             (pitch_x * rng.uniform(0.84, 0.93), pitch_y * rng.uniform(0.84, 0.93), 0.002),
+                             at=(x + rng.uniform(-0.006, 0.006), y + rng.uniform(-0.005, 0.005), 0.012),
+                             rotate=(0, 0, rng.uniform(-4, 4))))
+        parts.append(box(col, name + "_Tab", M("busbar"), (inner_w - 0.02, 0.003, 0.0008), at=(0, y, 0.0142)))
     for x in (-width / 2 + 0.12, 0, width / 2 - 0.12):
         for sign in (-1, 1):
-            box(col, "Homemade_Clip", M("aluminium"), (0.03, 0.045, 0.004), at=(x, sign * (depth / 2 - 0.02), height))
-    for i, colour in enumerate(("red", "black")):
-        y = 0.03 * i
-        tube(col, "Homemade_Lead", M(colour), [(width / 2 - 0.01, y, 0.025), (width / 2 + 0.05, y + 0.01, 0.02),
-                                               (width / 2 + 0.09, y + 0.05, 0.006)], 0.005)
+            parts.append(box(col, name + "_Clip", M("aluminium"), (0.03, 0.045, 0.004), at=(x, sign * (depth / 2 - 0.02), height)))
+    if leads:
+        for i, colour in enumerate(("red", "black")):
+            y = 0.03 * i
+            parts.append(tube(col, name + "_Lead", M(colour), [(width / 2 - 0.01, y, 0.025), (width / 2 + 0.05, y + 0.01, 0.02),
+                                                                (width / 2 + 0.09, y + 0.05, 0.006)], 0.005))
+    return parts
 
 
 def solar_cells(col):

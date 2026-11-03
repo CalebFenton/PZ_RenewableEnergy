@@ -1,4 +1,4 @@
--- Text for the status windows, the menus and the battery tooltip. Unit symbols are SI and the
+-- Text for the status windows, the menus and the item tooltips. Unit symbols are SI and the
 -- same in every language, so they are not translated (m³ is a translation key only for its
 -- character; see Format.cubicMetres).
 

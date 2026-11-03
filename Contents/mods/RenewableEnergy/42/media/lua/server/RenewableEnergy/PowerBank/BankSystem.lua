@@ -141,7 +141,7 @@ function BankSystem:OnObjectAdded(isoObject)
     else
         -- Placing a mount, rotating it (picked up and placed again) and world spawns all land
         -- here, with the modules the item carried.
-        PanelSource.showCracks(isoObject)
+        PanelSource.showModules(isoObject)
     end
 end
 
@@ -251,9 +251,10 @@ end
 
 Tiles.onLoad(PowerBank.bankSprites(), loadBank, { first = true })
 
--- A panel's chunk loaded: its overlays are saved with it, but older saves may lack the cracks.
+-- A panel's chunk loaded: its overlays are saved with it, but older saves may lack its homemade
+-- modules or cracks.
 for kind in pairs(Specs.mounts) do
-    Tiles.onLoad(Sprites.namesOf(kind), PanelSource.showCracks)
+    Tiles.onLoad(Sprites.namesOf(kind), PanelSource.showModules)
 end
 
 --- What every bank in this pass shares: the weather, and the light on each mount averaged over

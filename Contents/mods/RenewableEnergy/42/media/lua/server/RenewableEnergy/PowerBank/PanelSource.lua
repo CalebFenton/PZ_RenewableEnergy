@@ -1,7 +1,7 @@
 -- How a bank runs a solar panel (the "panel" family of Sources) on the authority:
 -- its modules' watts in the sun, snow lying on it, and storms cracking its modules (PanelStorms),
 -- connected or loose. The one writer of a placed panel's module record (Panel.MODULES_KEY) and of
--- its crack and snow overlays.
+-- its module (homemade and cracked) and snow overlays.
 
 if isClient() then return end
 
@@ -42,7 +42,7 @@ local function ratedWatts(source)
     return now, best
 end
 
---- Commits detached `modules` to a placed panel and its cracks, and adopts them in `source` when
+--- Commits detached `modules` to a placed panel and its looks, and adopts them in `source` when
 --- connected. The object's copy stays independent of the bank's simulated module records.
 function PanelSource.writeModules(isoObject, modules, source)
     isoObject:getModData()[Panel.MODULES_KEY] = Panel.copyModules(modules)
@@ -50,16 +50,19 @@ function PanelSource.writeModules(isoObject, modules, source)
         source.modules, source.modulesChanged = modules, nil
     end
     isoObject:transmitModData()
-    PanelSource.showCracks(isoObject, modules)
+    PanelSource.showModules(isoObject, modules)
 end
 
--- Cracks and snow draw over a panel's tile; snow lies on the glass, so it draws last.
-local isCrackOrSnow = Sprites.matcher(Sprites.cracks, Sprites.snow)
+-- Over a panel's tile draw its homemade modules, their cracks, and the snow on their glass last.
+local isModuleOrSnow = Sprites.matcher(Sprites.homemadeModules, Sprites.cracks, Sprites.snow)
 
--- Shows the cracks of `modules` on the panel `isoObject` of kind, facing and material, keeping the
--- snow it shows on top.
-local function showCracksOf(isoObject, kind, facing, material, modules)
-    local wanted = Sprites.crackOverlays(kind, facing, material, modules)
+-- Shows `modules` on the panel `isoObject` of kind, facing and material, keeping the snow it shows
+-- on top.
+local function showModulesOf(isoObject, kind, facing, material, modules)
+    local wanted = Sprites.homemadeOverlays(kind, facing, material, modules)
+    for _, name in ipairs(Sprites.crackOverlays(kind, facing, material, modules)) do
+        table.insert(wanted, name)
+    end
     local attached = isoObject:getAttachedAnimSprite()
     for i = 0, (attached and attached:size() or 0) - 1 do
         local name = attached:get(i):getName()
@@ -67,16 +70,17 @@ local function showCracksOf(isoObject, kind, facing, material, modules)
             table.insert(wanted, name)
         end
     end
-    Tiles.showOverlays(isoObject, isCrackOrSnow, wanted)
+    Tiles.showOverlays(isoObject, isModuleOrSnow, wanted)
 end
 
---- Shows each of a placed panel's modules' cracked glass, light or heavy as
---- ModuleRepair.crackLookOf has it, and none over the others, keeping the snow it shows on
---- top, and sends the overlays to clients if they changed. Does nothing for an object that is no panel.
-function PanelSource.showCracks(isoObject, modules)
+--- Shows each of a placed panel's modules as it is: homemade ones in place of the tile's factory
+--- modules, and cracked glass, light or heavy as ModuleRepair.crackLookOf has it, keeping the snow
+--- it shows on top, and sends the overlays to clients if they changed. Does nothing for an object
+--- that is no panel.
+function PanelSource.showModules(isoObject, modules)
     local kind, facing, material = Sources.kindOf(isoObject)
     if Sources.familyOf(kind) ~= "panel" then return end
-    showCracksOf(isoObject, kind, facing, material, modules or Panel.modulesOf(isoObject, kind))
+    showModulesOf(isoObject, kind, facing, material, modules or Panel.modulesOf(isoObject, kind))
 end
 
 -- Snow cover after `hours` of the weather in `context`.
@@ -116,14 +120,14 @@ end
 
 --- Keeps a panel's module record and the bank's copy `source` the same: a crack while the
 --- panel's square was unloaded goes to the object, otherwise the object (which unmounting and
---- repairs change) is the truth. Either way the tile shows the cracks the record now holds.
+--- repairs change) is the truth. Either way the tile shows the modules the record now holds.
 function PanelSource.reconcile(source, object)
     if source.modulesChanged then
         PanelSource.writeModules(object, source.modules, source)
         return
     end
     source.modules = Panel.modulesOf(object, source.kind)
-    showCracksOf(object, source.kind, source.facing, source.material, source.modules)
+    showModulesOf(object, source.kind, source.facing, source.material, source.modules)
 end
 
 -- Why a panel makes less than it would at its best in clear full sun: the biggest loss, if it

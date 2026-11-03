@@ -61,6 +61,9 @@ local ModuleRepair = require "RenewableEnergy/PowerBank/ModuleRepair"
 -- ModuleRepair.crackLookOf gives it, as a list by module slot. A rack's slot 1 is the lower module,
 -- so it shows only the modules that are cracked, each as it is cracked.
 --
+-- homemadeModules: a homemade module in place of the factory module a mount's tile draws in a slot,
+-- drawn over the tile under its cracks and snow, as a list by module slot laid out as the cracks.
+--
 -- bankFill: each bank tile's overlays, by the bank's Sprites field and facing:
 -- `batteries[look][n]` shows a battery of that look in slot n, linked to the one before it, and
 -- `meter[level]` its charge meter lit from 1 (empty) to the last level (full). A bank draws one
@@ -236,9 +239,9 @@ end
 --- Whether a sprite is a snow overlay.
 Sprites.isSnow = Sprites.matcher(Sprites.snow)
 --- Whether a sprite is one of the overlays drawn over a tile, which are never placed on their own.
-Sprites.isOverlay = Sprites.matcher(Sprites.snow, Sprites.cracks, Sprites.crateOverlays, Sprites.bankFill,
-    Sprites.digesterHolder, Sprites.digesterScrubber, Sprites.digesterScrubberSpent, Sprites.digesterSour, Sprites.gasKit,
-    Sprites.gasifierLit, Sprites.gasifierPipe, Sprites.gasifierPipeGen)
+Sprites.isOverlay = Sprites.matcher(Sprites.snow, Sprites.cracks, Sprites.homemadeModules, Sprites.crateOverlays,
+    Sprites.bankFill, Sprites.digesterHolder, Sprites.digesterScrubber, Sprites.digesterScrubberSpent, Sprites.digesterSour,
+    Sprites.gasKit, Sprites.gasifierLit, Sprites.gasifierPipe, Sprites.gasifierPipeGen)
 
 --- The tile of a bladed wind charger of `kind` facing `facing` (Sprites.kindOf) with blades of
 --- `material` (Wind.SPEC.blades), or nil for blades it has no tile for.
@@ -314,6 +317,38 @@ function Sprites.crackOverlays(kind, facing, material, modules)
         end
     end
     return shown
+end
+
+-- The module drawn homemade on a mount's tile and item; any other is drawn as a factory module.
+local HOMEMADE_MODULE = "RenewableEnergy.HomemadeSolarModule"
+
+--- The homemade module overlays a mount's tile shows: one over each slot holding a homemade
+--- module, in slot order.
+---@param kind string "flat", "wall" or "rack" (see kindOf)
+---@param facing string? the mount's facing, for walls and racks
+---@param material string? "wood" or "metal", for walls and racks
+---@param modules table[] the mount's { type, condition } modules in slot order
+---@return string[]
+function Sprites.homemadeOverlays(kind, facing, material, modules)
+    local shown = {}
+    for slot, name in ipairs(ofMount(Sprites.homemadeModules, kind, facing, material) or NO_SLOTS) do
+        if modules[slot] and modules[slot].type == HOMEMADE_MODULE then
+            table.insert(shown, name)
+        end
+    end
+    return shown
+end
+
+--- How many of `modules` are homemade: a panel mount item's model index, which picks its ground
+--- model and icon (its WorldStaticModelsByIndex and IconsForTexture).
+function Sprites.homemadeCount(modules)
+    local count = 0
+    for _, module in ipairs(modules) do
+        if module.type == HOMEMADE_MODULE then
+            count = count + 1
+        end
+    end
+    return count
 end
 
 --- The meter level, from 1 (empty), that shows a charge fraction.

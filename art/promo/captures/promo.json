@@ -3,12 +3,12 @@
     {
       "fullType": "RenewableEnergy.BatteryBankMetal",
       "icon": "icon_RenewableEnergy_BatteryBankMetal",
-      "name": "Metal Battery Bank"
+      "name": "Metal Battery Cabinet"
     },
     {
       "fullType": "RenewableEnergy.BatteryBankWood",
       "icon": "icon_RenewableEnergy_BatteryBankWood",
-      "name": "Wooden Battery Bank"
+      "name": "Wooden Battery Cabinet"
     },
     {
       "fullType": "RenewableEnergy.BatteryBoxMetal",
@@ -83,7 +83,7 @@
     {
       "fullType": "RenewableEnergy.DeepCycleBattery",
       "icon": "icon_RenewableEnergy_DeepCycleBattery",
-      "name": "Deep Cycle Marine Battery"
+      "name": "Deep Cycle Battery"
     },
     {
       "fullType": "RenewableEnergy.DeepCycleBatteryCase",
@@ -118,12 +118,12 @@
     {
       "fullType": "RenewableEnergy.HomemadeInverter",
       "icon": "icon_RenewableEnergy_HomemadeInverter",
-      "name": "Homemade Inverter"
+      "name": "Makeshift Power Inverter"
     },
     {
       "fullType": "RenewableEnergy.HomemadeSolarModule",
       "icon": "icon_RenewableEnergy_HomemadeSolarModule",
-      "name": "Homemade Solar Module"
+      "name": "Makeshift Solar Module"
     },
     {
       "fullType": "RenewableEnergy.HomesteadPowerMag1",
@@ -178,7 +178,7 @@
     {
       "fullType": "RenewableEnergy.MakeshiftInverter",
       "icon": "icon_RenewableEnergy_MakeshiftInverter",
-      "name": "Makeshift Inverter"
+      "name": "Makeshift Plug-in Inverter"
     },
     {
       "fullType": "RenewableEnergy.MicrowaveTransformer",
@@ -238,22 +238,22 @@
     {
       "fullType": "RenewableEnergy.SolarRackMetal",
       "icon": "icon_RenewableEnergy_SolarRackMetal",
-      "name": "Metal Solar Ground Rack"
+      "name": "Metal Solar Rack"
     },
     {
       "fullType": "RenewableEnergy.SolarRackWood",
       "icon": "icon_RenewableEnergy_SolarRackWood",
-      "name": "Wooden Solar Ground Rack"
+      "name": "Wooden Solar Rack"
     },
     {
       "fullType": "RenewableEnergy.SolarWallMetal",
       "icon": "icon_RenewableEnergy_SolarWallMetal",
-      "name": "Metal Wall-Mounted Solar Panel"
+      "name": "Metal Wall Solar Panel"
     },
     {
       "fullType": "RenewableEnergy.SolarWallWood",
       "icon": "icon_RenewableEnergy_SolarWallWood",
-      "name": "Wooden Wall-Mounted Solar Panel"
+      "name": "Wooden Wall Solar Panel"
     },
     {
       "fullType": "RenewableEnergy.SpentIronSponge",
@@ -1075,16 +1075,16 @@
         "needed": true,
         "research": [
           "Inverter/Charger",
-          "Wooden Battery Bank"
+          "Wooden Battery Cabinet"
         ]
       },
-      "name": "Build Wooden Battery Bank",
+      "name": "Build Wooden Battery Cabinet",
       "outputs": [
         {
           "count": 1,
           "fullType": "RenewableEnergy.BatteryBankWood",
           "icon": "icon_RenewableEnergy_BatteryBankWood",
-          "name": "Wooden Battery Bank"
+          "name": "Wooden Battery Cabinet"
         }
       ],
       "skills": [
@@ -1638,7 +1638,7 @@
               "count": 2,
               "fullType": "RenewableEnergy.HomemadeSolarModule",
               "icon": "icon_RenewableEnergy_HomemadeSolarModule",
-              "name": "Homemade Solar Module"
+              "name": "Makeshift Solar Module"
             }
           ],
           "keep": false,
@@ -1735,17 +1735,17 @@
         ],
         "needed": true,
         "research": [
-          "Metal Solar Ground Rack",
+          "Metal Solar Rack",
           "Solar Module"
         ]
       },
-      "name": "Make Metal Solar Ground Rack",
+      "name": "Make Metal Solar Rack",
       "outputs": [
         {
           "count": 1,
           "fullType": "RenewableEnergy.SolarRackMetal",
           "icon": "icon_RenewableEnergy_SolarRackMetal",
-          "name": "Metal Solar Ground Rack"
+          "name": "Metal Solar Rack"
         }
       ],
       "skills": [
@@ -1928,7 +1928,7 @@
               "count": 1,
               "fullType": "RenewableEnergy.HomemadeSolarModule",
               "icon": "icon_RenewableEnergy_HomemadeSolarModule",
-              "name": "Homemade Solar Module"
+              "name": "Makeshift Solar Module"
             }
           ],
           "keep": false,
@@ -2133,16 +2133,16 @@
         "needed": true,
         "research": [
           "Inverter/Charger",
-          "Metal Battery Bank"
+          "Metal Battery Cabinet"
         ]
       },
-      "name": "Build Metal Battery Bank",
+      "name": "Build Metal Battery Cabinet",
       "outputs": [
         {
           "count": 1,
           "fullType": "RenewableEnergy.BatteryBankMetal",
           "icon": "icon_RenewableEnergy_BatteryBankMetal",
-          "name": "Metal Battery Bank"
+          "name": "Metal Battery Cabinet"
         }
       ],
       "skills": [
@@ -2180,7 +2180,7 @@
               "count": 1,
               "fullType": "RenewableEnergy.DeepCycleBattery",
               "icon": "icon_RenewableEnergy_DeepCycleBattery",
-              "name": "Deep Cycle Marine Battery"
+              "name": "Deep Cycle Battery"
             },
             {
               "count": 1,
@@ -2348,7 +2348,7 @@
               "count": 1,
               "fullType": "RenewableEnergy.SolarWallWood",
               "icon": "icon_RenewableEnergy_SolarWallWood",
-              "name": "Wooden Wall-Mounted Solar Panel"
+              "name": "Wooden Wall Solar Panel"
             }
           ],
           "keep": false,
@@ -2363,7 +2363,7 @@
         "needed": false,
         "research": []
       },
-      "name": "Unmount Wooden Wall-Mounted Solar Panel",
+      "name": "Unmount Wooden Wall Solar Panel",
       "outputs": [
         {
           "count": 2,
@@ -2415,7 +2415,7 @@
               "count": 1,
               "fullType": "RenewableEnergy.HomemadeSolarModule",
               "icon": "icon_RenewableEnergy_HomemadeSolarModule",
-              "name": "Homemade Solar Module"
+              "name": "Makeshift Solar Module"
             }
           ],
           "keep": true,
@@ -2450,7 +2450,7 @@
         ],
         "needed": true,
         "research": [
-          "Homemade Solar Module",
+          "Makeshift Solar Module",
           "Solar Module"
         ]
       },
@@ -2994,7 +2994,7 @@
               "count": 1,
               "fullType": "RenewableEnergy.DeepCycleBattery",
               "icon": "icon_RenewableEnergy_DeepCycleBattery",
-              "name": "Deep Cycle Marine Battery"
+              "name": "Deep Cycle Battery"
             },
             {
               "count": 1,
@@ -3103,7 +3103,7 @@
               "count": 1,
               "fullType": "RenewableEnergy.SolarWallMetal",
               "icon": "icon_RenewableEnergy_SolarWallMetal",
-              "name": "Metal Wall-Mounted Solar Panel"
+              "name": "Metal Wall Solar Panel"
             }
           ],
           "keep": false,
@@ -3118,7 +3118,7 @@
         "needed": false,
         "research": []
       },
-      "name": "Unmount Metal Wall-Mounted Solar Panel",
+      "name": "Unmount Metal Wall Solar Panel",
       "outputs": [
         {
           "count": 2,
@@ -3372,7 +3372,7 @@
               "count": 1,
               "fullType": "RenewableEnergy.DeepCycleBattery",
               "icon": "icon_RenewableEnergy_DeepCycleBattery",
-              "name": "Deep Cycle Marine Battery"
+              "name": "Deep Cycle Battery"
             }
           ],
           "keep": false,
@@ -3841,17 +3841,17 @@
         ],
         "needed": true,
         "research": [
-          "Homemade Inverter",
+          "Makeshift Power Inverter",
           "Power Inverter"
         ]
       },
-      "name": "Make Homemade Inverter",
+      "name": "Make Makeshift Power Inverter",
       "outputs": [
         {
           "count": 1,
           "fullType": "RenewableEnergy.HomemadeInverter",
           "icon": "icon_RenewableEnergy_HomemadeInverter",
-          "name": "Homemade Inverter"
+          "name": "Makeshift Power Inverter"
         }
       ],
       "skills": [
@@ -4165,16 +4165,16 @@
         ],
         "needed": true,
         "research": [
-          "Homemade Solar Module"
+          "Makeshift Solar Module"
         ]
       },
-      "name": "Make Homemade Solar Module",
+      "name": "Make Makeshift Solar Module",
       "outputs": [
         {
           "count": 1,
           "fullType": "RenewableEnergy.HomemadeSolarModule",
           "icon": "icon_RenewableEnergy_HomemadeSolarModule",
-          "name": "Homemade Solar Module"
+          "name": "Makeshift Solar Module"
         }
       ],
       "skills": [
@@ -5206,7 +5206,7 @@
               "count": 1,
               "fullType": "RenewableEnergy.SolarRackMetal",
               "icon": "icon_RenewableEnergy_SolarRackMetal",
-              "name": "Metal Solar Ground Rack"
+              "name": "Metal Solar Rack"
             }
           ],
           "keep": false,
@@ -5221,7 +5221,7 @@
         "needed": false,
         "research": []
       },
-      "name": "Unmount Metal Solar Ground Rack",
+      "name": "Unmount Metal Solar Rack",
       "outputs": [
         {
           "count": 4,
@@ -5463,7 +5463,7 @@
               "count": 1,
               "fullType": "RenewableEnergy.HomemadeSolarModule",
               "icon": "icon_RenewableEnergy_HomemadeSolarModule",
-              "name": "Homemade Solar Module"
+              "name": "Makeshift Solar Module"
             }
           ],
           "keep": false,
@@ -5546,17 +5546,17 @@
         ],
         "needed": true,
         "research": [
-          "Metal Wall-Mounted Solar Panel",
+          "Metal Wall Solar Panel",
           "Solar Module"
         ]
       },
-      "name": "Make Metal Wall-Mounted Solar Panel",
+      "name": "Make Metal Wall Solar Panel",
       "outputs": [
         {
           "count": 1,
           "fullType": "RenewableEnergy.SolarWallMetal",
           "icon": "icon_RenewableEnergy_SolarWallMetal",
-          "name": "Metal Wall-Mounted Solar Panel"
+          "name": "Metal Wall Solar Panel"
         }
       ],
       "skills": [
@@ -5692,7 +5692,7 @@
               "count": 1,
               "fullType": "RenewableEnergy.HomemadeSolarModule",
               "icon": "icon_RenewableEnergy_HomemadeSolarModule",
-              "name": "Homemade Solar Module"
+              "name": "Makeshift Solar Module"
             }
           ],
           "keep": false,
@@ -5764,16 +5764,16 @@
         "needed": true,
         "research": [
           "Solar Module",
-          "Wooden Wall-Mounted Solar Panel"
+          "Wooden Wall Solar Panel"
         ]
       },
-      "name": "Make Wooden Wall-Mounted Solar Panel",
+      "name": "Make Wooden Wall Solar Panel",
       "outputs": [
         {
           "count": 1,
           "fullType": "RenewableEnergy.SolarWallWood",
           "icon": "icon_RenewableEnergy_SolarWallWood",
-          "name": "Wooden Wall-Mounted Solar Panel"
+          "name": "Wooden Wall Solar Panel"
         }
       ],
       "skills": [
@@ -6062,7 +6062,7 @@
               "count": 1,
               "fullType": "RenewableEnergy.HomemadeSolarModule",
               "icon": "icon_RenewableEnergy_HomemadeSolarModule",
-              "name": "Homemade Solar Module"
+              "name": "Makeshift Solar Module"
             }
           ],
           "keep": true,
@@ -6149,7 +6149,7 @@
               "count": 2,
               "fullType": "RenewableEnergy.HomemadeSolarModule",
               "icon": "icon_RenewableEnergy_HomemadeSolarModule",
-              "name": "Homemade Solar Module"
+              "name": "Makeshift Solar Module"
             }
           ],
           "keep": false,
@@ -6221,16 +6221,16 @@
         "needed": true,
         "research": [
           "Solar Module",
-          "Wooden Solar Ground Rack"
+          "Wooden Solar Rack"
         ]
       },
-      "name": "Make Wooden Solar Ground Rack",
+      "name": "Make Wooden Solar Rack",
       "outputs": [
         {
           "count": 1,
           "fullType": "RenewableEnergy.SolarRackWood",
           "icon": "icon_RenewableEnergy_SolarRackWood",
-          "name": "Wooden Solar Ground Rack"
+          "name": "Wooden Solar Rack"
         }
       ],
       "skills": [
@@ -6617,7 +6617,7 @@
               "count": 1,
               "fullType": "RenewableEnergy.HomemadeSolarModule",
               "icon": "icon_RenewableEnergy_HomemadeSolarModule",
-              "name": "Homemade Solar Module"
+              "name": "Makeshift Solar Module"
             }
           ],
           "keep": true,
@@ -6738,7 +6738,7 @@
               "count": 1,
               "fullType": "RenewableEnergy.SolarRackWood",
               "icon": "icon_RenewableEnergy_SolarRackWood",
-              "name": "Wooden Solar Ground Rack"
+              "name": "Wooden Solar Rack"
             }
           ],
           "keep": false,
@@ -6753,7 +6753,7 @@
         "needed": false,
         "research": []
       },
-      "name": "Unmount Wooden Solar Ground Rack",
+      "name": "Unmount Wooden Solar Rack",
       "outputs": [
         {
           "count": 4,
@@ -6888,7 +6888,7 @@
         ],
         "needed": true,
         "research": [
-          "Deep Cycle Marine Battery"
+          "Deep Cycle Battery"
         ]
       },
       "name": "Rebuild Deep Cycle Battery",
@@ -6897,7 +6897,7 @@
           "count": 1,
           "fullType": "RenewableEnergy.DeepCycleBattery",
           "icon": "icon_RenewableEnergy_DeepCycleBattery",
-          "name": "Deep Cycle Marine Battery"
+          "name": "Deep Cycle Battery"
         }
       ],
       "skills": [
@@ -7000,17 +7000,17 @@
         ],
         "needed": true,
         "research": [
-          "Makeshift Inverter",
+          "Makeshift Plug-in Inverter",
           "Plug-in Inverter"
         ]
       },
-      "name": "Make Makeshift Inverter",
+      "name": "Make Makeshift Plug-in Inverter",
       "outputs": [
         {
           "count": 1,
           "fullType": "RenewableEnergy.MakeshiftInverter",
           "icon": "icon_RenewableEnergy_MakeshiftInverter",
-          "name": "Makeshift Inverter"
+          "name": "Makeshift Plug-in Inverter"
         }
       ],
       "skills": [
@@ -7359,7 +7359,7 @@
     {
       "build": {
         "icon": "icon_build_RenewableEnergy_TurbineWood",
-        "name": "Homebuilt Wind Turbine"
+        "name": "Homemade Wind Turbine"
       },
       "id": "RenewableEnergy_TurbineWood",
       "inputs": [
@@ -7560,7 +7560,7 @@
         "needed": true,
         "research": []
       },
-      "name": "Homebuilt Wind Turbine",
+      "name": "Homemade Wind Turbine",
       "outputs": [],
       "skills": [
         {

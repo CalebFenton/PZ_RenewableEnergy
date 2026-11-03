@@ -37,7 +37,7 @@ module RenewableEnergy
         Tags = base:hasmetal;base:ignorezombiedensity;base:showcondition,
     }
 
-    /* Salvaged cells under glass. Rated like a factory module, its ConditionMax caps it lower.
+    /* Salvaged cells under glass, rated lower than a factory module (Specs.modules).
        It weighs what a factory module does, as vanilla's makeshift radios weigh what found ones do. */
     item HomemadeSolarModule
     {
@@ -46,7 +46,7 @@ module RenewableEnergy
         Weight = 4.0,
         Icon = RenewableEnergy_HomemadeSolarModule,
         WorldStaticModel = RenewableEnergy.HomemadeSolarModule_Ground,
-        ConditionMax = 60,
+        ConditionMax = 100,
         Tooltip = Tooltip_RenewableEnergy_HomemadeSolarModule,
         ResearchableRecipes = RenewableEnergy_RepairCrackedModule,
         Tags = base:ignorezombiedensity;base:showcondition,
@@ -65,14 +65,21 @@ module RenewableEnergy
     }
 
     /**************************** Panel mounts ******************************/
+    /*
+        Ground models and icons by model index, the number of homemade modules a mount holds
+        (Lua: Recipes.showMountModules, which is also OnCreate: a new item's index is random).
+    */
 
     item SolarFlat
     {
         DisplayCategory = Electronics,
         ItemType = base:moveable,
-        Weight = 4.0,
+        Weight = 4.5,
         Icon = RenewableEnergy_SolarFlat,
         WorldStaticModel = RenewableEnergy.SolarFlat_Ground,
+        WorldStaticModelsByIndex = RenewableEnergy.SolarFlat_Ground;RenewableEnergy.SolarFlat_Homemade_Ground,
+        IconsForTexture = RenewableEnergy_SolarFlat;RenewableEnergy_SolarFlat_Homemade,
+        OnCreate = RenewableEnergy.Recipes.showMountModules,
         WorldObjectSprite = renewable_energy_01_0,
         Tooltip = Tooltip_RenewableEnergy_SolarFlat,
         Tags = base:hasmetal;base:ignorezombiedensity,
@@ -82,9 +89,12 @@ module RenewableEnergy
     {
         DisplayCategory = Electronics,
         ItemType = base:moveable,
-        Weight = 5.0,
+        Weight = 8.0,
         Icon = RenewableEnergy_SolarWallWood,
         WorldStaticModel = RenewableEnergy.SolarWallWood_Ground,
+        WorldStaticModelsByIndex = RenewableEnergy.SolarWallWood_Ground;RenewableEnergy.SolarWallWood_Homemade_Ground,
+        IconsForTexture = RenewableEnergy_SolarWallWood;RenewableEnergy_SolarWallWood_Homemade,
+        OnCreate = RenewableEnergy.Recipes.showMountModules,
         WorldObjectSprite = renewable_energy_01_21,
         Tooltip = Tooltip_RenewableEnergy_SolarWall,
         Tags = base:ignorezombiedensity,
@@ -94,9 +104,12 @@ module RenewableEnergy
     {
         DisplayCategory = Electronics,
         ItemType = base:moveable,
-        Weight = 5.0,
+        Weight = 8.0,
         Icon = RenewableEnergy_SolarWallMetal,
         WorldStaticModel = RenewableEnergy.SolarWallMetal_Ground,
+        WorldStaticModelsByIndex = RenewableEnergy.SolarWallMetal_Ground;RenewableEnergy.SolarWallMetal_Homemade_Ground,
+        IconsForTexture = RenewableEnergy_SolarWallMetal;RenewableEnergy_SolarWallMetal_Homemade,
+        OnCreate = RenewableEnergy.Recipes.showMountModules,
         WorldObjectSprite = renewable_energy_01_1,
         Tooltip = Tooltip_RenewableEnergy_SolarWall,
         Tags = base:hasmetal;base:ignorezombiedensity,
@@ -106,9 +119,12 @@ module RenewableEnergy
     {
         DisplayCategory = Electronics,
         ItemType = base:moveable,
-        Weight = 11.0,
+        Weight = 18.0,
         Icon = RenewableEnergy_SolarRackWood,
         WorldStaticModel = RenewableEnergy.SolarRackWood_Ground,
+        WorldStaticModelsByIndex = RenewableEnergy.SolarRackWood_Ground;RenewableEnergy.SolarRackWood_Homemade1_Ground;RenewableEnergy.SolarRackWood_Homemade2_Ground,
+        IconsForTexture = RenewableEnergy_SolarRackWood;RenewableEnergy_SolarRackWood_Homemade1;RenewableEnergy_SolarRackWood_Homemade2,
+        OnCreate = RenewableEnergy.Recipes.showMountModules,
         WorldObjectSprite = renewable_energy_01_24,
         Tooltip = Tooltip_RenewableEnergy_SolarRackWood,
         Tags = base:ignorezombiedensity,
@@ -118,9 +134,12 @@ module RenewableEnergy
     {
         DisplayCategory = Electronics,
         ItemType = base:moveable,
-        Weight = 9.0,
+        Weight = 15.0,
         Icon = RenewableEnergy_SolarRackMetal,
         WorldStaticModel = RenewableEnergy.SolarRackMetal_Ground,
+        WorldStaticModelsByIndex = RenewableEnergy.SolarRackMetal_Ground;RenewableEnergy.SolarRackMetal_Homemade1_Ground;RenewableEnergy.SolarRackMetal_Homemade2_Ground,
+        IconsForTexture = RenewableEnergy_SolarRackMetal;RenewableEnergy_SolarRackMetal_Homemade1;RenewableEnergy_SolarRackMetal_Homemade2,
+        OnCreate = RenewableEnergy.Recipes.showMountModules,
         WorldObjectSprite = renewable_energy_01_3,
         Tooltip = Tooltip_RenewableEnergy_SolarRackMetal,
         Tags = base:hasmetal;base:ignorezombiedensity,
@@ -135,7 +154,7 @@ module RenewableEnergy
     {
         DisplayCategory = Electronics,
         ItemType = base:moveable,
-        Weight = 6.0,
+        Weight = 7.5,
         Icon = RenewableEnergy_BatteryBoxWood,
         WorldStaticModel = RenewableEnergy.BatteryBoxWood_Ground,
         WorldObjectSprite = renewable_energy_01_340,
@@ -147,7 +166,7 @@ module RenewableEnergy
     {
         DisplayCategory = Electronics,
         ItemType = base:moveable,
-        Weight = 5.0,
+        Weight = 2.5,
         Icon = RenewableEnergy_BatteryBoxMetal,
         WorldStaticModel = RenewableEnergy.BatteryBoxMetal_Ground,
         WorldObjectSprite = renewable_energy_01_344,
@@ -171,7 +190,7 @@ module RenewableEnergy
     {
         DisplayCategory = Electronics,
         ItemType = base:moveable,
-        Weight = 14.0,
+        Weight = 10.0,
         Icon = RenewableEnergy_BatteryRackMetal,
         WorldStaticModel = RenewableEnergy.BatteryRackMetal_Ground,
         WorldObjectSprite = renewable_energy_01_352,
@@ -195,7 +214,7 @@ module RenewableEnergy
     {
         DisplayCategory = Electronics,
         ItemType = base:moveable,
-        Weight = 25.0,
+        Weight = 18.0,
         Icon = RenewableEnergy_BatteryBankMetal,
         WorldStaticModel = RenewableEnergy.BatteryBankMetal_Ground,
         WorldObjectSprite = renewable_energy_01_360,
@@ -299,7 +318,7 @@ module RenewableEnergy
     {
         DisplayCategory = Electronics,
         ItemType = base:normal,
-        Weight = 4.0,
+        Weight = 2.5,
         Icon = RenewableEnergy_MicrowaveTransformer,
         WorldStaticModel = RenewableEnergy.MicrowaveTransformer_Ground,
         MetalValue = 2.0,
@@ -462,7 +481,7 @@ module RenewableEnergy
     {
         DisplayCategory = Material,
         ItemType = base:normal,
-        Weight = 0.5,
+        Weight = 0.3,
         Icon = RenewableEnergy_WoodenBatteryPlatePattern,
         WorldStaticModel = RenewableEnergy.WoodenBatteryPlatePattern_Ground,
         Tags = base:ignorezombiedensity,
@@ -472,7 +491,7 @@ module RenewableEnergy
     {
         DisplayCategory = Material,
         ItemType = base:normal,
-        Weight = 0.5,
+        Weight = 0.3,
         Icon = RenewableEnergy_BatteryPlateMoldUnfired,
         WorldStaticModel = RenewableEnergy.BatteryPlateMoldUnfired_Ground,
         Tags = base:ignorezombiedensity,
@@ -482,7 +501,7 @@ module RenewableEnergy
     {
         DisplayCategory = Material,
         ItemType = base:normal,
-        Weight = 0.5,
+        Weight = 0.3,
         Icon = RenewableEnergy_BatteryPlateMold,
         WorldStaticModel = RenewableEnergy.BatteryPlateMold_Ground,
         Tooltip = Tooltip_RenewableEnergy_BatteryPlateMold,
@@ -494,7 +513,7 @@ module RenewableEnergy
     {
         DisplayCategory = Electronics,
         ItemType = base:normal,
-        Weight = 0.3,
+        Weight = 0.2,
         Icon = RenewableEnergy_BatteryElectrolyte,
         WorldStaticModel = RenewableEnergy.BatteryElectrolyte_Ground,
         Tooltip = Tooltip_RenewableEnergy_BatteryElectrolyte,
@@ -533,7 +552,7 @@ module RenewableEnergy
     {
         DisplayCategory = Electronics,
         ItemType = base:moveable,
-        Weight = 1.0,
+        Weight = 0.5,
         Icon = RenewableEnergy_SolarCellCharger,
         WorldStaticModel = RenewableEnergy.SolarCellCharger_Ground,
         WorldObjectSprite = renewable_energy_01_10,
@@ -749,7 +768,7 @@ module RenewableEnergy
         Weight = 2.0,
         Icon = RenewableEnergy_PipeBlades,
         WorldStaticModel = RenewableEnergy.PipeBlades_Ground,
-        Tooltip = Tooltip_RenewableEnergy_Blades,
+        Tooltip = Tooltip_RenewableEnergy_PipeBlades,
         Tags = base:ignorezombiedensity,
     }
 
@@ -760,7 +779,7 @@ module RenewableEnergy
     {
         DisplayCategory = Material,
         ItemType = base:normal,
-        Weight = 6.0,
+        Weight = 2.0,
         Icon = RenewableEnergy_SteelBlades,
         WorldStaticModel = RenewableEnergy.SteelBlades_Ground,
         Tooltip = Tooltip_RenewableEnergy_SteelBlades,
@@ -798,7 +817,7 @@ module RenewableEnergy
     {
         DisplayCategory = Material,
         ItemType = base:normal,
-        Weight = 4.0,
+        Weight = 1.5,
         Icon = RenewableEnergy_BrokenSteelBlades,
         WorldStaticModel = RenewableEnergy.BrokenSteelBlades_Ground,
         Tooltip = Tooltip_RenewableEnergy_BrokenSteelBlades,

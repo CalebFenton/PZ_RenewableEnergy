@@ -501,10 +501,11 @@ module Base
         }
     }
 
-    /* A new pane over the cracked cells. The cells stay cracked, so it can't bring a module back
-       to new. Like vanilla car glass, a trailer panel is replaced in hand, not fixed in place.
-       A car window serves as the pane: vanilla makes panes only with a rare magazine or trait,
-       while cars are everywhere. A shattered one is broken, which inputs refuse. */
+    /* A new pane in place of cracked glass. Cells cracked under it stay cracked, so such a module
+       never comes back to new (ModuleRepair.REGLAZE). Like vanilla car glass, a trailer panel is
+       replaced in hand, not fixed in place. A car window serves as the pane: vanilla makes panes
+       only with a rare magazine or trait, while cars are everywhere. A shattered one is broken,
+       which inputs refuse. */
     craftRecipe RenewableEnergy_ReglazeModule
     {
         timedAction = MakingElectrical,
@@ -516,7 +517,7 @@ module Base
         SkillRequired = Electricity:3,
         xpAward = Electricity:20;Glassmaking:10,
         Tooltip = Tooltip_RenewableEnergy_ReglazeModule,
-        OnTest = RenewableEnergy.Recipes.isModuleBelowReglaze,
+        OnTest = RenewableEnergy.Recipes.isReglazableModule,
         OnCreate = RenewableEnergy.Recipes.reglazeModule,
         inputs
         {

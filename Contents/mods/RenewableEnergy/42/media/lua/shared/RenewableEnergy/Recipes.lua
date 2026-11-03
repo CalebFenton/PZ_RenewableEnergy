@@ -13,6 +13,7 @@ local Specs = require "RenewableEnergy/Specs"
 local Battery = require "RenewableEnergy/PowerBank/Battery"
 local ModuleRepair = require "RenewableEnergy/PowerBank/ModuleRepair"
 local Panel = require "RenewableEnergy/PowerBank/Panel"
+local Sprites = require "RenewableEnergy/Sprites"
 local Wear = require "RenewableEnergy/PowerBank/Wear"
 local SolarGardenLight = require "RenewableEnergy/Gadgets/SolarGardenLight"
 local VehicleBattery = require "RenewableEnergy/Gadgets/VehicleBattery"
@@ -59,8 +60,34 @@ local function countRepair(item)
     setRepairs(item, item:getHaveBeenRepaired() + 1)
 end
 
+--- Shows on the panel mount item `item` the modules it holds: its ground model and icon by how
+--- many are homemade (its model index, Sprites.homemadeCount). Also the mount items' OnCreate: the
+--- game gives a new item that has models by index a random one, and a new mount holds factory
+--- modules (Panel.modulesOf).
+function Recipes.showMountModules(item)
+    item:setModelIndex(Sprites.homemadeCount(Panel.modulesOf(item, Recipes.MOUNTS[item:getFullType()].kind)))
+end
+
+-- Sends a crafted `item` to the clients again, whole: an MP client got it before OnCreate ran,
+-- and no item sync carries its model index. In a container it replaces itself; on the floor it is
+-- put down again where it lies.
+local function resendWhole(item)
+    if not isServer() then return end
+    local container, worldItem = item:getContainer(), item:getWorldItem()
+    if container then
+        sendReplaceItemInContainer(container, item, item)
+    elseif worldItem then
+        local square = worldItem:getSquare()
+        local x, y, z = worldItem:getOffX(), worldItem:getOffY(), worldItem:getOffZ()
+        square:transmitRemoveItemFromSquare(worldItem)
+        square:removeWorldObject(worldItem)
+        item:setWorldItem(nil)
+        square:AddWorldInventoryItem(item, x, y, z)
+    end
+end
+
 -- OnCreate of the mount recipes: the mount remembers its modules, as its placed object will, and
--- the modules new to mounting teach their share of the recipe's XP.
+-- shows them; the modules new to mounting teach their share of the recipe's XP.
 function Recipes.mountModules(craftRecipeData, character)
     local modules, new = {}, 0
     local items = craftRecipeData:getAllInputItems()
@@ -77,7 +104,8 @@ function Recipes.mountModules(craftRecipeData, character)
     end
     local mount = craftRecipeData:getFirstCreatedItem()
     mount:getModData()[Panel.MODULES_KEY] = modules
-    mount:syncItemFields()
+    Recipes.showMountModules(mount)
+    resendWhole(mount)
     if new > 0 then
         for perk, xp in pairs(Recipes.MOUNTS[mount:getFullType()].xp) do
             addXp(character, Perks[perk], xp * new / #modules)
@@ -103,40 +131,35 @@ function Recipes.unmountModules(craftRecipeData, character)
     end
 end
 
-local function isSealType(item)
-    return ModuleRepair.SEAL_CAP[item:getFullType()] ~= nil
-end
-
 -- OnTest of Seal Cracked Module and its glue twin: a module must be one a seal can help.
 function Recipes.isModuleBelowRepairCap(item, character)
-    return not isSealType(item)
+    return not isModule(item)
         or ModuleRepair.sealable(item:getFullType(), item:getCondition(), item:getHaveBeenRepaired())
 end
 
 -- OnCreate of Seal Cracked Module and its glue twin.
 function Recipes.repairModule(craftRecipeData, character)
-    local module = Items.firstInput(craftRecipeData, isSealType)
+    local module = Items.firstInput(craftRecipeData, isModule)
     local condition, repaired = ModuleRepair.sealed(module:getFullType(), module:getCondition(),
         module:getHaveBeenRepaired())
     Wear.setCondition(module, condition)
     setRepairs(module, repaired)
 end
 
--- What Reglaze Module brings the module item `item` to (ModuleRepair.reglazedCondition), or nil.
-local function reglazedItem(item)
-    return ModuleRepair.reglazedCondition(item:getFullType(), item:getCondition(), item:getHaveBeenRepaired())
+-- OnTest of Reglaze Module: the module's glass must show cracks.
+function Recipes.isReglazableModule(item, character)
+    return not isModule(item) or ModuleRepair.reglazable(item:getFullType(), item:getCondition())
 end
 
--- OnTest of Reglaze Module: the module must be below what new glass brings it to.
-function Recipes.isModuleBelowReglaze(item, character)
-    local reglazed = reglazedItem(item)
-    return reglazed == nil or item:getCondition() < reglazed
-end
-
--- OnCreate of Reglaze Module: new glass, so the seals on the old no longer count.
+-- OnCreate of Reglaze Module: new glass, so the seals on the old no longer count, and the module
+-- remembers cells cracked under it (Panel.CELLS_CRACKED_KEY).
 function Recipes.reglazeModule(craftRecipeData, character)
     local module = Items.firstInput(craftRecipeData, isModule)
-    Wear.setCondition(module, reglazedItem(module))
+    local data = module:getModData()
+    local condition, cellsCracked = ModuleRepair.reglazed(module:getFullType(), module:getCondition(),
+        module:getHaveBeenRepaired(), data[Panel.CELLS_CRACKED_KEY] == true)
+    data[Panel.CELLS_CRACKED_KEY] = cellsCracked or nil
+    Wear.setCondition(module, condition)
     setRepairs(module, 0)
 end
 

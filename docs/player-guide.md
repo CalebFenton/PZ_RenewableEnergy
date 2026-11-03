@@ -45,11 +45,11 @@ A bank bills each appliance what vanilla bills a generator for it:
 
 A fridge runs day and night, so it's what sizes your bank: 160 W around the clock is about 4 kWh a day, 2 of them overnight. A stove or a washer counts only while it's on.
 
-The inverter also loses a share of what passes through it, a tenth for a found one and more for a homemade one, and draws a few watts while it's on. Everything in the bank's reach counts, the neighbours' lights and fridges included, so set up away from town or switch off what you don't need.
+The inverter also loses a share of what passes through it, a tenth for a found one and more for a makeshift one, and draws a few watts while it's on. Everything in the bank's reach counts, the neighbours' lights and fridges included, so set up away from town or switch off what you don't need.
 
 ## Your first setup
 
-You need a **Wooden Battery Box** (Homestead Power #1, or Woodwork), two car batteries, a **Plug-in Inverter** from an auto parts store or a car's glove box (or a **Makeshift Inverter** you build, see [Inverters](#inverters)), and a solar module or two.
+You need a **Wooden Battery Box** (Homestead Power #1, or Woodwork), two car batteries, a **Plug-in Inverter** from an auto parts store or a car's glove box (or a **Makeshift Plug-in Inverter** you build, see [Inverters](#inverters)), and a solar module or two.
 
 1. Place the box inside a building, in a room. Outdoors, it does nothing.
 2. Right-click it and **Wire In** the batteries and the inverter. That takes a screwdriver, some Electric Wire and enough light to see by.
@@ -71,9 +71,9 @@ Every piece has a better version. Mostly you upgrade by building the next one an
 |---|---|---|---|---|---|
 | Battery box | 2 (2) | 1 | 1 | 0 | 2 |
 | Battery rack | 6 (8) | 1 | 2 | 2 | 16 |
-| Battery bank | 12 (16) | 2 | 2 | 4 | 30 |
+| Battery cabinet | 12 (16) | 2 | 2 | 4 | 30 |
 
-A metal rack or bank holds more batteries than a wooden one; a metal box holds the same two.
+A metal rack or cabinet holds more batteries than a wooden one; a metal box holds the same two.
 
 ### Inverters
 
@@ -81,18 +81,18 @@ The inverter decides how much you can switch on at once. With two inverters, a b
 
 | Inverter | Carries | Wastes | Wire it in at | Comes from |
 |---|---|---|---|---|
-| Makeshift Inverter | 300 W | A quarter | Electricity 0 | Crafted (Electricity 2) |
+| Makeshift Plug-in Inverter | 300 W | A quarter | Electricity 0 | Crafted (Electricity 2) |
 | Plug-in Inverter | 300 W | A tenth | Electricity 0 | Common |
-| Homemade Inverter | 600 W | A fifth | Electricity 2 | Crafted (Electricity 4) |
+| Makeshift Power Inverter | 600 W | A fifth | Electricity 2 | Crafted (Electricity 4) |
 | Power Inverter | 600 W | A tenth | Electricity 2 | Uncommon |
 | Inverter/Charger | 1000 W | A tenth | Electricity 4 | Rare |
 
 The Inverter/Charger also has a 1000 W charger built in (see [Chargers and generators](#chargers-and-generators)). As a guide, 300 W runs a fridge with the TV, the radio and the lights; 600 W adds the washer or the stove; 1000 W runs a fridge-freezer, the stove and the washer at once; a pair of inverter/chargers runs the whole house.
 
-**Building one.** A homemade inverter carries what the found one of its size does, but wastes more of your charge, idles hotter, wears a little faster and never comes up to a found one's condition: a makeshift one tops out at 80, a homemade one at 90. The better your Electricity when you build it, the closer to that it comes out. A found inverter is always an upgrade.
+**Building one.** A makeshift inverter carries what the found one of its size does, but wastes more of your charge, idles hotter, wears a little faster and never comes up to a found one's condition: a Makeshift Plug-in Inverter tops out at 80, a Makeshift Power Inverter at 90. The better your Electricity when you build it, the closer to that it comes out. A found inverter is always an upgrade.
 
-- **Makeshift Inverter**: a Car Battery Charger or a Microwave Transformer, an Amplifier, two Electronics Scrap and two lengths of wire, with a screwdriver, at Electricity 2.
-- **Homemade Inverter**: a Microwave Transformer (a battery charger's is too small), two Amplifiers, four Electronics Scrap, four lengths of wire, a small sheet of metal and four screws, with a screwdriver and pliers, at Electricity 4.
+- **Makeshift Plug-in Inverter**: a Car Battery Charger or a Microwave Transformer, an Amplifier, two Scrap Electronics and two lengths of wire, with a screwdriver, at Electricity 2.
+- **Makeshift Power Inverter**: a Microwave Transformer (a battery charger's is too small), two Amplifiers, four Scrap Electronics, four lengths of wire, a small sheet of metal and four screws, with a screwdriver and pliers, at Electricity 4.
 
 Taking apart a radio or a TV often gives an Amplifier, and a Speaker always does. Dismantling a microwave gives its transformer 20% of the time at Electricity 0, 10% more for each level, and every time from Electricity 8.
 
@@ -101,14 +101,14 @@ Taking apart a radio or a TV often gives an Amplifier, and a Speaker always does
 A usual climb:
 
 - **Two flat panels**, for summer days.
-- **Wall panels and ground racks** for winter, and a **scoop rotor** for a trickle at night.
+- **Wall panels and solar racks** for winter, and a **scoop rotor** for a trickle at night.
 - A **charge controller**, then a **treadmill wind charger** to help the panels through winter nights.
-- A **car alternator wind charger**, then a **homebuilt wind turbine** on high, open ground.
+- A **car alternator wind charger**, then a **homemade wind turbine** on high, open ground.
 - A generator on biogas or wood gas as the backup, started by a **Solar Failsafe**.
 
 ### Batteries
 
-Car batteries come first, then **Deep Cycle Marine Batteries**, which hold twice as much and last far longer, then **L-16s**, found mostly where the phone and power companies kept them. You can make a **Jar Battery** from scratch when you can't find anything better. See [Batteries](#batteries).
+Car batteries come first, then **Deep Cycle Batteries**, which hold twice as much and last far longer, then **L-16s**, found mostly where the phone and power companies kept them. You can make a **Jar Battery** from scratch when you can't find anything better. See [Batteries](#batteries).
 
 ### Gas
 
@@ -129,13 +129,13 @@ For a fridge through a twelve-hour night you need about 2 kWh out of the batteri
 
 ### Placing
 
-A box, rack or bank works only inside a building's room. A box is small enough to go on a table, counter or shelf, as a microwave does; racks and banks stand on the floor. Like furniture, it turns to face any way as you place it: hold the mouse button and move the cursor the way it should face. Its charge meter is on the front. One you find stands with its back to a wall, already connected but switched off.
+A box, rack or cabinet works only inside a building's room. A box is small enough to go on a table, counter or shelf, as a microwave does; racks and cabinets stand on the floor. Like furniture, it turns to face any way as you place it: hold the mouse button and move the cursor the way it should face. Its charge meter is on the front. One you find stands with its back to a wall, already connected but switched off.
 
 ### Wiring parts in
 
 Parts go in with **Wire In** and come out with **Unwire**; you can't drag them. **Wire In** lists every part you carry by type, each with its condition. **Wire In > All Batteries** fills the bank with your best batteries first, and **Unwire > All Batteries** empties it in one go. What doesn't fit in your inventory lands at your feet.
 
-Every part takes a screwdriver, Electric Wire and light to see by; an L-16's cable lugs bolt on, so it takes a wrench too. Unwiring takes the same tools and gives the wire back. The first time an item is wired in, it gives Electricity XP, and higher Electricity makes the work faster. A charge controller needs Electricity 3 and an Electronics Scrap.
+Every part takes a screwdriver, Electric Wire and light to see by; an L-16's cable lugs bolt on, so it takes a wrench too. Unwiring takes the same tools and gives the wire back. The first time an item is wired in, it gives Electricity XP, and higher Electricity makes the work faster. A charge controller needs Electricity 3 and a Scrap Electronics.
 
 **Turn On** stays greyed out until the bank has a working inverter and a battery.
 
@@ -157,9 +157,9 @@ A bank has 2 inputs of its own, and each working **Charge Controller** adds 7. E
 
 | Source | Inputs |
 |---|---|
-| Any solar panel, including a ground rack's two modules | 1 |
+| Any solar panel, including a solar rack's two modules | 1 |
 | Scoop rotor, treadmill | 1 |
-| Treadmill or car alternator wind charger, homebuilt wind turbine | 3 |
+| Treadmill or car alternator wind charger, homemade wind turbine | 3 |
 
 So a bladed wind charger always needs a controller.
 
@@ -183,7 +183,7 @@ Place it on a generator's square. It starts the generator when the bank drops to
 
 ### Upkeep
 
-Inverters lose condition every hour the bank powers its area, about one Electronics Scrap's worth every two and a half weeks. Controllers wear half as fast, so even a full metal bank needs only a scrap every few days. **Repair with Scrap** in the bank's menu (Electricity 2) adds the same amount for each scrap. A part at zero is broken, but you can still repair it. Found inverters and controllers are usually in good shape, but now and then one is a dud.
+Inverters lose condition every hour the bank powers its area, about one Scrap Electronics' worth every two and a half weeks. Controllers wear half as fast, so even a full metal cabinet needs only a scrap every few days. **Repair with Scrap** in the bank's menu (Electricity 2) adds the same amount for each scrap. A part at zero is broken, but you can still repair it. Found inverters and controllers are usually in good shape, but now and then one is a dud.
 
 ### The status window
 
@@ -201,7 +201,7 @@ While grid power reaches the bank, the window says so, and whether the chargers 
 | Battery | Holds | Years to half capacity, drained half (a quarter) nightly | Fits a car |
 |---|---|---|---|
 | Car battery | 600 Wh | 0.4 (1.6) | Yes |
-| Deep Cycle Marine Battery | 1260 Wh | 1 (4) | Yes |
+| Deep Cycle Battery | 1260 Wh | 1 (4) | Yes |
 | L-16 Battery | 2100 Wh | 2 (8) | No |
 | Jar Battery | 400 Wh | 0.2 (0.8) | No |
 
@@ -245,17 +245,21 @@ A deep cycle fits a car's battery slot. It runs the lights and radio twice as lo
 
 ### Mounts
 
-Each mount holds factory or homemade modules, and each suits a different season:
+There are two kinds of module. A factory **Solar Module** is rated 160 W; a **Makeshift Solar Module** you build is rated 96 W. Output follows condition: a module at half condition makes half its rating. Every module's tooltip shows **Output: N of M W**, what it makes at its condition out of its rating.
 
-| Mount | Modules | Best in | A new module banks a day, July / December |
+Each mount holds either kind of module, and each suits a different season:
+
+| Mount | Modules | Best in | A new factory module banks a day, July / December |
 |---|---|---|---|
 | Flat Solar Panel | 1 | Summer | 1.7 / 0.5 kWh |
-| Wall-Mounted Solar Panel | 1 | Winter | 0.7 / 0.9 kWh |
-| Solar Ground Rack | 2 | All year | 1.5 / 0.9 kWh per module |
+| Wooden or Metal Wall Solar Panel | 1 | Winter | 0.7 / 0.9 kWh |
+| Wooden or Metal Solar Rack | 2 | All year | 1.5 / 0.9 kWh per module |
 
-Those are averages over the weather; a clear day gives half again or more, and a grey week much less. A flat panel lies flat and likes the summer sun high overhead. A wall panel goes on an outside wall facing south or east, and gets extra light off fresh snow; an east wall gets only morning sun. A ground rack tilts its two modules and faces any way you place it, which makes it the most even across the year.
+A makeshift module banks 60% of those figures. They are averages over the weather; a clear day gives half again or more, and a grey week much less. A flat panel lies flat and likes the summer sun high overhead. A wall panel goes on an outside wall facing south or east, and gets extra light off fresh snow; an east wall gets only morning sun. A solar rack tilts its two modules and faces any way you place it, which makes it the most even across the year. A rack's two modules use 1 bank input between them.
 
-As a rule of thumb, three flat panels run a fridge through a July day and night, and it takes five modules on racks or walls in December. Sandbox: **Sunlight Multiplier**.
+A mount's tooltip lists each module it holds with its output, and the total. Makeshift modules look different from factory ones, on a placed mount and on a mount you carry, so you can tell at a glance which slots hold them.
+
+As a rule of thumb, three flat panels with factory modules run a fridge through a July day and night, and it takes five factory modules on racks or walls in December. Sandbox: **Sunlight Multiplier**.
 
 ### Weather and snow
 
@@ -270,32 +274,32 @@ A thunderstorm with strong wind can crack a module; a gale without thunder can't
 | Mount | Storm risk |
 |---|---|
 | Wall panel | Never cracks |
-| Metal ground rack | Least |
+| Metal solar rack | Least |
 | Flat panel | Middling |
-| Wooden ground rack | Most |
+| Wooden solar rack | Most |
 
 At the default rate, ten panels lose about one module every four to six months. Even the longest run of thunderstorms cracks a module on a wooden rack only about one time in seven. Every panel standing outdoors is at risk, connected or not. Sandbox: **Storm Damage**, **Storm Damage Rate**.
 
-The glass shows how worn a module is: whole down to 85% of its best condition, a few fine cracks below that, and heavy cracks below half. A new module's first crack always shows.
+The glass shows how worn a module is: whole down to 85 condition, a few fine cracks below that, and heavy cracks below 50. A new module's first crack always shows.
 
 ### Fixing modules
 
 Sealing is the cheap fix, reglazing the good one.
 
-- **Seal Cracked Module** takes a screwdriver and either 1 use of epoxy or 2 of glue. Seal a loose module in the crafting window (with glue, pick **Seal Cracked Module With Glue**), or one still on a placed panel from the panel's menu. It brings back some condition, but only up to a ceiling that drops with every seal, and the glass still looks cracked. Once a module is at its ceiling, the panel's menu greys its seal out: reglaze it instead.
-- **Reglaze Module** puts on a new pane of glass. **Unmount** the module first. It looks whole again, and its seal count clears. If its cracks were light, it's as good as new; if they were heavy, or you'd sealed it, the cells underneath cracked too and it comes back to 90% of new.
+- **Seal Cracked Module** takes a screwdriver and either 1 use of epoxy or 2 of glue. Seal a loose module in the crafting window (with glue, pick **Seal Cracked Module With Glue**), or one still on a placed panel from the panel's menu. Each seal adds 20 condition, up to 55, less 10 for each earlier seal, for either kind of module; the glass still looks cracked. Once a module is at its ceiling, the panel's menu greys its seal out: reglaze it instead.
+- **Reglaze Module** puts on a new pane of glass. **Unmount** the module first. Only a module whose glass shows cracks can be reglazed. It looks whole again, and its seal count clears. If its cracks were light, it's as good as new. If they were heavy, or you'd sealed it, the cells underneath cracked too and it comes back to 90% of new. A module remembers cracked cells: every later reglaze also brings it back to 90%, never to new.
 
 **Unmount** always gives back the same modules at the same condition, plus some of the frame.
 
 Sealing in place follows the crafting window's item protections: favorite adhesives and items excluded from recipes are not used. A favorite screwdriver is allowed because the job keeps it.
 
-### Homemade modules
+### Makeshift modules
 
-A **Homemade Solar Module** is 16 solar cells under glass. Cells come from taking apart calculators, garden lights, solar battery chargers, maintainers, and shattered modules (only at zero condition). A homemade module tops out at 60% of a factory one, so its glass cracks at 51 and 30.
+A **Makeshift Solar Module** is 16 solar cells under glass, rated 96 W. Cells come from taking apart calculators, garden lights, solar battery chargers, maintainers, and shattered factory modules (only at 0 condition, for 12 cells). It wears, cracks, seals and reglazes like a factory module.
 
 ### Glass
 
-Reglazing and homemade modules each take a pane of glass, and a car window taken off in the mechanics window does as well, as long as it isn't shattered. Panes are hard to make, but houses are full of them: pick up a window with a crowbar (that takes a little carpentry), then **Take Out Window Glass** with a screwdriver or a sharp knife digs out the putty and gives you its two panes. Taking the glass out needs nothing learned, but a window can break as you pick it up, and then there is nothing to take out.
+Reglazing and makeshift modules each take a pane of glass, and a car window taken off in the mechanics window does as well, as long as it isn't shattered. Panes are hard to make, but houses are full of them: pick up a window with a crowbar (that takes a little carpentry), then **Take Out Window Glass** with a screwdriver or a sharp knife digs out the putty and gives you its two panes. Taking the glass out needs nothing learned, but a window can break as you pick it up, and then there is nothing to take out.
 
 ## Wind chargers
 
@@ -303,19 +307,19 @@ Wind blows day and night, and hardest in winter, just when the panels give the l
 
 ### The four kinds
 
-The figures here are at the default **Wind Multiplier** of 2, which scales them all; 1 is what such homebuilt chargers really made.
+The figures here are at the default **Wind Multiplier** of 2, which scales them all; 1 is what such homemade chargers really made.
 
 | Charger | Generator | Full output | Inputs | Breaks in storms |
 |---|---|---|---|---|
 | Scoop Rotor Wind Charger | Treadmill Motor | 200 W at 50 km/h | 1 | Never |
 | Treadmill Wind Charger | Treadmill Motor | 600 W at 40 km/h | 3 | Yes |
 | Car Alternator Wind Charger | Car Alternator | 800 W at 40 km/h | 3 | Yes |
-| Homebuilt Wind Turbine | Homemade Alternator | 1600 W at 40 km/h | 3 | Yes, but turns aside in a gale |
+| Homemade Wind Turbine | Homemade Alternator | 1600 W at 40 km/h | 3 | Yes, but turns aside in a gale |
 
 - **Scoop rotor**: two half-drum scoops on a short pole. It never needs the brake and never breaks, but it makes little. It's the one charger that needs no controller.
 - **Treadmill wind charger**: three blades high on a steel mast. It's the first charger that makes real power.
 - **Car alternator wind charger**: the same mast belted to a car's alternator. It makes a third more in any wind for the same inputs, a straight upgrade.
-- **Homebuilt wind turbine**: speaker magnets on a car's brake hub turning past hand-wound coils. It makes well over twice the treadmill charger's power, and its tail swings it out of a gale.
+- **Homemade wind turbine**: speaker magnets on a car's brake hub turning past hand-wound coils. It makes well over twice the treadmill charger's power, and its tail swings it out of a gale.
 
 ### How much the wind gives
 
@@ -338,7 +342,7 @@ The everyday wind averages about 12 km/h in July and 19 in December, so a charge
 | Scoop rotor | 0.1 kWh | 0.5 kWh |
 | Treadmill wind charger | 0.5 kWh | 2.6 kWh |
 | Car alternator wind charger | 0.7 kWh | 3.5 kWh |
-| Homebuilt wind turbine | 1.5 kWh | 7.1 kWh |
+| Homemade wind turbine | 1.5 kWh | 7.1 kWh |
 
 A fridge-freezer uses about 6 kWh a day, and a south rack's module banks about 1.5 kWh in July and 0.9 in December.
 
@@ -364,7 +368,7 @@ A charger warns you when the wind gets strong enough to break its blades. Wooden
 
 Once at risk, steel blades break a quarter as often as pipe, and wood half as often. Thunderstorms top out around 84 km/h. Blizzards blow 90 to 120 km/h for a day or two and are the real danger, though even the longest breaks unbraked pipe blades at most about one time in seven at the default Storm Damage Rate. Blades never change the power, only how much wind they stand.
 
-From 55 km/h, the homebuilt turbine's tail swings its head out of the wind ("turned out of the wind"). It keeps 85% of its full output, and its blades take less of the gale, which is why they hold 20 km/h longer.
+From 55 km/h, the homemade turbine's tail swings its head out of the wind ("turned out of the wind"). It keeps 85% of its full output, and its blades take less of the gale, which is why they hold 20 km/h longer.
 
 ### Replacing blades
 
@@ -374,13 +378,13 @@ From 55 km/h, the homebuilt turbine's tail swings its head out of the wind ("tur
 
 - **Treadmill Motor**: take a treadmill apart. Every one gives its motor.
 - **Car Alternator**: in the vehicle mechanics window, the engine's menu has **Take Out Alternator** (engine off, a wrench, Mechanics 2; it opens the hood if it's shut). Each car has one. The car still runs without it, but it stops charging its battery until you **Put Back Alternator**. Cutting up a smashed wreck gives one as often as it gives engine parts, more with Metalworking and Mechanics; a burnt wreck never does. Mechanics' shelves and auto parts stores have them too.
-- **Homemade Alternator**: a car's brake, two speakers (or two ham radios, or four portable radios, for their smaller speakers' magnets), four lengths of wire, two Electronics Scrap and a small sheet of metal, with a screwdriver and a wrench, at Electricity 5 and Mechanics 3.
+- **Homemade Alternator**: a car's brake, two speakers (or two ham radios, or four portable radios, for their smaller speakers' magnets), four lengths of wire, two Scrap Electronics and a small sheet of metal, with a screwdriver and a wrench, at Electricity 5 and Mechanics 3.
 
 ## Treadmills
 
 No sun and no wind? Run for it.
 
-Right-click a treadmill and **Connect to** a bank in reach (Electricity 2, a screwdriver, wire and an Electronics Scrap): that wires its motor to make power instead of using it. **Run on Treadmill** lasts half an hour and banks roughly what a fridge-freezer draws in that time. The energy goes in when the run ends and reaches the batteries over the next half hour; stopping early banks your share of the run.
+Right-click a treadmill and **Connect to** a bank in reach (Electricity 2, a screwdriver, wire and a Scrap Electronics): that wires its motor to make power instead of using it. **Run on Treadmill** lasts half an hour and banks roughly what a fridge-freezer draws in that time. The energy goes in when the run ends and reaches the batteries over the next half hour; stopping early banks your share of the run.
 
 A run costs a good chunk of endurance and some thirst, and trains Fitness and Sprinting. You stop by yourself when you're nearly spent. If the bank has no free input, the run still tires you, but the energy is lost.
 
@@ -551,16 +555,16 @@ Tow it home and it keeps charging its batteries on the way, or strip it for part
 
 | Read | It teaches |
 |---|---|
-| Homestead Power #1: Sun & Batteries | Battery boxes and racks, every panel mount, sealing, the makeshift inverter |
-| Homestead Power #2: Inverters & Control | Battery banks, the homemade inverter, the charge controller, the failsafe, homemade modules, reglazing, reconditioning, the whole battery rebuild |
+| Homestead Power #1: Sun & Batteries | Battery boxes and racks, every panel mount, sealing, the Makeshift Plug-in Inverter |
+| Homestead Power #2: Inverters & Control | Battery cabinets, the Makeshift Power Inverter, the charge controller, the failsafe, makeshift modules, reglazing, reconditioning, the whole battery rebuild |
 | Homestead Power #3 | Digesters, the Gas Conversion Kit, the Gas Heater, Weld Metal Drum |
 | Homestead Power #4 | Every wind charger, their blades, the homemade alternator, Weld Metal Drum |
 | FEMA Wood Gas Generator Plans | The three gasifiers, the Gas Conversion Kit, the wood vinegar sprays, Weld Metal Drum |
 
 ### Other ways to learn
 
-- **Skills.** Every recipe is also learned by reaching a skill level, usually above what crafting it needs, so a magazine gets you there sooner. Boxes, racks, banks and panels come from Woodwork, Metalworking or Electricity. Battery work, inverters and controllers come from Electricity, digesters from Farming plus a building skill, gasifiers from Mechanics and Metalworking, wind chargers from Metalworking and Electricity, and the car alternator wind charger takes Mechanics too.
-- **Research.** Researching a found module teaches the panel mounts and sealing, and a homemade one teaches sealing. A plug-in inverter teaches battery boxes and the makeshift inverter, a power inverter racks and the homemade inverter, and an inverter/charger banks and the failsafe.
+- **Skills.** Every recipe is also learned by reaching a skill level, usually above what crafting it needs, so a magazine gets you there sooner. Boxes, racks, cabinets and panels come from Woodwork, Metalworking or Electricity. Battery work, inverters and controllers come from Electricity, digesters from Farming plus a building skill, gasifiers from Mechanics and Metalworking, wind chargers from Metalworking and Electricity, and the car alternator wind charger takes Mechanics too.
+- **Research.** Researching a found module teaches the panel mounts and sealing, and a makeshift one teaches sealing. A plug-in inverter teaches battery boxes and the Makeshift Plug-in Inverter, a power inverter racks and the Makeshift Power Inverter, and an inverter/charger cabinets and the failsafe.
 
 ### What a recipe needs around it
 

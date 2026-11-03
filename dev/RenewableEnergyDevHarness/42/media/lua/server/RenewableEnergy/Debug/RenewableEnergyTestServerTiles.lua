@@ -14,7 +14,7 @@ local handler, need, Fixtures = PZHarness.serverHandler, PZHarness.need, PZHarne
 
 -- The panel drawn as `args.sprite` on the square at `args`, changed by `args.change`, if given: its
 -- modules replaced by `change.modules` and, with `change.snow`, snow laid on it first; then its
--- cracks shown as the mod shows them. Answers its overlays in drawing order.
+-- modules shown as the mod shows them. Answers its overlays in drawing order.
 handler("panelCracks", function(_, args)
     local panel = Kinds.find(args)
     local change = args.change
@@ -24,7 +24,7 @@ handler("panelCracks", function(_, args)
         end
         PanelSource.writeModules(panel, change.modules)
     else
-        PanelSource.showCracks(panel)
+        PanelSource.showModules(panel)
     end
     return { overlays = Fixtures.overlaysOf(panel) }
 end)

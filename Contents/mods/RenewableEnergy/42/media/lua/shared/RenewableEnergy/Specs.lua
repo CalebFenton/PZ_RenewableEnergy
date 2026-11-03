@@ -75,11 +75,11 @@ Specs.partWear = {
 Specs.partRepair = { condition = 10, skill = 2, xp = 5 }
 
 -- Solar modules by item type: rated watts at full condition, tuned so a handful run a fridge-freezer
--- through an average July at the default Sunlight Multiplier. Output scales with condition / 100,
--- so a homemade module's lower ConditionMax caps it lower.
+-- through an average July at the default Sunlight Multiplier. Output scales with condition / 100.
+-- A homemade module's salvaged cells make less.
 Specs.modules = {
     ["RenewableEnergy.SolarModule"] = { watts = 160 },
-    ["RenewableEnergy.HomemadeSolarModule"] = { watts = 160 },
+    ["RenewableEnergy.HomemadeSolarModule"] = { watts = 96 },
 }
 -- What a panel holds when nothing recorded its modules, and what world spawns place.
 Specs.factoryModule = "RenewableEnergy.SolarModule"
@@ -116,11 +116,9 @@ Specs.storm = { fullKph = 120, worstHours = 48, worstChance = 0.15, panelKph = 4
     crack = 20, crackSound = "BreakGlassItem" }
 -- How a module's glass looks, on a mount or the arrow board, by its condition as a share of its
 -- own ConditionMax (ModuleRepair.crackLookOf): whole down to `lightBelow`, lightly cracked
--- below that, heavily cracked below `heavyBelow`. A share, so a homemade module, whose max is
--- lower, looks whole when new and cracks into each look as a factory one does. The first crack
--- of a new module shows: lightBelow sits above the share one crack (storm.crack) leaves it. Reglazed
--- modules show whole; sealed ones still show cracked, because the glass still is (ModuleRepair
--- keeps both levels so).
+-- below that, heavily cracked below `heavyBelow`. The first crack of a new module shows:
+-- lightBelow sits above the share one crack (storm.crack) leaves it. Reglazed modules show whole;
+-- sealed ones still show cracked, because the glass still is (ModuleRepair keeps both levels so).
 Specs.crackLooks = { lightBelow = 0.85, heavyBelow = 0.5 }
 
 -- Banks by item type: the Sprites field of its placed tile, and how many of each part it takes.

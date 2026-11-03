@@ -1,14 +1,14 @@
 {
     "Flat_Solar_Panel": "Flat Solar Panel",
-    "Wall_Mounted_Solar_Panel": "Wall-Mounted Solar Panel",
-    "Ground_Rack_Solar_Panel": "Solar Ground Rack",
+    "Wall_Mounted_Solar_Panel": "Wall Solar Panel",
+    "Ground_Rack_Solar_Panel": "Solar Rack",
     "Solar_Failsafe": "Solar Failsafe",
     "Wooden_Battery_Box": "Wooden Battery Box",
     "Metal_Battery_Box": "Metal Battery Box",
     "Wooden_Battery_Rack": "Wooden Battery Rack",
     "Metal_Battery_Rack": "Metal Battery Rack",
-    "Wooden_Battery_Bank": "Wooden Battery Bank",
-    "Metal_Battery_Bank": "Metal Battery Bank",
+    "Wooden_Battery_Bank": "Wooden Battery Cabinet",
+    "Metal_Battery_Bank": "Metal Battery Cabinet",
     "Solar_Battery_Charger": "Solar Battery Charger",
     "Solar_Garden_Light": "Solar Garden Light",
     "Solar_Box": "Solar Box",
@@ -22,5 +22,5 @@
     "Scoop_Rotor_Wind_Charger": "Scoop Rotor Wind Charger",
     "Treadmill_Wind_Charger": "Treadmill Wind Charger",
     "Car_Alternator_Wind_Charger": "Car Alternator Wind Charger",
-    "Homebuilt_Wind_Turbine": "Homebuilt Wind Turbine"
+    "Homebuilt_Wind_Turbine": "Homemade Wind Turbine"
 }

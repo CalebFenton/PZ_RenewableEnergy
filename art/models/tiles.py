@@ -18,10 +18,10 @@ from art.render import layer
 from tile_numbers import (BARREL_DIGESTERS, BARREL_HOLDERS, BATTERY_LOOKS, CRACKS, CRATE_CLOSED, CRATE_FULL, DIGESTERS,
                           DIRECTIONS, DOME_DIGESTER, DRUM_HOLDER, DRUM_LEVELS, FACINGS, FLAT_SNOW, GARDEN_LIGHT,
                           GARDEN_LIGHT_LIT, GAS_KIT, GASIFIER_PIPE, GASIFIERS, GENERATOR_BODIES, GENERATOR_KIT_FIRST,
-                          GENERATOR_PIPE, GENERATOR_PIPE_FIRST, HEATER, HEATER_LIT, HOLDER_FILLS, INSULATED_DIGESTER,
-                          METER_LEVELS, MOUNTS, RACK_SLOTS, SCOOP_ROTOR, SCRUBBERS, SOLAR_CELL_CHARGER, SOLAR_CRATE,
-                          SOLAR_FAILSAFE, SOLAR_FLAT, SOUR_FOAM, SPENT_SCRUBBERS, STORAGE_CAPACITY, STORAGE_TILES,
-                          TURNED_HEATER_FIRST, TURNED_STORAGE_FIRST, TURNED_STORAGE_OVERLAYS, WIND_TILES)
+                          GENERATOR_PIPE, GENERATOR_PIPE_FIRST, HEATER, HEATER_LIT, HOLDER_FILLS, HOMEMADE_MODULES,
+                          INSULATED_DIGESTER, METER_LEVELS, MOUNTS, RACK_SLOTS, SCOOP_ROTOR, SCRUBBERS, SOLAR_CELL_CHARGER,
+                          SOLAR_CRATE, SOLAR_FAILSAFE, SOLAR_FLAT, SOUR_FOAM, SPENT_SCRUBBERS, STORAGE_CAPACITY,
+                          STORAGE_TILES, TURNED_HEATER_FIRST, TURNED_STORAGE_FIRST, TURNED_STORAGE_OVERLAYS, WIND_TILES)
 
 
 def _turned(at, facing):
@@ -34,24 +34,28 @@ def _turned(at, facing):
 WALL_PANEL_HEIGHT = 1.1
 
 
-def _wall(material, facing, cracks=False, light_cracks=False):
+def _wall(material, facing, cracks=False, light_cracks=False, cover=False):
     """On the square's north edge facing south, or on its west edge facing east. `cracks` makes the
-    overlay of the cracks in its glass, the light ones with `light_cracks`."""
+    overlay of the cracks in its glass, the light ones with `light_cracks`; `cover` that of a
+    homemade module in place of its factory one."""
     at = (0, 0.5, WALL_PANEL_HEIGHT) if facing == "S" else (-0.5, 0, WALL_PANEL_HEIGHT)
     turn = FACING_TURN[facing]
-    if cracks:
+    if cracks or cover:
+        shows = {"cover": True} if cover else {"cracks": True, "light_cracks": light_cracks}
         return [layer(solar.solar_wall, holdout=True, material=material, at=at, turn=turn),
-                layer(solar.solar_wall, material=material, cracks=True, light_cracks=light_cracks, at=at, turn=turn)]
+                layer(solar.solar_wall, material=material, at=at, turn=turn, **shows)]
     return [layer(solar.solar_wall, material=material, at=at, turn=turn)]
 
 
-def _rack(material, facing, snow=False, cracks=None, light_cracks=False):
+def _rack(material, facing, snow=False, cracks=None, light_cracks=False, cover=None):
     """`snow` makes the overlay of the snow on it, `cracks` (a module slot) that of the cracks in
-    one module's glass, the light ones with `light_cracks`."""
+    one module's glass, the light ones with `light_cracks`, and `cover` (a slot) that of a homemade
+    module in place of that slot's factory one."""
     turn = FACING_TURN[facing]
-    if snow or cracks:
+    if snow or cracks or cover:
+        shows = {"cover": cover} if cover else {"snow": snow, "cracks": cracks, "light_cracks": light_cracks}
         return [layer(solar.solar_rack, holdout=True, material=material, turn=turn),
-                layer(solar.solar_rack, material=material, snow=snow, cracks=cracks, light_cracks=light_cracks, turn=turn)]
+                layer(solar.solar_rack, material=material, turn=turn, **shows)]
     return [layer(solar.solar_rack, material=material, turn=turn)]
 
 
@@ -98,6 +102,16 @@ for look, flat, mounts in CRACKS:
         for offset, facing in enumerate(FACINGS):
             for slot in range(1, RACK_SLOTS + 1):
                 TILES[first_rack + RACK_SLOTS * offset + slot - 1] = _rack(material, facing, cracks=slot, light_cracks=light)
+
+# A homemade module in place of a mount's factory one, laid out as the cracks are.
+flat, mounts = HOMEMADE_MODULES
+TILES[flat] = [layer(solar.solar_flat, holdout=True), layer(solar.solar_flat, cover=True)]
+for material, (first_wall, first_rack) in mounts.items():
+    for offset, facing in enumerate("SE"):
+        TILES[first_wall + offset] = _wall(material, facing, cover=True)
+    for offset, facing in enumerate(FACINGS):
+        for slot in range(1, RACK_SLOTS + 1):
+            TILES[first_rack + RACK_SLOTS * offset + slot - 1] = _rack(material, facing, cover=slot)
 
 # Battery storage. Battery overlay n of a look shows a battery of that look in slot n; meter
 # overlay n shows n LEDs lit. The car batteries' overlays are the tiles that once showed n batteries

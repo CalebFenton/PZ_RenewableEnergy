@@ -36,6 +36,23 @@ def lying(builder, **options):
 # sized to fit them take the car battery's own scale instead; the parts stay real size for the
 # icons and the battery storage tiles.
 BATTERY_GROUND_SCALE = 0.75
+
+# The panel mount items' looks with homemade modules in place of factory ones, by item and how many:
+# with its own entry below for none, a mount item's ground models and icons by index
+# (WorldStaticModelsByIndex and IconsForTexture in Items.txt), the index the count
+# (Sprites.homemadeCount).
+HOMEMADE_MOUNTS = {
+    "SolarFlat_Homemade": {"model": lambda col: solar.solar_flat(col, homemade=True), "icon_elevation": 25},
+    "SolarWallWood_Homemade": {"model": lambda col: solar.solar_wall(col, "wood", lying=True, homemade=True),
+                               "icon": lambda col: solar.solar_wall(col, "wood", homemade=True)},
+    "SolarWallMetal_Homemade": {"model": lambda col: solar.solar_wall(col, "metal", lying=True, homemade=True),
+                                "icon": lambda col: solar.solar_wall(col, "metal", homemade=True)},
+    "SolarRackWood_Homemade1": {"model": lambda col: solar.solar_rack(col, "wood", homemade=(1,))},
+    "SolarRackWood_Homemade2": {"model": lambda col: solar.solar_rack(col, "wood", homemade=(1, 2))},
+    "SolarRackMetal_Homemade1": {"model": lambda col: solar.solar_rack(col, "metal", homemade=(1,))},
+    "SolarRackMetal_Homemade2": {"model": lambda col: solar.solar_rack(col, "metal", homemade=(1, 2))},
+}
+
 ITEMS = {
     "SolarModule": {"model": solar.solar_module, "icon_elevation": 55},
     "HomemadeSolarModule": {"model": solar.homemade_module, "icon_elevation": 55},
@@ -46,6 +63,7 @@ ITEMS = {
                        "icon": lambda col: solar.solar_wall(col, "metal")},
     "SolarRackWood": {"model": lambda col: solar.solar_rack(col, "wood")},
     "SolarRackMetal": {"model": lambda col: solar.solar_rack(col, "metal")},
+    **HOMEMADE_MOUNTS,
     "BatteryBoxWood": {"model": batteries.STORAGE["BatteryBoxWood"],
                        "icon": lambda col: batteries.STORAGE["BatteryBoxWood"](col, batteries=2, meter_level=4)},
     "BatteryBoxMetal": {"model": batteries.STORAGE["BatteryBoxMetal"],

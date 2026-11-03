@@ -29,6 +29,11 @@ MOUNTS = (("metal", 1, 3, 17), ("wood", 21, 24, 28))
 CRACKS = (("heavy", 115, {"metal": (116, 120), "wood": (118, 128)}),
           ("light", 376, {"metal": (377, 381), "wood": (379, 389)}))
 RACK_SLOTS = 2
+# A homemade module in a mount's slot, laid out as one look of CRACKS: the flat panel's overlay,
+# then each mount material's first wall panel overlay and first rack overlay, one per slot per
+# facing. Each covers the factory module the mount's tile draws in that slot; the slot's crack and
+# snow overlays draw over it.
+HOMEMADE_MODULES = (424, {"metal": (425, 427), "wood": (435, 437)})
 
 # Battery storage: the item type, the tile a save's storage stands on, facing S, the first battery
 # overlay of each look in BATTERY_LOOKS' order, and its first meter overlay.

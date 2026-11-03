@@ -425,6 +425,33 @@ return {
             },
         },
     },
+    homemadeModules = {
+        flat = { "renewable_energy_01_424" },
+        wall = {
+            metal = {
+                S = { "renewable_energy_01_425" },
+                E = { "renewable_energy_01_426" },
+            },
+            wood = {
+                S = { "renewable_energy_01_435" },
+                E = { "renewable_energy_01_436" },
+            },
+        },
+        rack = {
+            metal = {
+                S = { "renewable_energy_01_427", "renewable_energy_01_428" },
+                E = { "renewable_energy_01_429", "renewable_energy_01_430" },
+                N = { "renewable_energy_01_431", "renewable_energy_01_432" },
+                W = { "renewable_energy_01_433", "renewable_energy_01_434" },
+            },
+            wood = {
+                S = { "renewable_energy_01_437", "renewable_energy_01_438" },
+                E = { "renewable_energy_01_439", "renewable_energy_01_440" },
+                N = { "renewable_energy_01_441", "renewable_energy_01_442" },
+                W = { "renewable_energy_01_443", "renewable_energy_01_444" },
+            },
+        },
+    },
     bankFill = {
         batteryBoxWood = {
             S = {

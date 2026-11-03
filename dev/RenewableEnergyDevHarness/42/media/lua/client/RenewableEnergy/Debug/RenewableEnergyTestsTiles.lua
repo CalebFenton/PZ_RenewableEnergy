@@ -6,6 +6,7 @@ local SolarGardenLight = require "RenewableEnergy/Gadgets/SolarGardenLight"
 require "Moveables/ISMoveableDefinitions"
 local Digester = require "RenewableEnergy/Biogas/Digester"
 local Panel = require "RenewableEnergy/PowerBank/Panel"
+local Recipes = require "RenewableEnergy/Recipes"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local SolarCellCharger = require "RenewableEnergy/Gadgets/SolarCellCharger"
 local Sprites = require "RenewableEnergy/Sprites"
@@ -351,7 +352,7 @@ end
 -- What an item keeps in its modData from item to placed object and back.
 local MODULES = {
     { type = "RenewableEnergy.HomemadeSolarModule", condition = 41 },
-    { type = "RenewableEnergy.SolarModule", condition = 72, mounted = true, connected = true },
+    { type = "RenewableEnergy.SolarModule", condition = 72, cellsCracked = true, mounted = true, connected = true },
 }
 local CARRIED = {
     ["RenewableEnergy.SolarRackWood"] = { key = Panel.MODULES_KEY, value = MODULES },
@@ -366,13 +367,14 @@ local function describe(value)
     local parts = {}
     for _, module in ipairs(value) do
         table.insert(parts, tostring(module.type) .. "@" .. tostring(module.condition)
-            .. (module.mounted and " mounted" or "") .. (module.connected and " connected" or ""))
+            .. (module.cellsCracked and " cellsCracked" or "") .. (module.mounted and " mounted" or "")
+            .. (module.connected and " connected" or ""))
     end
     return "{" .. table.concat(parts, ", ") .. "}"
 end
 
 -- Placed and picked up as a player does, each item of PLACED comes back as that one item, with its
--- modData (CARRIED).
+-- modData (CARRIED); a mount's item on this client shows as many homemade modules as it holds.
 test("renewable_energy_tiles_place_and_pick_up", {
     instant = true,
     run = function(self)
@@ -386,13 +388,22 @@ test("renewable_energy_tiles_place_and_pick_up", {
             for _, item in ipairs(PLACED) do
                 local sprite = getScriptManager():getItem(item):getWorldObjectSprite()
                 local carried = CARRIED[item]
-                local result = { what = sprite .. " (" .. item .. ")", item = item, expected = carried and describe(carried.value) }
+                local mount = Recipes.MOUNTS[item] ~= nil
+                local result = { what = sprite .. " (" .. item .. ")", item = item, expected = carried and describe(carried.value),
+                    homemade = mount and Sprites.homemadeCount(carried and carried.value or {}) or nil }
                 table.insert(self.results, result)
                 local handle = T.placeAsPlayer(self, square, item, sprite, carried and { [carried.key] = carried.value })
                 if carried then
                     T.read(self, "PZHarness.objectModData", T.at(square, { sprite = sprite, key = carried.key }), item)
                 end
                 T.pickUpAsPlayer(self, handle, sprite)
+                if mount then
+                    T.waitFor(self, function()
+                        local copy = T.carried(item)
+                        result.modelIndex = copy and copy:getModelIndex()
+                        return copy ~= nil
+                    end, "this client's picked-up " .. item)
+                end
                 T.readCarried(self, { item })
                 T.step(function()
                     local items = T.carriedItems(self, item)
@@ -413,6 +424,10 @@ test("renewable_energy_tiles_place_and_pick_up", {
             if r.expected then
                 expectEqual("what placed " .. r.what .. " holds", describe(self.reads[r.item].value), r.expected)
                 expectEqual("what picked-up " .. r.what .. " holds", r.pickedUpData, r.expected)
+            end
+            if r.homemade then
+                expectEqual("this client's picked-up " .. r.what .. "'s model index, its homemade modules", r.modelIndex,
+                    r.homemade)
             end
         end
     end,
@@ -532,12 +547,14 @@ test("renewable_energy_tiles_turned_banks_show_their_overlays", {
 
 -- A module just below each Specs.crackLooks threshold shows that look's cracks over its own slot,
 -- one at the light threshold shows whole, repair clears them, and snow stays drawn over cracks
--- added under it; this client matches.
+-- added under it. A homemade module shows over its own slot only, under its cracks and snow, and
+-- factory modules show none; this client matches.
 local HEAVY_AT = T.conditionAt(T.FACTORY_MODULE, Specs.crackLooks.heavyBelow) - 1
 local LIGHT_AT = T.conditionAt(T.FACTORY_MODULE, Specs.crackLooks.lightBelow) - 1
 local WHOLE_AT = LIGHT_AT + 1
-local HEAVY, LIGHT, SNOW = Sprites.cracks.heavy, Sprites.cracks.light, Sprites.snow
-local CRACKED = {
+local HOMEMADE_HEAVY_AT = T.conditionAt(T.HOMEMADE_MODULE, Specs.crackLooks.heavyBelow) - 1
+local HEAVY, LIGHT, SNOW, HOMEMADE = Sprites.cracks.heavy, Sprites.cracks.light, Sprites.snow, Sprites.homemadeModules
+local SHOWN = {
     { name = "flatHeavy", sprite = Sprites.flat, modules = T.factoryModules(HEAVY_AT), shows = HEAVY.flat[1],
         what = "a flat panel just below the heavy cracks" },
     { name = "flatLight", sprite = Sprites.flat, modules = T.factoryModules(LIGHT_AT), shows = LIGHT.flat[1],
@@ -556,13 +573,20 @@ local CRACKED = {
     { name = "snowed", sprite = Sprites.flat, modules = T.factoryModules(100),
         change = { modules = T.factoryModules(HEAVY_AT), snow = true }, shows = HEAVY.flat[1] .. "," .. SNOW.flat,
         what = "a snowed-on flat panel cracked under the snow" },
+    { name = "homemadeUpper", sprite = Sprites.rack.wood.S,
+        modules = { { type = T.FACTORY_MODULE, condition = 100 }, { type = T.HOMEMADE_MODULE, condition = 100 } },
+        shows = HOMEMADE.rack.wood.S[2], what = "a wooden rack facing south with a homemade upper module" },
+    { name = "homemadeFlat", sprite = Sprites.flat, modules = { { type = T.HOMEMADE_MODULE, condition = 100 } },
+        change = { modules = { { type = T.HOMEMADE_MODULE, condition = HOMEMADE_HEAVY_AT } }, snow = true },
+        shows = HOMEMADE.flat[1] .. "," .. HEAVY.flat[1] .. "," .. SNOW.flat,
+        what = "a snowed-on flat panel with a homemade module cracked under the snow" },
 }
 
-test("renewable_energy_tiles_cracked_modules_show", {
+test("renewable_energy_tiles_modules_show", {
     run = function(self)
         -- Every case has a panel of its own, which the other cases' calls leave alone.
         T.batch(function()
-            for _, case in ipairs(CRACKED) do
+            for _, case in ipairs(SHOWN) do
                 local panel = T.panel(self, case.sprite, { modules = case.modules })
                 if not panel then return end
                 T.read(self, "panelCracks", T.at(panel, { sprite = case.sprite, change = case.change }), case.name)
@@ -574,7 +598,7 @@ test("renewable_energy_tiles_cracked_modules_show", {
         end)
     end,
     validate = function(self)
-        for _, case in ipairs(CRACKED) do
+        for _, case in ipairs(SHOWN) do
             local server = table.concat(self.reads[case.name].overlays, ",")
             expectEqual("what " .. case.what .. " shows", server, case.shows)
         end

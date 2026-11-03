@@ -8,19 +8,17 @@ local Items = require "cf_commonlib/Items"
 
 local ModuleRepair = {}
 
--- Seal Cracked Module: condition it adds, and the most a first seal brings each module type to.
--- The caps stay below Specs.crackLooks.lightBelow of the type's ConditionMax, and a first seal's
--- at or above heavyBelow: sealed glass is still cracked glass, and at best shows light cracks.
+-- Seal Cracked Module: condition it adds, and the most a first seal brings a module to. The cap
+-- stays below Specs.crackLooks.lightBelow of a module's ConditionMax, and a first seal's at or
+-- above heavyBelow: sealed glass is still cracked glass, and at best shows light cracks.
 ModuleRepair.SEAL_ADDS = 20
-ModuleRepair.SEAL_CAP = {
-    [Specs.factoryModule] = 55,
-    ["RenewableEnergy.HomemadeSolarModule"] = 40,
-}
+ModuleRepair.SEAL_CAP = 55
 
 -- Reglaze Module's new glass, as shares of the module's ConditionMax: a module whose cracks stayed
 -- in the glass comes back as new; one cracked heavily, or sealed, since a crack that needed sealing
--- ran deep enough to let the weather in, keeps the cells cracked under it. Both shares stay at or
--- above Specs.crackLooks.lightBelow, so new glass shows whole.
+-- ran deep enough to let the weather in, keeps the cells cracked under it, and remembers so (its
+-- record's cellsCracked): new glass over cracked cells comes back to that share every time. Both
+-- shares stay at or above Specs.crackLooks.lightBelow, so new glass shows whole.
 ModuleRepair.REGLAZE = { glassOnly = 1, cellsCracked = 0.9 }
 
 --- How the glass of a module of `fullType` at `condition` looks (Specs.crackLooks): nil whole,
@@ -38,22 +36,25 @@ function ModuleRepair.crackLookOf(fullType, condition)
     return nil
 end
 
---- The condition Reglaze Module brings a module of `fullType` at `condition`, sealed `repaired`
---- times, to; nil for a type that is no module.
-function ModuleRepair.reglazedCondition(fullType, condition, repaired)
-    if not Specs.modules[fullType] then
-        return nil
-    end
-    local deep = (repaired or 0) > 0 or ModuleRepair.crackLookOf(fullType, condition) == "heavy"
+--- Whether Reglaze Module takes a module of `fullType` at `condition`: only cracked glass is
+--- replaced, so a module reglazed already wants a new crack first.
+function ModuleRepair.reglazable(fullType, condition)
+    return Specs.modules[fullType] ~= nil and ModuleRepair.crackLookOf(fullType, condition) ~= nil
+end
+
+--- The condition Reglaze Module brings a reglazable module of `fullType` at `condition`, sealed
+--- `repaired` times, its cells cracked before if `cellsCracked`, to, and whether its cells are
+--- cracked from then on.
+function ModuleRepair.reglazed(fullType, condition, repaired, cellsCracked)
+    local deep = cellsCracked == true or (repaired or 0) > 0 or ModuleRepair.crackLookOf(fullType, condition) == "heavy"
     local share = deep and ModuleRepair.REGLAZE.cellsCracked or ModuleRepair.REGLAZE.glassOnly
-    return math.floor(Items.conditionMaxOf(fullType) * share)
+    return math.floor(Items.conditionMaxOf(fullType) * share), deep
 end
 
 -- The most a seal can bring a module of `fullType`, sealed `repaired` times, to; nil for a type
 -- that is no module.
 local function sealCap(fullType, repaired)
-    local cap = ModuleRepair.SEAL_CAP[fullType]
-    return cap and Wear.repairLimit(cap, repaired)
+    return Specs.modules[fullType] and Wear.repairLimit(ModuleRepair.SEAL_CAP, repaired)
 end
 
 --- Whether a seal can help a module of `fullType` at `condition`, sealed `repaired` times: its

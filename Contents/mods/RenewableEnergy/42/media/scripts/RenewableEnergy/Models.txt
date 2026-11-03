@@ -49,6 +49,48 @@ module RenewableEnergy
         texture = WorldItems/RenewableEnergy_SolarRackMetal,
         scale = 0.666667,
     }
+    model SolarFlat_Homemade_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_SolarFlat_Homemade,
+        texture = WorldItems/RenewableEnergy_SolarFlat_Homemade,
+        scale = 0.666667,
+    }
+    model SolarWallWood_Homemade_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_SolarWallWood_Homemade,
+        texture = WorldItems/RenewableEnergy_SolarWallWood_Homemade,
+        scale = 0.666667,
+    }
+    model SolarWallMetal_Homemade_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_SolarWallMetal_Homemade,
+        texture = WorldItems/RenewableEnergy_SolarWallMetal_Homemade,
+        scale = 0.666667,
+    }
+    model SolarRackWood_Homemade1_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_SolarRackWood_Homemade1,
+        texture = WorldItems/RenewableEnergy_SolarRackWood_Homemade1,
+        scale = 0.666667,
+    }
+    model SolarRackWood_Homemade2_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_SolarRackWood_Homemade2,
+        texture = WorldItems/RenewableEnergy_SolarRackWood_Homemade2,
+        scale = 0.666667,
+    }
+    model SolarRackMetal_Homemade1_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_SolarRackMetal_Homemade1,
+        texture = WorldItems/RenewableEnergy_SolarRackMetal_Homemade1,
+        scale = 0.666667,
+    }
+    model SolarRackMetal_Homemade2_Ground
+    {
+        mesh = WorldItems/RenewableEnergy_SolarRackMetal_Homemade2,
+        texture = WorldItems/RenewableEnergy_SolarRackMetal_Homemade2,
+        scale = 0.666667,
+    }
     model BatteryBoxWood_Ground
     {
         mesh = WorldItems/RenewableEnergy_BatteryBoxWood,
