@@ -20,6 +20,10 @@ Debug.PREFERRED_INPUTS = {
     "Base.File",
 }
 
+-- What stands in for the picked-up window Take Out Window Glass takes: every picked-up tile is the
+-- one script item Base.Moveable, and only the recipe's OnTest says it must be a window.
+Debug.PICKED_UP = { RenewableEnergy_TakeOutWindowGlass = "Moveables.fixtures_windows_01_0" }
+
 local function isContainerGeneratorOrSource(object)
     return object:getContainer() ~= nil or instanceof(object, "IsoGenerator")
         or Sources.kindOf(object) ~= nil

@@ -5,8 +5,8 @@
 # ///
 """Lays out the README and Workshop images from the captures `dev/run-debug-client.sh --promo`
 saved, with the harness's lib/promo.py (dev/harness/docs/workshop-page.md, "Laying out the
-images"). Rerun it after editing a layout; recapture only when the game's look or the mod's names
-change:
+images"). Rerun it after editing a layout; recapture when the game's look, the mod's names, items
+or recipes change (that doc says which groups):
 
     art/promo/compose.py
 

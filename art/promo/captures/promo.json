@@ -2427,6 +2427,18 @@
           "items": [
             {
               "count": 1,
+              "fullType": "Base.Glue",
+              "icon": "icon_Base_Glue",
+              "name": "Glue"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.Woodglue",
+              "icon": "icon_Base_Woodglue",
+              "name": "Wood Glue"
+            },
+            {
+              "count": 1,
               "fullType": "Base.Epoxy",
               "icon": "icon_Base_Epoxy",
               "name": "Epoxy"
@@ -2657,6 +2669,56 @@
           "name": "Electrical"
         }
       ]
+    },
+    {
+      "id": "RenewableEnergy_TakeOutWindowGlass",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Screwdriver",
+              "icon": "icon_Base_Screwdriver",
+              "name": "Screwdriver"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Moveables.fixtures_windows_01_0",
+              "icon": "icon_Moveables_fixtures_windows_01_0",
+              "name": "Wooden Window"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        }
+      ],
+      "learn": {
+        "auto": [],
+        "autoAll": [],
+        "magazines": [],
+        "needed": false,
+        "research": []
+      },
+      "name": "Take Out Window Glass",
+      "outputs": [
+        {
+          "count": 2,
+          "fullType": "Base.GlassPanel",
+          "icon": "icon_Base_GlassPanel",
+          "name": "Glass Pane"
+        }
+      ],
+      "skills": []
     },
     {
       "id": "RenewableEnergy_TakeApartShatteredModule",
@@ -4091,6 +4153,78 @@
               "fullType": "Base.GlassPanel",
               "icon": "icon_Base_GlassPanel",
               "name": "Glass Pane"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.Windshield1",
+              "icon": "icon_Base_Windshield1",
+              "name": "Windshield"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.Windshield2",
+              "icon": "icon_Base_Windshield2",
+              "name": "Windshield"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.Windshield3",
+              "icon": "icon_Base_Windshield3",
+              "name": "Windshield"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.RearWindshield1",
+              "icon": "icon_Base_RearWindshield1",
+              "name": "Rear Windshield"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.RearWindshield2",
+              "icon": "icon_Base_RearWindshield2",
+              "name": "Rear Windshield"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.RearWindshield3",
+              "icon": "icon_Base_RearWindshield3",
+              "name": "Rear Windshield"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.FrontWindow1",
+              "icon": "icon_Base_FrontWindow1",
+              "name": "Front Window"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.FrontWindow2",
+              "icon": "icon_Base_FrontWindow2",
+              "name": "Front Window"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.FrontWindow3",
+              "icon": "icon_Base_FrontWindow3",
+              "name": "Front Window"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.RearWindow1",
+              "icon": "icon_Base_RearWindow1",
+              "name": "Rear Window"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.RearWindow2",
+              "icon": "icon_Base_RearWindow2",
+              "name": "Rear Window"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.RearWindow3",
+              "icon": "icon_Base_RearWindow3",
+              "name": "Rear Window"
             }
           ],
           "keep": false,
@@ -4122,15 +4256,21 @@
           "items": [
             {
               "count": 1,
-              "fullType": "Base.Epoxy",
-              "icon": "icon_Base_Epoxy",
-              "name": "Epoxy"
-            },
-            {
-              "count": 2,
               "fullType": "Base.Glue",
               "icon": "icon_Base_Glue",
               "name": "Glue"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.Woodglue",
+              "icon": "icon_Base_Woodglue",
+              "name": "Wood Glue"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.Epoxy",
+              "icon": "icon_Base_Epoxy",
+              "name": "Epoxy"
             }
           ],
           "keep": false,
@@ -6033,79 +6173,6 @@
       ]
     },
     {
-      "id": "RenewableEnergy_RepairCrackedModuleWithGlue",
-      "inputs": [
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "Base.Screwdriver",
-              "icon": "icon_Base_Screwdriver",
-              "name": "Screwdriver"
-            }
-          ],
-          "keep": true,
-          "tag": true,
-          "uses": false
-        },
-        {
-          "count": 1,
-          "items": [
-            {
-              "count": 1,
-              "fullType": "RenewableEnergy.SolarModule",
-              "icon": "icon_RenewableEnergy_SolarModule",
-              "name": "Solar Module"
-            },
-            {
-              "count": 1,
-              "fullType": "RenewableEnergy.HomemadeSolarModule",
-              "icon": "icon_RenewableEnergy_HomemadeSolarModule",
-              "name": "Makeshift Solar Module"
-            }
-          ],
-          "keep": true,
-          "tag": false,
-          "uses": false
-        },
-        {
-          "count": 2,
-          "items": [
-            {
-              "count": 2,
-              "fullType": "Base.Glue",
-              "icon": "icon_Base_Glue",
-              "name": "Glue"
-            }
-          ],
-          "keep": false,
-          "tag": false,
-          "uses": true
-        }
-      ],
-      "learn": {
-        "auto": [
-          {
-            "level": 3,
-            "name": "Electrical"
-          }
-        ],
-        "autoAll": [],
-        "magazines": [],
-        "needed": true,
-        "research": []
-      },
-      "name": "Seal Cracked Module With Glue",
-      "outputs": [],
-      "skills": [
-        {
-          "level": 2,
-          "name": "Electrical"
-        }
-      ]
-    },
-    {
       "id": "RenewableEnergy_MakeSolarRackWood",
       "inputs": [
         {
@@ -6632,6 +6699,78 @@
               "fullType": "Base.GlassPanel",
               "icon": "icon_Base_GlassPanel",
               "name": "Glass Pane"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.Windshield1",
+              "icon": "icon_Base_Windshield1",
+              "name": "Windshield"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.Windshield2",
+              "icon": "icon_Base_Windshield2",
+              "name": "Windshield"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.Windshield3",
+              "icon": "icon_Base_Windshield3",
+              "name": "Windshield"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.RearWindshield1",
+              "icon": "icon_Base_RearWindshield1",
+              "name": "Rear Windshield"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.RearWindshield2",
+              "icon": "icon_Base_RearWindshield2",
+              "name": "Rear Windshield"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.RearWindshield3",
+              "icon": "icon_Base_RearWindshield3",
+              "name": "Rear Windshield"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.FrontWindow1",
+              "icon": "icon_Base_FrontWindow1",
+              "name": "Front Window"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.FrontWindow2",
+              "icon": "icon_Base_FrontWindow2",
+              "name": "Front Window"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.FrontWindow3",
+              "icon": "icon_Base_FrontWindow3",
+              "name": "Front Window"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.RearWindow1",
+              "icon": "icon_Base_RearWindow1",
+              "name": "Rear Window"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.RearWindow2",
+              "icon": "icon_Base_RearWindow2",
+              "name": "Rear Window"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.RearWindow3",
+              "icon": "icon_Base_RearWindow3",
+              "name": "Rear Window"
             }
           ],
           "keep": false,
@@ -6643,15 +6782,21 @@
           "items": [
             {
               "count": 1,
-              "fullType": "Base.Epoxy",
-              "icon": "icon_Base_Epoxy",
-              "name": "Epoxy"
-            },
-            {
-              "count": 2,
               "fullType": "Base.Glue",
               "icon": "icon_Base_Glue",
               "name": "Glue"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.Woodglue",
+              "icon": "icon_Base_Woodglue",
+              "name": "Wood Glue"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.Epoxy",
+              "icon": "icon_Base_Epoxy",
+              "name": "Epoxy"
             }
           ],
           "keep": false,
@@ -8394,6 +8539,12 @@
               "fullType": "Base.Glue",
               "icon": "icon_Base_Glue",
               "name": "Glue"
+            },
+            {
+              "count": 1,
+              "fullType": "Base.Woodglue",
+              "icon": "icon_Base_Woodglue",
+              "name": "Wood Glue"
             }
           ],
           "keep": false,
@@ -8765,6 +8916,9 @@
       "icon_Base_EmptyJar",
       "icon_Base_Epoxy",
       "icon_Base_File",
+      "icon_Base_FrontWindow1",
+      "icon_Base_FrontWindow2",
+      "icon_Base_FrontWindow3",
       "icon_Base_Funnel",
       "icon_Base_Garbagebag",
       "icon_Base_GardeningSprayAphids",
@@ -8808,6 +8962,12 @@
       "icon_Base_Propane_Refill",
       "icon_Base_RadioBlack",
       "icon_Base_RadioRed",
+      "icon_Base_RearWindow1",
+      "icon_Base_RearWindow2",
+      "icon_Base_RearWindow3",
+      "icon_Base_RearWindshield1",
+      "icon_Base_RearWindshield2",
+      "icon_Base_RearWindshield3",
       "icon_Base_RemoteCraftedV3",
       "icon_Base_RippedSheets",
       "icon_Base_RubberHose",
@@ -8834,7 +8994,12 @@
       "icon_Base_WaterBottle",
       "icon_Base_WeldingMask",
       "icon_Base_WeldingRods",
+      "icon_Base_Windshield1",
+      "icon_Base_Windshield2",
+      "icon_Base_Windshield3",
+      "icon_Base_Woodglue",
       "icon_Base_Wrench",
+      "icon_Moveables_fixtures_windows_01_0",
       "icon_RenewableEnergy_BatteryBankMetal",
       "icon_RenewableEnergy_BatteryBankWood",
       "icon_RenewableEnergy_BatteryBoxMetal",

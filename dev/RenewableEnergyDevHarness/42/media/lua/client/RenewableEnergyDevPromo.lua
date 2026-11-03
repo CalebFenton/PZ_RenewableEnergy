@@ -881,7 +881,8 @@ function Promo.capture(selection, onDone)
         groups = GROUPS,
         places = Places.PLACES,
         gap = Places.GAP,
-        catalog = Capture.newCatalog({ prefer = Debug.PREFERRED_INPUTS, fluidContainers = FLUID_CONTAINERS }),
+        catalog = Capture.newCatalog({ prefer = Debug.PREFERRED_INPUTS, fluidContainers = FLUID_CONTAINERS,
+            moveables = Debug.PICKED_UP }),
         items = sheetItems(),
         data = { models = {}, strings = { modName = getText("Sandbox_RenewableEnergy") } },
         prepare = function(_, found, origins)

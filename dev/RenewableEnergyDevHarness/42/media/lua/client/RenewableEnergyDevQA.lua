@@ -286,8 +286,8 @@ local function addJobMaterials(stock, player, summary)
 end
 
 -- What stands in for a recipe need that names only the script item every picked-up tile shares:
--- Take Out Window Glass takes a picked-up window.
-local PICKED_UP = { ["Base.Moveable"] = "Moveables.fixtures_windows_01_0" }
+-- Take Out Window Glass, the one recipe that takes one, takes a picked-up window (Debug.PICKED_UP).
+local PICKED_UP = { ["Base.Moveable"] = Debug.PICKED_UP.RenewableEnergy_TakeOutWindowGlass }
 
 -- Everything the scenario hands out: every item of the mod a player can hold, what the recipes
 -- take, the batteries and modules among them worn, and what the menu jobs take and work on.

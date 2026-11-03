@@ -345,5 +345,5 @@ Code kept only so older saves load, to delete once they needn't:
 
 1. `dev/static-check.sh`, `dev/validate-server.sh` and `dev/run-debug-client.sh --test` must pass.
 2. Bump `modversion` in `42/mod.info`. Raise `versionMin` when the mod starts depending on a newer game version.
-3. Update `README.md`, then run `dev/workshop-txt.sh`, `dev/run-debug-client.sh --promo` if the look or the names changed, and `dev/review.sh` to read the result.
+3. Update `README.md`, then run `dev/workshop-txt.sh`, `dev/run-debug-client.sh --promo` and `art/promo/compose.py` if the look, the names, the items or the recipes changed since the last capture (`dev/harness/docs/workshop-page.md`, "Laying out the images"), and `dev/review.sh` to read the result.
 4. Upload from the in-game Workshop screen, then `dev/workshop-gallery.sh --upload` if the gallery changed.
