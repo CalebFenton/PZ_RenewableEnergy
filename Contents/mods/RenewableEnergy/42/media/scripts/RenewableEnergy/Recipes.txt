@@ -445,8 +445,8 @@ module Base
 
     /* Epoxy or glue over the cracks keeps the water out. The glass stays cracked, so the module
        still shows cracked; new glass is Reglaze Module. The module recipes take one use of any
-       adhesive, by vanilla's tags as its gas mask recipes take glue: rare epoxy is worth more to
-       vanilla's Fix With Epoxy than here. */
+       adhesive: rare epoxy is worth more to vanilla's Fix With Epoxy than here. The commonest is
+       listed first, since a tooltip in place and the recipe sheet name a line by its first item. */
     craftRecipe RenewableEnergy_RepairCrackedModule
     {
         timedAction = MakingElectrical,
@@ -464,7 +464,7 @@ module Base
         {
             item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],
             item 1 [RenewableEnergy.SolarModule;RenewableEnergy.HomemadeSolarModule] mode:keep,
-            item 1 tags[base:glue;base:epoxy],
+            item 1 [Base.Glue;Base.Woodglue;Base.Epoxy],
         }
         outputs
         {
@@ -494,7 +494,7 @@ module Base
             item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],
             item 1 [RenewableEnergy.SolarModule;RenewableEnergy.HomemadeSolarModule] mode:keep,
             item 1 [Base.GlassPanel;Base.Windshield1;Base.Windshield2;Base.Windshield3;Base.RearWindshield1;Base.RearWindshield2;Base.RearWindshield3;Base.FrontWindow1;Base.FrontWindow2;Base.FrontWindow3;Base.RearWindow1;Base.RearWindow2;Base.RearWindow3],
-            item 1 tags[base:glue;base:epoxy],
+            item 1 [Base.Glue;Base.Woodglue;Base.Epoxy],
             item 1 [Base.ElectricWire],
         }
         outputs
@@ -521,7 +521,7 @@ module Base
             item 16 [RenewableEnergy.SolarCells],
             item 1 [Base.GlassPanel;Base.Windshield1;Base.Windshield2;Base.Windshield3;Base.RearWindshield1;Base.RearWindshield2;Base.RearWindshield3;Base.FrontWindow1;Base.FrontWindow2;Base.FrontWindow3;Base.RearWindow1;Base.RearWindow2;Base.RearWindow3],
             item 1 [Base.SmallSheetMetal;4:Base.Plank],
-            item 1 tags[base:glue;base:epoxy],
+            item 1 [Base.Glue;Base.Woodglue;Base.Epoxy],
             item 2 [Base.ElectricWire],
         }
         outputs

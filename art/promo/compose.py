@@ -109,7 +109,7 @@ RECIPE_SECTIONS = [
               "RenewableEnergy_UnmountSolarWallWood", "RenewableEnergy_UnmountSolarWallMetal",
               "RenewableEnergy_UnmountSolarRackWood", "RenewableEnergy_UnmountSolarRackMetal"]),
     (MODULES, ["RenewableEnergy_RepairCrackedModule", "RenewableEnergy_ReglazeModule",
-               "RenewableEnergy_MakeHomemadeSolarModule",
+               "RenewableEnergy_MakeHomemadeSolarModule", "RenewableEnergy_TakeOutWindowGlass",
                "RenewableEnergy_TakeApartCalculator", "RenewableEnergy_TakeApartSolarGardenLight",
                "RenewableEnergy_TakeApartSolarCellCharger", "RenewableEnergy_TakeApartSolarMaintainer",
                "RenewableEnergy_TakeApartShatteredModule"]),
