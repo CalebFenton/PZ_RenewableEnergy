@@ -37,12 +37,13 @@ module RenewableEnergy
         Tags = base:hasmetal;base:ignorezombiedensity;base:showcondition,
     }
 
-    /* Salvaged cells under glass. Rated like a factory module, its ConditionMax caps it lower. */
+    /* Salvaged cells under glass. Rated like a factory module, its ConditionMax caps it lower.
+       It weighs what a factory module does, as vanilla's makeshift radios weigh what found ones do. */
     item HomemadeSolarModule
     {
         DisplayCategory = Electronics,
         ItemType = base:normal,
-        Weight = 4.5,
+        Weight = 4.0,
         Icon = RenewableEnergy_HomemadeSolarModule,
         WorldStaticModel = RenewableEnergy.HomemadeSolarModule_Ground,
         ConditionMax = 60,

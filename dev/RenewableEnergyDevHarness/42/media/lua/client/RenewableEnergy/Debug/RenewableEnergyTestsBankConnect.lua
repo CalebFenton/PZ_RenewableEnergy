@@ -228,3 +228,70 @@ test("renewable_energy_bank_box_and_rack_both_offered", {
         expect(wired.rack.shown and not wired.rack.greyed, "a panel on the box isn't offered the rack")
     end,
 })
+
+-- Whether the moveables cursor would pick up and turn the object drawn as `sprite` on `handle`,
+-- and whether its panel says to disconnect it first.
+local function takeable(handle, sprite)
+    local object = T.objectWithSprite(handle.square, sprite)
+    local props = ISMoveableSpriteProps.fromObject(object)
+    local refusal = "- " .. getText("Tooltip_RenewableEnergy_DisconnectFirst")
+    local says = false
+    for _, line in ipairs(props:getInfoPanelDescription(handle.square, object, player(), "pickup")) do
+        says = says or line[1].txt == refusal
+    end
+    return { pickUp = props:canPickUpMoveable(player(), handle.square, object),
+        rotate = props:canRotateMoveable(handle.square, object, props), says = says }
+end
+
+-- Like a connected generator, a source connected to a bank can't be picked up or turned, and the
+-- cursor's panel says to disconnect it first; a treadmill's unwired tile counts as its wired one.
+-- Disconnected, a rack picks up, and put back down where it stood it feeds nothing. Catches a
+-- source taken or turned while connected, which drops it from its bank unseen, and one that comes
+-- back connected.
+test("renewable_energy_bank_connected_source_stays_put", {
+    instant = true,
+    run = function(self)
+        self.bank = T.bank(self, "batteryBoxWood", {})
+        self.rack = self.bank and T.panel(self, Sprites.rack.wood.S, { near = self.bank, connect = true })
+        self.treadmill = self.rack and T.panel(self, Sprites.treadmill.W.rear, { near = self.bank, connect = true, wired = true })
+        local square = self.treadmill and self.treadmill.square
+        self.console = square and T.panel(self, Sprites.treadmill.W.console,
+            { square = getSquare(square:getX() - 1, square:getY(), square:getZ()) })
+        if not self.console then return end
+        local rack = self.rack
+        -- The tiles' Electrician pick-up tool, and light to disconnect by.
+        T.setPerk(self, Perks.Electricity, 10)
+        T.give(self, "screwdriver", { { type = "Base.Screwdriver" } })
+        T.holdLight(self)
+        T.step(function()
+            self.connectedRack = takeable(rack, Sprites.rack.wood.S)
+            self.connectedTreadmill = takeable(self.console, Sprites.treadmill.W.console)
+        end)
+        T.job(self, "source", SourceJobs.DISCONNECT, rack, nil, "disconnected")
+        T.waitFor(self, function() return PowerBank.bankOfSource(rack.x, rack.y, rack.z) == nil end,
+            "this client's summary of the bank without the rack")
+        T.step(function() self.disconnectedRack = takeable(rack, Sprites.rack.wood.S) end)
+        T.pickUpAsPlayer(self, rack, Sprites.rack.wood.S)
+        T.placeAsPlayer(self, rack.square, "RenewableEnergy.SolarRackWood", Sprites.rack.wood.S, nil, true)
+        T.readRecord(self, self.bank, "putBack")
+        T.step(function() self.clientPutBack = PowerBank.bankOfSource(rack.x, rack.y, rack.z) end)
+    end,
+    validate = function(self)
+        expect(self.rack.connected and self.treadmill.connected, "the bank refused a source: " .. tostring(self.rack.reason or self.treadmill.reason))
+        local rack, treadmill, loose = self.connectedRack, self.connectedTreadmill, self.disconnectedRack
+        expect(not rack.pickUp, "a connected rack can be picked up")
+        expect(not rack.rotate, "a connected rack can be turned")
+        expect(rack.says, "the cursor's panel doesn't say to disconnect the connected rack first")
+        expect(not treadmill.pickUp, "a connected treadmill can be picked up by its unwired tile")
+        expect(treadmill.says, "the cursor's panel doesn't say to disconnect the treadmill first")
+        T.expectOk(self.reads.disconnected, "disconnecting the rack")
+        expect(loose.pickUp and loose.rotate, "a disconnected rack can't be picked up or turned")
+        expect(not loose.says, "the cursor's panel says to disconnect a disconnected rack")
+        local listed = false
+        for _, source in ipairs(self.reads.putBack.summary.sources) do
+            listed = listed or Squares.samePosition(source, self.rack)
+        end
+        expect(not listed, "the bank feeds from the rack put back where it stood")
+        expect(self.clientPutBack == nil, "this client sees the rack put back connected")
+    end,
+})

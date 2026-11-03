@@ -324,20 +324,33 @@ test("renewable_energy_treadmill_unconnected_run_gives_nothing", {
     end,
 })
 
+-- Counts, in the floor items `items` (a T.takeFloorItems read's), the Electric Wire and the
+-- treadmill items still carrying their wiring.
+local function wireAndWired(items)
+    local wire, wired = 0, 0
+    for _, item in ipairs(items) do
+        if item.type == Wiring.WIRE then
+            wire = wire + 1
+        elseif item.modData[Treadmill.WIRED_KEY] then
+            wired = wired + 1
+        end
+    end
+    return wire, wired
+end
+
 -- What a run banked that the passes haven't paid out yet goes into the batteries when the treadmill
--- is unwired or picked up: the same run on a treadmill unwired at once, on one picked up at once and
--- on one left wired, with the same passes after, stores the same. Picking it up leaves the wire its
--- wiring took on the floor, and the treadmill it becomes carries no wiring to be placed with.
--- Catches unwiring, moving or picking up a treadmill right after a run forfeiting the run, at once
--- or at the next pass, and a pickup that loses the wire or lets wiring travel with the item.
+-- is unwired or smashed: the same run on a treadmill unwired at once, on one smashed at once and
+-- on one left wired, with the same passes after, stores the same. Smashing it leaves the wire its
+-- wiring took on the floor. Catches unwiring or smashing a treadmill right after a run forfeiting
+-- the run, at once or at the next pass, and a smash that loses the wire.
 test("renewable_energy_treadmill_unwire_keeps_the_run", {
     instant = true,
     run = function(self)
         self.cases = {}
-        for _, name in ipairs({ "kept", "unwired", "pickedUp" }) do
+        for _, name in ipairs({ "kept", "unwired", "smashed" }) do
             local bank = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY, T.PLUG_IN_INVERTER }, { charge = 0.5 })
             local treadmill = bank and T.panel(self, Sprites.treadmill.W.rear, { near = bank, connect = true, wired = true })
-            -- The pickup takes both tiles.
+            -- The sledgehammer takes both tiles.
             local console = treadmill and westConsole(self, treadmill)
             if not console then return end
             table.insert(self.cases, { name = name, bank = bank, treadmill = treadmill, console = console })
@@ -351,9 +364,8 @@ test("renewable_energy_treadmill_unwire_keeps_the_run", {
             T.read(self, "completeTreadmillRun", T.at(treadmill), case.name .. "Run")
             if case.name == "unwired" then
                 T.job(self, "treadmill", Treadmill.UNWIRE, treadmill, nil, "unwired")
-            elseif case.name == "pickedUp" then
-                T.pickUpAsPlayer(self, treadmill, Sprites.treadmill.W.rear)
-                -- What the pickup left on the floor: the treadmill and its wire.
+            elseif case.name == "smashed" then
+                T.smash(self, treadmill, Treadmill.isWiredTile, "wired treadmill")
                 T.takeFloorItems(self, { treadmill, case.console }, "floor")
             end
         end
@@ -377,17 +389,31 @@ test("renewable_energy_treadmill_unwire_keeps_the_run", {
         T.expectOk(self.reads.unwired, "unwiring the treadmill")
         if expect(stored.kept > 0, "the run on the treadmill left wired stored nothing") then
             T.expectNear("Wh a run stored with the treadmill unwired at once, against left wired", stored.unwired, stored.kept, 0.5)
-            T.expectNear("Wh a run stored with the treadmill picked up at once, against left wired", stored.pickedUp, stored.kept, 0.5)
+            T.expectNear("Wh a run stored with the treadmill smashed at once, against left wired", stored.smashed, stored.kept, 0.5)
         end
-        local wire, wiredItems = 0, 0
-        for _, item in ipairs(self.reads.floor.items) do
-            if item.type == Wiring.WIRE then
-                wire = wire + 1
-            elseif item.modData[Treadmill.WIRED_KEY] then
-                wiredItems = wiredItems + 1
-            end
-        end
+        local wire = wireAndWired(self.reads.floor.items)
+        T.expectEqual("wire the smash left on the floor, against what wiring takes", wire, Treadmill.SPEC.wiring.wire)
+    end,
+})
+
+-- A treadmill left wired without a bank picks up unwired: the wire its wiring took lands on the
+-- floor, and the treadmill it becomes carries no wiring to be placed with. Catches a pickup that
+-- loses the wire or lets wiring travel with the item.
+test("renewable_energy_treadmill_wired_pick_up_leaves_wire", {
+    instant = true,
+    run = function(self)
+        local treadmill = T.panel(self, Sprites.treadmill.W.rear, { wired = true })
+        -- The pickup takes both tiles.
+        local console = treadmill and westConsole(self, treadmill)
+        if not console then return end
+        T.give(self, "screwdriver", { { type = "Base.Screwdriver" } })
+        T.pickUpAsPlayer(self, treadmill, Sprites.treadmill.W.rear)
+        -- What the pickup left on the floor: the treadmill and its wire.
+        T.takeFloorItems(self, { treadmill, console }, "floor")
+    end,
+    validate = function(self)
+        local wire, wired = wireAndWired(self.reads.floor.items)
         T.expectEqual("wire the pickup left on the floor, against what wiring takes", wire, Treadmill.SPEC.wiring.wire)
-        T.expectEqual("picked-up treadmill items still carrying their wiring", wiredItems, 0)
+        T.expectEqual("picked-up treadmill items still carrying their wiring", wired, 0)
     end,
 })

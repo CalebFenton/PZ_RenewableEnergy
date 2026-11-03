@@ -9,6 +9,7 @@ require "Moveables/ISMoveableSpriteProps"
 local Specs = require "RenewableEnergy/Specs"
 local Sprites = require "RenewableEnergy/Sprites"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
+local Sources = require "RenewableEnergy/PowerBank/Sources"
 local Panel = require "RenewableEnergy/PowerBank/Panel"
 local Treadmill = require "RenewableEnergy/PowerBank/Treadmill"
 local SolarGardenLight = require "RenewableEnergy/Gadgets/SolarGardenLight"
@@ -137,6 +138,27 @@ local function isLitGasifier(isoObject)
     return summary ~= nil and summary.lit == true
 end
 
+-- Whether `isoObject` is connected, which, like a connected generator (ISTakeGenerator.isValid),
+-- must be disconnected before it is taken or turned: a bank connected itself, or a source
+-- connected to a bank. Either tile of a treadmill counts as its wired half.
+local function isConnected(isoObject)
+    if PowerBank.isBank(isoObject) then
+        return isoObject:isConnected()
+    end
+    local source = Treadmill.isTreadmill(isoObject) and Treadmill.wiredHalf(isoObject) or isoObject
+    return source ~= nil and Sources.kindOf(source) ~= nil and PowerBank.connectedBank(source) ~= nil
+end
+
+-- Why `isoObject` may not be picked up or turned now: a translation key, or nil if it may.
+local function takeRefusal(isoObject)
+    if isLitGasifier(isoObject) then
+        return "Tooltip_RenewableEnergy_PutOutFirst"
+    elseif isConnected(isoObject) then
+        return "Tooltip_RenewableEnergy_DisconnectFirst"
+    end
+    return nil
+end
+
 local vanillaCanPlace = ISMoveableSpriteProps.canPlaceMoveableInternal
 function ISMoveableSpriteProps:canPlaceMoveableInternal(character, square, item, forceTypeObject)
     return vanillaCanPlace(self, character, square, item, forceTypeObject)
@@ -144,12 +166,13 @@ function ISMoveableSpriteProps:canPlaceMoveableInternal(character, square, item,
 end
 
 -- The cursor's panel says why it refuses, in the red vanilla gives its own refusals: placing an
--- item where it may not go, or picking up a gasifier still burning.
+-- item where it may not go, or picking up or turning a gasifier still burning or anything
+-- connected.
 local vanillaInfoPanel = ISMoveableSpriteProps.getInfoPanelDescription
 function ISMoveableSpriteProps:getInfoPanelDescription(square, object, player, mode)
     local infoTable = vanillaInfoPanel(self, square, object, player, mode)
     local refusal = mode == "place" and self.customItem and placementRefusal(self.customItem, square)
-        or mode == "pickup" and object and isLitGasifier(object) and "Tooltip_RenewableEnergy_PutOutFirst"
+        or (mode == "pickup" or mode == "rotate") and object and takeRefusal(object)
     if refusal then
         local bad = ISMoveableSpriteProps.bhc
         ISMoveableSpriteProps.addLineToInfoTable(infoTable, "- " .. getText(refusal),
@@ -158,14 +181,35 @@ function ISMoveableSpriteProps:getInfoPanelDescription(square, object, player, m
     return infoTable
 end
 
--- A connected bank, like a connected generator, must be disconnected before it is taken
--- (ISTakeGenerator.isValid).
+-- Vanilla asks this on the authority too, before it picks up (pickUpMoveable), so a connected
+-- object stays put even if a client's cursor let it through. A multi-tile object is asked tile by
+-- tile.
 local vanillaCanPickUp = ISMoveableSpriteProps.canPickUpMoveableInternal
 function ISMoveableSpriteProps:canPickUpMoveableInternal(character, square, object, isMulti)
-    if object and (PowerBank.isBank(object) and object:isConnected() or isLitGasifier(object)) then
+    if object and takeRefusal(object) then
         return false
     end
     return vanillaCanPickUp(self, character, square, object, isMulti)
+end
+
+-- Turning an object picks it up and places it again (rotateMoveable), which would disconnect it
+-- unseen. Vanilla asks canRotateMoveable only at the cursor, so the authority refuses in
+-- rotateMoveable too.
+local vanillaCanRotate = ISMoveableSpriteProps.canRotateMoveable
+function ISMoveableSpriteProps:canRotateMoveable(square, object, origProps)
+    if object and takeRefusal(object) then
+        return false
+    end
+    return vanillaCanRotate(self, square, object, origProps)
+end
+
+local vanillaRotate = ISMoveableSpriteProps.rotateMoveable
+function ISMoveableSpriteProps:rotateMoveable(character, square, origSpriteName)
+    local object = ISMoveableSpriteProps.new(origSpriteName):findOnSquare(square, origSpriteName)
+    if object and takeRefusal(object) then
+        return
+    end
+    return vanillaRotate(self, character, square, origSpriteName)
 end
 
 -- Placing copies an item's modData onto the object, but picking up copies an object's back only
