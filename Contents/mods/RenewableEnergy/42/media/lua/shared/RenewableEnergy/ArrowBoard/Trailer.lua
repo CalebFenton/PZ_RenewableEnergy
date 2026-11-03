@@ -383,14 +383,25 @@ function ArrowBoard.panelWatts(vehicle)
     return watts
 end
 
---- The trailer's panel `partId` if it holds a module that Seal Cracked Panel can seal, else nil.
-function ArrowBoard.sealablePanel(vehicle, partId)
+-- The trailer's panel `partId` if it holds a module for which `allowed(type, condition, repaired)`
+-- holds, else nil.
+local function panelIf(allowed, vehicle, partId)
     local part = ArrowBoard.isTrailer(vehicle) and vehicle:getPartById(partId)
     local item = part and isPanel(part) and part:getInventoryItem()
-    if item and ModuleRepair.sealable(item:getFullType(), part:getCondition(), item:getHaveBeenRepaired()) then
+    if item and allowed(item:getFullType(), part:getCondition(), item:getHaveBeenRepaired()) then
         return part
     end
     return nil
+end
+
+--- The trailer's panel `partId` if it holds a module that Seal Cracked Panel can seal, else nil.
+function ArrowBoard.sealablePanel(vehicle, partId)
+    return panelIf(ModuleRepair.sealable, vehicle, partId)
+end
+
+--- The trailer's panel `partId` if it holds a module that Reglaze Panel takes, else nil.
+function ArrowBoard.reglazablePanel(vehicle, partId)
+    return panelIf(ModuleRepair.reglazable, vehicle, partId)
 end
 
 --- Seal Cracked Panel's effect on a module still on the trailer (its inputs, skill and XP are the
@@ -402,6 +413,17 @@ function ArrowBoard.sealPanel(vehicle, partId)
     local condition, repaired = ModuleRepair.sealed(item:getFullType(), part:getCondition(), item:getHaveBeenRepaired())
     item:setHaveBeenRepaired(repaired)
     setPanelCondition(vehicle, part, condition)
+    vehicle:transmitPartItem(part)
+    return true
+end
+
+--- Reglaze Panel's effect on a module still on the trailer (ModuleRepair.REGLAZE): back to new,
+--- its seals gone with the old glass. Authority only, once the job was checked (VehicleJobs).
+function ArrowBoard.reglazePanel(vehicle, partId)
+    local part = vehicle:getPartById(partId)
+    local item = part:getInventoryItem()
+    item:setHaveBeenRepaired(0)
+    setPanelCondition(vehicle, part, item:getConditionMax())
     vehicle:transmitPartItem(part)
     return true
 end

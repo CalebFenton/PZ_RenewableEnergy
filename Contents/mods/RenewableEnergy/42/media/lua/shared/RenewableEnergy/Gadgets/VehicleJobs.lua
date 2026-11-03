@@ -22,6 +22,7 @@ VehicleJobs.BOARD_ON = "BoardOn"
 VehicleJobs.BOARD_OFF = "BoardOff"
 VehicleJobs.CUT_PADLOCK = "CutPadlock"
 VehicleJobs.SEAL_PANEL = "RepairPanel"
+VehicleJobs.REGLAZE_PANEL = "ReglazePanel"
 
 function VehicleJobs.isBoltCutters(item)
     return item ~= nil and item:hasTag(ItemTag.BOLT_CUTTERS) and Items.notBroken(item)
@@ -73,7 +74,7 @@ local function alternatorJob(putBack)
 end
 
 -- Every job, by name (Jobs.define); `with` is the maintainer, alternator or bolt cutters a job
--- works with, or the panel part Seal Cracked Panel seals.
+-- works with, or the panel part Seal Cracked Panel or Reglaze Panel mends.
 VehicleJobs.JOBS = {
     [VehicleJobs.ATTACH_MAINTAINER] = {
         minutes = 1, position = "Mid", sound = "GeneratorConnect", area = atBattery, hideBlocked = true,
@@ -104,10 +105,13 @@ VehicleJobs.JOBS = {
         end,
         with = VehicleJobs.isBoltCutters, withMissing = "Tooltip_RenewableEnergy_NeedsBoltCutters",
     },
-    -- Seal Cracked Module's twin for a panel still on the trailer.
-    [VehicleJobs.SEAL_PANEL] = ModuleRepair.sealRow(function(vehicle, partId)
+    -- Seal Cracked Module's and Reglaze Module's twins for a panel still on the trailer.
+    [VehicleJobs.SEAL_PANEL] = ModuleRepair.jobRow(ModuleRepair.SEAL, function(vehicle, partId)
         return ArrowBoard.sealablePanel(vehicle, partId) ~= nil
     end, "Tooltip_RenewableEnergy_PanelSealedFully", { position = "Mid", area = areaOf }),
+    [VehicleJobs.REGLAZE_PANEL] = ModuleRepair.jobRow(ModuleRepair.REGLAZE, function(vehicle, partId)
+        return ArrowBoard.reglazablePanel(vehicle, partId) ~= nil
+    end, "not damaged", { position = "Mid", area = areaOf }),
 }
 
 Jobs.define(VehicleJobs, {

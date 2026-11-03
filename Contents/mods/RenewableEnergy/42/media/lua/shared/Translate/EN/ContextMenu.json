@@ -18,6 +18,8 @@
     "ContextMenu_RenewableEnergy_DetachMaintainer": "Detach Solar Maintainer",
     "ContextMenu_RenewableEnergy_RepairPanel": "Seal Cracked Panel: %1 (%2)",
     "ContextMenu_RenewableEnergy_SealModule": "Seal Cracked Module %1 (%2)",
+    "ContextMenu_RenewableEnergy_ReglazePanel": "Reglaze Panel: %1 (%2)",
+    "ContextMenu_RenewableEnergy_ReglazeModule": "Reglaze Module %1 (%2)",
     "ContextMenu_RenewableEnergy_RepairFrame": "Repair Frame: %1 (%2)",
     "ContextMenu_RenewableEnergy_TakeSludge": "Take Sludge",
     "ContextMenu_RenewableEnergy_VentGas": "Vent Gas",

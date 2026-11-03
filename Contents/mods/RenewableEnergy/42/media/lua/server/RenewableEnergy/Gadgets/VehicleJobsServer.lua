@@ -42,6 +42,9 @@ local DO = {
     [VehicleJobs.SEAL_PANEL] = function(character, row, vehicle, partId)
         return ArrowBoard.sealPanel(vehicle, partId)
     end,
+    [VehicleJobs.REGLAZE_PANEL] = function(character, row, vehicle, partId)
+        return ArrowBoard.reglazePanel(vehicle, partId)
+    end,
 }
 DO[VehicleJobs.BOARD_OFF] = DO[VehicleJobs.BOARD_ON]
 

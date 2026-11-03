@@ -72,7 +72,9 @@ function DigesterWindow:rowsOf(summary)
     row(rows, "IGUI_RenewableEnergy_DigesterGas", Format.cubicMetres(summary.gas) .. " / " .. Format.cubicMetres(summary.capacity))
     row(rows, "IGUI_RenewableEnergy_DigesterMaking", getText("IGUI_RenewableEnergy_PerDay", Format.cubicMetres(summary.madePerDay)))
     row(rows, "IGUI_RenewableEnergy_DigesterHolder", holderText(summary), (summary.torn or summary.leaking) and "bad" or nil)
-    row(rows, "IGUI_RenewableEnergy_DigesterFill", Format.percent(summary.fill))
+    -- The feed in the tank isn't used up but gas still to come, which a player reads off here.
+    row(rows, "IGUI_RenewableEnergy_DigesterFill", getText("IGUI_RenewableEnergy_DigesterToCome", Format.percent(summary.fill),
+        Format.number(summary.toCome, 1)))
     row(rows, "IGUI_RenewableEnergy_DigesterHopper", tostring(summary.hopper))
     row(rows, "IGUI_RenewableEnergy_DigesterSludge", Format.percent(summary.sludge / 100), summary.sludge >= Digester.SLUDGE_SLOW and "bad" or nil)
     row(rows, "IGUI_RenewableEnergy_DigesterSmell", smellText(summary.stink), summary.stink >= Digester.SMELL_SCORES[2] and "bad" or nil)

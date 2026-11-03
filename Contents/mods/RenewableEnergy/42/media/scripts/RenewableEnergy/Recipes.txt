@@ -501,11 +501,11 @@ module Base
         }
     }
 
-    /* A new pane in place of cracked glass. Cells cracked under it stay cracked, so such a module
-       never comes back to new (ModuleRepair.REGLAZE). Like vanilla car glass, a trailer panel is
-       replaced in hand, not fixed in place. A car window serves as the pane: vanilla makes panes
-       only with a rare magazine or trait, while cars are everywhere. A shattered one is broken,
-       which inputs refuse. */
+    /* A new pane for a damaged module, which brings it back to new and clears its seals. A module
+       on a placed mount or the trailer is reglazed in place by a job that takes these inputs, skill
+       and XP (ModuleRepair.REGLAZE), so keep the module on a line of its own. A car window serves
+       as the pane: vanilla makes panes only with a rare magazine or trait, while cars are
+       everywhere. A shattered one is broken, which inputs refuse. */
     craftRecipe RenewableEnergy_ReglazeModule
     {
         timedAction = MakingElectrical,
@@ -1333,7 +1333,8 @@ module Base
 
     /* The scrubber's packing a farm can make (DigesterJobs): small iron scrap or nails filed into
        filings, mixed with splinters and damped to rust together, as gas works' iron sponge is
-       wood shavings and iron oxide. Free to all, as the scrubber is. */
+       wood shavings and iron oxide. Tainted water rusts it as well as clean. Free to all, as the
+       scrubber is. */
     craftRecipe RenewableEnergy_MakeIronSponge
     {
         timedAction = Making,
@@ -1348,7 +1349,7 @@ module Base
             item 10 [2:Base.IronScrap;2:Base.SteelScrap;2:Base.ScrapMetal;2:Base.UnusableMetal;Base.Nails] flags[IsExclusive],
             item 3 [Base.Splinters],
             item 1 [*],
-            -fluid 0.5 [Water],
+            -fluid 0.5 [Water;TaintedWater],
         }
         outputs
         {
@@ -1369,7 +1370,7 @@ module Base
         {
             item 1 [RenewableEnergy.SpentIronSponge],
             item 1 [*],
-            -fluid 0.25 [Water],
+            -fluid 0.25 [Water;TaintedWater],
         }
         outputs
         {

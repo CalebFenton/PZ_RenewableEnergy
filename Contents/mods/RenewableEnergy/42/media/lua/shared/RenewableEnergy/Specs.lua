@@ -117,8 +117,9 @@ Specs.storm = { fullKph = 120, worstHours = 48, worstChance = 0.15, panelKph = 4
 -- How a module's glass looks, on a mount or the arrow board, by its condition as a share of its
 -- own ConditionMax (ModuleRepair.crackLookOf): whole down to `lightBelow`, lightly cracked
 -- below that, heavily cracked below `heavyBelow`. The first crack of a new module shows:
--- lightBelow sits above the share one crack (storm.crack) leaves it. Reglazed modules show whole;
--- sealed ones still show cracked, because the glass still is (ModuleRepair keeps both levels so).
+-- lightBelow sits above the share one crack (storm.crack) leaves it. Reglazed modules are new and
+-- show whole; sealed ones still show cracked, because the glass still is (ModuleRepair.SEAL_CAP
+-- stays below lightBelow).
 Specs.crackLooks = { lightBelow = 0.85, heavyBelow = 0.5 }
 
 -- Banks by item type: the Sprites field of its placed tile, and how many of each part it takes.

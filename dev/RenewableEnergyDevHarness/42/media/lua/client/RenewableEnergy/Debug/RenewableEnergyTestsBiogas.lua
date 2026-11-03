@@ -186,8 +186,9 @@ test("renewable_energy_biogas_digester_sour_and_fix", {
         local handle = T.placeRecord(self, "digester", "barrel.MetalDrum")
         if not handle then return end
         local limit = Digester.ACID_LIMIT * Digester.TIERS.barrel.potentialCap
+        -- Each with a fresh day's intake, so the alkali goes in at the first hour.
         local function set(share, sour)
-            T.setRecord(self, handle, Fixtures.matureDigester("barrel", { acid = share * limit, sour = sour }))
+            T.setRecord(self, handle, Fixtures.matureDigester("barrel", { acid = share * limit, sour = sour, intakeKg = 0 }))
         end
         -- An hour's decay takes far less acid than the step, so each side stays on its side.
         local step = 0.01
@@ -209,7 +210,7 @@ test("renewable_energy_biogas_digester_sour_and_fix", {
             T.fillRecord(self, handle, { hopper = { { type = "Base.BakingSoda" } } })
             T.runDigester(self, handle, 1, 30)
             T.readRecord(self, handle, "soda")
-            T.setRecord(self, handle, { acid = 1 - 2 * Digester.feedOf(soda).acid })
+            T.setRecord(self, handle, { acid = 1 - 2 * Digester.feedOf(soda).acid, intakeKg = 0 })
             T.runDigester(self, handle, 2, 30)
         end)
         T.waitFor(self, function()
@@ -233,40 +234,47 @@ test("renewable_energy_biogas_digester_sour_and_fix", {
 
 -- Feed -------------------------------------------------------------------------------------------
 
--- The hopper takes feed and alkalis only, on this client's copy as in the loot window, and feeds
--- one item an hour until the tank holds its cap; manure eaten brings its head start.
+-- The hopper takes manure, alkalis and food however fresh, but not a worm, on this client's copy as
+-- in the loot window. Feed goes into the tank by weight: a dome takes a day's worth of cow pats in
+-- a day, and a barrel a pat short of its cap takes that one and no more. Manure eaten brings its
+-- head start.
 test("renewable_energy_biogas_digester_hopper_meters", {
     run = function(self)
-        local handle = T.placeRecord(self, "digester", "barrel.MetalDrum")
-        if not handle then return end
-        self.digester = handle
+        local barrel = T.placeRecord(self, "digester", "barrel.MetalDrum")
+        local dome = barrel and T.placeRecord(self, "digester", "dome")
+        if not dome then return end
+        self.barrel = barrel
         self.cow = Digester.feedOf(instanceItem(FEED))
-        self.fits = math.floor(Digester.TIERS.barrel.potentialCap / self.cow.potential + 1e-6)
-        -- More than fits, run first for an hour less than eating what fits takes.
-        self.count, self.firstHours = self.fits + 2, self.fits - 1
-        self.left = self.count - self.fits
+        self.domeDay = Digester.TIERS.dome.kgPerDay / self.cow.kg
+        self.domeCount = self.domeDay + 3
+        self.barrelCount = 3
         T.batch(function()
-            T.fillRecord(self, handle, { hopper = { { type = FEED, count = self.count } } })
-            T.runDigester(self, handle, self.firstHours, 25)
-            T.readRecord(self, handle, "metered")
-            T.runDigester(self, handle, self.count, 25)
-            T.readRecord(self, handle, "after")
+            -- Cold, so it never starts and nothing in the tank digests.
+            T.setRecord(self, barrel, { fed = true, started = false, startupHours = 0, seedHours = 0, temp = 0,
+                potential = Digester.TIERS.barrel.potentialCap - self.cow.potential / 2 })
+            T.fillRecord(self, barrel, { hopper = { { type = FEED, count = self.barrelCount } } })
+            T.runDigester(self, barrel, 48, 0)
+            T.readRecord(self, barrel, "barrel")
+            T.fillRecord(self, dome, { hopper = { { type = FEED, count = self.domeCount } } })
+            T.runDigester(self, dome, 24, 0)
+            T.readRecord(self, dome, "dome")
         end)
-        T.waitForSummary(self, handle, function(summary) return summary.hopper == self.left end, "this client's count of the hopper")
+        T.waitForSummary(self, barrel, function(summary) return summary.hopper == self.barrelCount - 1 end,
+            "this client's count of the barrel's hopper")
     end,
     validate = function(self)
-        local metered, after = self.reads.metered, self.reads.after
-        T.expectEqual("items left in the hopper after " .. self.firstHours .. " hours, at one an hour", metered.hopperItems,
-            self.count - self.firstHours)
-        T.expectNear("undigested potential", after.potential, Digester.TIERS.barrel.potentialCap, 0.001)
-        T.expectEqual("items left in the hopper", after.hopperItems, self.left)
-        T.expectNear("startup the manure seeded", after.seedHours, self.fits * self.cow.seedHours, 0.001)
-        local container = self.digester.object:getContainer()
+        local barrel, dome = self.reads.barrel, self.reads.dome
+        T.expectEqual("cow pats the dome took in a day", self.domeCount - dome.hopperItems, self.domeDay)
+        T.expectEqual("cow pats the barrel took a pat short of its cap", self.barrelCount - barrel.hopperItems, 1)
+        T.expect(barrel.potential >= Digester.TIERS.barrel.potentialCap, "the barrel stopped short of its cap")
+        T.expectNear("startup the manure seeded", barrel.seedHours, self.cow.seedHours, 0.001)
+        local container = self.barrel.object:getContainer()
         local function allowed(fullType)
             return container:isItemAllowed(instanceItem(fullType))
         end
         T.expect(allowed(FEED) and allowed(Gasifier.WOOD_ASH), "this client's hopper refuses manure or wood ash")
-        T.expect(not allowed("Base.Apple") and not allowed("Base.Hammer"), "this client's hopper takes a fresh apple or a hammer")
+        T.expect(allowed("Base.Turnip"), "this client's hopper refuses a fresh turnip")
+        T.expect(not allowed("Base.Worm") and not allowed("Base.Hammer"), "this client's hopper takes a live worm or a hammer")
         -- Every animal's dung, not only the farm animals the feed table names.
         local dung, refused = 0, {}
         local scripts = getScriptManager():getAllItems()
@@ -541,8 +549,9 @@ test("renewable_energy_biogas_brick_dome_builds_only_on_ground", {
 })
 
 -- A digester built from a barrel loads whole from the save: its chunk unloaded and loaded again, it
--- still opens and takes feed. While unloaded it kept eating from what its hopper held, an item an
--- hour, and what it ate has left the hopper. Single player only, as the chunk reload test.
+-- still opens and takes feed. While unloaded it kept eating from what its hopper held, by weight
+-- as when loaded, and what it ate has left the hopper. Single player only, as the chunk reload
+-- test.
 test("renewable_energy_biogas_barrel_digester_reloads_whole", {
     spOnly = T.CHUNK_RELOAD_SP_ONLY,
     timeoutSeconds = T.CHUNK_RELOAD_SECONDS,
@@ -553,10 +562,10 @@ test("renewable_energy_biogas_barrel_digester_reloads_whole", {
         local handle = T.buildRecord(self, "digester", "Base.RenewableEnergy_BarrelDigester", tile, { "Base.Mov_LightGreenBarrel" })
         if not handle then return end
         T.fillRecord(self, handle, { hopper = { { type = FEED, count = 4 } } })
-        -- Part of an hour already on the meter, so each whole hour away eats one item.
+        -- Half an hour takes the first pat, a kilogram; a day away takes two more, its 2 kg a day.
         T.runDigester(self, handle, 0.5, 25)
         T.reloadChunk(self, handle, function()
-            T.ageRecord(self, handle, 3, "away")
+            T.ageRecord(self, handle, 24, "away")
         end)
         useBarrelDigester(self, handle, tile, "reloaded", 1)
     end,
@@ -564,9 +573,9 @@ test("renewable_energy_biogas_barrel_digester_reloads_whole", {
         local away = self.reads.away
         local cow = Digester.feedOf(instanceItem(FEED))
         T.expect(not away.loaded, "the digester's tile stayed loaded")
-        T.expectEqual("items eaten while unloaded", away.eaten, 3)
+        T.expectEqual("items eaten while unloaded", away.eaten, 2)
         T.expectEqual("items left in the unloaded hopper's snapshot", away.snapshot, 1)
-        T.expectNear("potential eaten while unloaded", away.potential, 3 * cow.potential, 0.001)
+        T.expectNear("potential in the tank", away.potential, 3 * cow.potential, 0.001)
         expectBarrelDigester(self, "reloaded", 1)
     end,
 })

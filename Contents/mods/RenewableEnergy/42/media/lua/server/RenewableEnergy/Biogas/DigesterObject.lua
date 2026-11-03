@@ -24,7 +24,7 @@ local DigesterObject = ObjectSystem.Object:derive("RenewableEnergy_Digester")
 DigesterObject.SAVED_FIELDS = {
     "tier", "holder", "holderCondition", "potential", "gas", "temp", "fed", "startupHours",
     "seedHours", "started", "gasHours", "sludge", "acid", "sour", "leakHours", "indoors", "inRoom",
-    "meterHours", "madePerDay", "hopper", "eaten", "scrubber", "scrubCO2", "scrubWool",
+    "intakeKg", "madePerDay", "hopper", "eaten", "scrubber", "scrubCO2", "scrubWool",
     "scrubSponge", "heaterLit", "compressor",
 }
 
@@ -59,7 +59,7 @@ function DigesterObject:initNew()
     self.acid = 0
     self.sour = false
     self.leakHours = 0
-    self.meterHours = 0
+    self.intakeKg = 0
     self.madePerDay = 0
     self.hopper = {}
     self.eaten = {}
@@ -182,22 +182,28 @@ function DigesterObject:eat(feed)
     end
 end
 
--- Eats from the hopper's snapshot; takeEaten applies its deductions to the real container.
+-- Eats from the hopper's snapshot while the intake (intakeKg) has any left; takeEaten applies its
+-- deductions to the real container. Feed goes in whole, so a heavy item takes the intake below
+-- zero and the hours after pay it back before the next goes in. Intake left for want of feed or
+-- room isn't saved up.
 function DigesterObject:feedFromSnapshot()
-    local index = self:pickFeed(self.hopper)
-    if not index then
-        return false
+    while self.intakeKg > 0 do
+        local index = self:pickFeed(self.hopper)
+        if not index then
+            self.intakeKg = 0
+            return
+        end
+        local entry = self.hopper[index]
+        self:eat(entry)
+        self.intakeKg = self.intakeKg - (entry.kg or 0)
+        if entry.uses and entry.uses > 1 then
+            entry.uses = entry.uses - 1
+            self.eaten[tostring(entry.id)] = (self.eaten[tostring(entry.id)] or 0) + 1
+        else
+            table.remove(self.hopper, index)
+            self.eaten[tostring(entry.id)] = "all"
+        end
     end
-    local entry = self.hopper[index]
-    self:eat(entry)
-    if entry.uses and entry.uses > 1 then
-        entry.uses = entry.uses - 1
-        self.eaten[tostring(entry.id)] = (self.eaten[tostring(entry.id)] or 0) + 1
-    else
-        table.remove(self.hopper, index)
-        self.eaten[tostring(entry.id)] = "all"
-    end
-    return true
 end
 
 function DigesterObject:takeEaten(container)
@@ -332,20 +338,18 @@ function DigesterObject:step(hours, air)
     end
 end
 
---- Runs `hours` of the digester, an hour at a time, at the air temperature `air`. Loaded and
---- unloaded feeding use the same snapshot; a loaded pass refreshes it before eating and applies
---- the deductions before returning.
+--- Runs `hours` of the digester, an hour at a time, at the air temperature `air`, feeding it its
+--- tier's kgPerDay as it goes. Loaded and unloaded feeding use the same snapshot; a loaded pass
+--- refreshes it before eating and applies the deductions before returning.
 function DigesterObject:run(hours, container, air)
     if container then
         self:snapshotHopper(container)
     end
+    local kgPerHour = self:tierSpec().kgPerDay / 24
     while hours > 0 do
         local step = math.min(1, hours)
-        self.meterHours = self.meterHours + step
-        while self.meterHours >= 1 do
-            self.meterHours = self.meterHours - 1
-            self:feedFromSnapshot()
-        end
+        self.intakeKg = (self.intakeKg or 0) + kgPerHour * step
+        self:feedFromSnapshot()
         self:step(step, air)
         hours = hours - step
     end
@@ -517,6 +521,8 @@ function DigesterObject:buildSummary()
         fed = self.fed, started = self.started, startup = round(self:startupProgress(), 2),
         sludge = math.floor(self.sludge), sour = self.sour, leaking = self.leakHours > 0,
         fill = round(math.min(1, self.potential / spec.potentialCap), 2),
+        -- The gas the feed in the tank has still to give, as `madePerDay` counts it.
+        toCome = round(self.potential * SandboxVars.RenewableEnergy.BiogasMultiplier, 1),
         madePerDay = round(self.madePerDay, 2),
         stink = round(self:stinkScore(), 1),
         scrubber = self.scrubber == true,

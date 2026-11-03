@@ -20,6 +20,7 @@ RenewableEnergy.Digester = Digester
 Digester.SYSTEM_NAME = "renewable_energy_digester"
 
 -- potentialCap: undigested potential it holds; feed waits in the hopper above it.
+-- kgPerDay: the feed, by weight, that goes from the hopper into the tank a day.
 -- days: how many days its temperature takes to follow the air (a time constant).
 -- stink: its share of the stink score; stinkCap: the most it stinks whatever its state.
 -- warmTo: the dome is buried and burns its gas to keep at least this warm, as a lit gas heater
@@ -28,9 +29,9 @@ Digester.SYSTEM_NAME = "renewable_energy_digester"
 -- off and goes on (DigesterJobs). upgrade: the tier its Upgrade job makes of it.
 -- sealed: it never fumes indoors.
 Digester.TIERS = {
-    barrel = { potentialCap = 5, days = 1, stink = 1.0, holder = "bags", gasBag = true, upgrade = "insulated" },
-    insulated = { potentialCap = 15, days = 3, stink = 0.6, holder = "drum" },
-    dome = { potentialCap = 45, days = 8, stink = 0.3, stinkCap = 0.99, warmTo = 20, holder = "dome",
+    barrel = { potentialCap = 5, kgPerDay = 2, days = 1, stink = 1.0, holder = "bags", gasBag = true, upgrade = "insulated" },
+    insulated = { potentialCap = 15, kgPerDay = 4, days = 3, stink = 0.6, holder = "drum" },
+    dome = { potentialCap = 45, kgPerDay = 6, days = 8, stink = 0.3, stinkCap = 0.99, warmTo = 20, holder = "dome",
         sealed = true },
 }
 
@@ -166,35 +167,42 @@ local MEAT_POTENTIAL_PER_KG, MEAT_ACID_PER_KG = 0.2, 2
 local MEAT_TYPES = { Meat = true, Game = true, Beef = true, Poultry = true, Sausage = true, Fish = true, Seafood = true, Roe = true }
 -- Dung of the other animals (mice, rats) is worth a little.
 local OTHER_DUNG = { potential = 0.01, acid = 0 }
+-- What the lightest feed counts for against the daily intake, a grass tuft's weight, so a hopper
+-- of droppings or a box of baking soda doesn't go in all at once.
+local MIN_KG = 0.1
 
---- What one hourly meter takes of `item` into the digester: { potential, acid, seedHours,
---- whole, neutraliser }, where whole is false for a drainable neutraliser, of which one use goes in
---- at a time. Nil for what the digester doesn't take; it takes manure, grass and hay, the
---- composter's food (rotten, or tagged compostable) and the neutralisers.
+local function intakeKg(item)
+    return math.max(MIN_KG, item:getActualWeight())
+end
+
+--- What `item` puts into the digester as it goes in: { potential, acid, seedHours, kg, whole,
+--- neutraliser }, where kg is what it counts for against the tier's kgPerDay, and whole is false
+--- for a drainable neutraliser, of which one use goes in at a time. Nil for what the digester
+--- doesn't take; it takes manure, grass and hay, the neutralisers, and food of any freshness but
+--- what vanilla's composter refuses (CANT_COMPOST: a worm).
 function Digester.feedOf(item)
     local fullType = item:getFullType()
     local neutraliser = NEUTRALISERS[fullType]
     if neutraliser then
-        return { potential = 0, acid = neutraliser, whole = not instanceof(item, "DrainableComboItem"), neutraliser = true }
+        local whole = not instanceof(item, "DrainableComboItem")
+        return { potential = 0, acid = neutraliser, kg = whole and intakeKg(item) or MIN_KG, whole = whole, neutraliser = true }
     end
     local known = FEEDS[fullType]
     if known then
-        return { potential = known.potential, acid = known.acid, seedHours = known.seedHours, whole = true }
+        return { potential = known.potential, acid = known.acid, seedHours = known.seedHours, kg = intakeKg(item), whole = true }
     end
-    if not instanceof(item, "Food") then
+    if not instanceof(item, "Food") or item:hasTag(ItemTag.CANT_COMPOST) then
         return nil
     end
+    local kg = intakeKg(item)
     if fullType:find("^Base%.Dung_") then
-        return { potential = OTHER_DUNG.potential, acid = OTHER_DUNG.acid, whole = true }
+        return { potential = OTHER_DUNG.potential, acid = OTHER_DUNG.acid, kg = kg, whole = true }
     end
-    if not (item:isRotten() or item:hasTag(ItemTag.IS_COMPOSTABLE)) then
-        return nil
-    end
-    local kg = item:getActualWeight()
+    local weight = item:getActualWeight()
     if MEAT_TYPES[item:getFoodType()] then
-        return { potential = MEAT_POTENTIAL_PER_KG * kg, acid = MEAT_ACID_PER_KG * kg, whole = true }
+        return { potential = MEAT_POTENTIAL_PER_KG * weight, acid = MEAT_ACID_PER_KG * weight, kg = kg, whole = true }
     end
-    return { potential = FOOD_POTENTIAL_PER_KG * kg, acid = FOOD_ACID_PER_KG * kg, whole = true }
+    return { potential = FOOD_POTENTIAL_PER_KG * weight, acid = FOOD_ACID_PER_KG * weight, kg = kg, whole = true }
 end
 
 --- The hopper's AcceptItemFunction: feed and neutralisers only.

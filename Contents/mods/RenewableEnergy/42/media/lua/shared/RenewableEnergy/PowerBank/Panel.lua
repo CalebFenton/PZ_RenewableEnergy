@@ -8,14 +8,12 @@ local Items = require "cf_commonlib/Items"
 local Panel = {}
 
 -- Item and placed-object modData: the modules a panel mount holds, { { type, condition, repaired,
--- cellsCracked, mounted, connected }, ... }. repaired is the module item's repair count (its seals;
--- nil is 0). cellsCracked says new glass went over cells cracked under the old (ModuleRepair.REGLAZE).
+-- mounted, connected }, ... }. repaired is the module item's repair count (its seals; nil is 0).
 -- mounted and connected say the module already taught the XP of its first mounting and its first
 -- connection to a bank, so moving modules around teaches nothing new.
 Panel.MODULES_KEY = "RenewableEnergy_modules"
--- Solar module item modData: the same three flags, while the module is off its mount. A placed
+-- Solar module item modData: the same two flags, while the module is off its mount. A placed
 -- wind charger keeps CONNECTED_ONCE too.
-Panel.CELLS_CRACKED_KEY = "RenewableEnergy_cellsCracked"
 Panel.MOUNTED_ONCE_KEY = "RenewableEnergy_mountedOnce"
 Panel.CONNECTED_ONCE_KEY = "RenewableEnergy_connectedOnce"
 
@@ -23,7 +21,7 @@ function Panel.copyModules(modules)
     local copy = {}
     for i, module in ipairs(modules) do
         copy[i] = { type = module.type, condition = module.condition, repaired = module.repaired,
-            cellsCracked = module.cellsCracked, mounted = module.mounted, connected = module.connected }
+            mounted = module.mounted, connected = module.connected }
     end
     return copy
 end
@@ -52,8 +50,7 @@ end
 function Panel.moduleRecord(item)
     local data = item:getModData()
     return { type = item:getFullType(), condition = item:getCondition(), repaired = item:getHaveBeenRepaired(),
-        cellsCracked = data[Panel.CELLS_CRACKED_KEY] == true, mounted = data[Panel.MOUNTED_ONCE_KEY] == true,
-        connected = data[Panel.CONNECTED_ONCE_KEY] == true }
+        mounted = data[Panel.MOUNTED_ONCE_KEY] == true, connected = data[Panel.CONNECTED_ONCE_KEY] == true }
 end
 
 --- The watts a module of `fullType` makes in full sun at `condition`, on a mount or a trailer
@@ -67,7 +64,6 @@ end
 function Panel.markModule(item, module)
     item:setHaveBeenRepaired(module.repaired or 0)
     local data = item:getModData()
-    data[Panel.CELLS_CRACKED_KEY] = module.cellsCracked or nil
     data[Panel.MOUNTED_ONCE_KEY] = module.mounted or nil
     data[Panel.CONNECTED_ONCE_KEY] = module.connected or nil
 end

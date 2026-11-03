@@ -235,6 +235,60 @@ test("renewable_energy_solar_seal_module_in_place", {
     end,
 })
 
+-- Reglaze Module, chosen from a connected flat panel's menu, brings its heavily cracked, sealed
+-- module back to new while it stays on the mount: its seals clear, the tile shows no cracks, the
+-- bank's record takes it at once, and it takes Reglaze Module's inputs, keeping the screwdriver.
+-- A module at new isn't offered it.
+test("renewable_energy_solar_reglaze_module_in_place", {
+    instant = true,
+    run = function(self)
+        self.bank = T.bank(self, "batteryBankWood", {}, { outdoors = true })
+        local cracked = { type = T.FACTORY_MODULE, condition = 30, repaired = 2 }
+        self.cracked = cracked
+        self.panel = self.bank and T.panel(self, Sprites.rack.wood.S, { near = self.bank, connect = true,
+            modules = { { type = T.FACTORY_MODULE, condition = 100 }, cracked } })
+        if not self.panel then return end
+        local bank = self.bank
+        T.setRecipeSkills(self, ModuleRepair.reglazeRecipe())
+        T.knowRecipes(self, { ModuleRepair.REGLAZE_RECIPE })
+        T.give(self, "inputs", { { type = "Base.Screwdriver" }, { type = "Base.GlassPanel" }, { type = "Base.Epoxy" },
+            { type = "Base.ElectricWire" } })
+        T.step(function()
+            local context = T.newContext()
+            local menu = SourceMenu.addSourceOptions(0, context, self.panel.object)
+            local whole = T.optionNamed(menu, getText("ContextMenu_RenewableEnergy_ReglazeModule", 1,
+                Format.condition(T.FACTORY_MODULE, 100)))
+            local option = T.optionNamed(menu, getText("ContextMenu_RenewableEnergy_ReglazeModule", 2,
+                Format.condition(cracked.type, cracked.condition)))
+            context:hideAndChildren()
+            self.wholeOffered = whole ~= nil
+            if not T.chooseOption(self, "Reglaze Module", option, self.panel.square) then return end
+            T.waitFor(self, function()
+                local modules = self.panel.object:getModData()[MODULES_KEY]
+                return modules and modules[2] and modules[2].condition ~= cracked.condition
+            end, "this client's copy of the reglazed module")
+            T.read(self, "panelState", T.at(self.panel), "panel")
+            T.readRecord(self, bank)
+            T.count(self, "left", { "Base.Screwdriver", "Base.GlassPanel", "Base.ElectricWire" })
+        end)
+    end,
+    validate = function(self)
+        if not T.expectConnected(self.panel) then return end
+        expect(not self.wholeOffered, "the module at new is offered Reglaze Module")
+        if not T.expectOffered(self, "Reglaze Module") then return end
+        local modules = self.reads.panel.modules
+        expectEqual("the reglazed module's condition", modules[2].condition, 100)
+        expectEqual("the reglazed module's seals", modules[2].repaired or 0, 0)
+        expectEqual("crack overlays on the reglazed panel", #self.reads.panel.overlays, 0)
+        local listed = self.bank.state.status.sources[1]
+        expectEqual("the bank's record of the reglazed module", listed and listed.modules[2] and listed.modules[2].condition, 100)
+        local left = self.counts.left
+        expectEqual("screwdrivers left", left["Base.Screwdriver"], 1)
+        expectEqual("glass panes left", left["Base.GlassPanel"], 0)
+        expectEqual("electric wire left", left["Base.ElectricWire"], 0)
+    end,
+})
+
 -- The Seal Cracked Module option for each module of the placed panel `object`, by slot, as its
 -- menu offers them now; nil for a module not offered.
 local function sealOptions(object)

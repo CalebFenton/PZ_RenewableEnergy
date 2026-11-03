@@ -37,8 +37,7 @@ test("renewable_energy_solar_crack_looks_follow_the_module", {
         end
         self.rows = {}
         local function reglazed(record)
-            local glass = ModuleRepair.reglazed(record.type, record.condition, record.repaired)
-            return shows({ type = record.type, condition = math.max(record.condition, glass) })
+            return shows({ type = record.type, condition = Items.conditionMaxOf(record.type) })
         end
         for _, row in ipairs(LIFE_LOOKS) do
             local module, cracks = row[1], row[2]
@@ -83,8 +82,7 @@ test("renewable_energy_solar_crack_looks_follow_the_module", {
 local function recordOf(item, fullType)
     local data = item and item.modData
     return item and { type = fullType, condition = item.condition, repaired = item.repaired,
-        cellsCracked = data[Panel.CELLS_CRACKED_KEY] == true, mounted = data[Panel.MOUNTED_ONCE_KEY] == true,
-        connected = data[Panel.CONNECTED_ONCE_KEY] == true }
+        mounted = data[Panel.MOUNTED_ONCE_KEY] == true, connected = data[Panel.CONNECTED_ONCE_KEY] == true }
 end
 
 -- Expects the module record `got` to be `want`: its type at its condition, seals and marks.
@@ -93,17 +91,15 @@ local function expectModule(what, got, want)
     expectEqual(what .. "'s type", got.type, want.type)
     expectEqual(what .. "'s condition", got.condition, want.condition)
     expectEqual(what .. "'s seals", got.repaired or 0, want.repaired or 0)
-    expectEqual(what .. " marked as reglazed over cracked cells", got.cellsCracked == true, want.cellsCracked == true)
     expectEqual(what .. " marked as mounted before", got.mounted == true, want.mounted == true)
     expectEqual(what .. " marked as connected before", got.connected == true, want.connected == true)
 end
 
 local FLAT, RACK, METAL_RACK = "RenewableEnergy.SolarFlat", "RenewableEnergy.SolarRackWood", "RenewableEnergy.SolarRackMetal"
--- A module off a found panel a player connected to a bank, reglazed over cracked cells once: a
--- world panel's record has no mounted mark, so it still teaches mounting. Its condition and seals
+-- A module off a found panel a player connected to a bank and sealed twice: a world panel's record has no mounted mark, so it still teaches mounting. Its condition and seals
 -- are none a new module has, so a mount that recorded a new module instead would give back
 -- something else.
-local FOUND = { type = T.FACTORY_MODULE, condition = 72, repaired = 2, cellsCracked = true, mounted = true, connected = true }
+local FOUND = { type = T.FACTORY_MODULE, condition = 72, repaired = 2, mounted = true, connected = true }
 -- The rack's second module: new to mounting, and of the other type.
 local NEW_HOMEMADE = { type = T.HOMEMADE_MODULE, condition = 41 }
 -- What loads the character past what they can carry.
@@ -127,7 +123,7 @@ test("renewable_energy_solar_craft_mounts_keep_their_modules_and_teach_once", {
         local function readXp(label) T.readCharacter(self, label, { perks = { "Electricity" } }) end
         readXp("start")
         self.flat = T.craftFrom(self, makeFlat, { type = FOUND.type, condition = FOUND.condition, repaired = FOUND.repaired,
-            modData = { [Panel.CONNECTED_ONCE_KEY] = true, [Panel.CELLS_CRACKED_KEY] = true } }, { read = { FLAT } })
+            modData = { [Panel.CONNECTED_ONCE_KEY] = true } }, { read = { FLAT } })
         readXp("mounted")
         self.unmounted = T.craftFrom(self, unmountFlat, FLAT, { read = { T.FACTORY_MODULE } })
         readXp("unmounted")
@@ -235,54 +231,25 @@ test("renewable_energy_solar_craft_mounts_keep_their_modules_and_teach_once", {
 
 -- What each module recipe does to a factory module, or refuses, by its condition and seals. Seal
 -- Cracked Module adds ModuleRepair.SEAL_ADDS up to its cap, a Wear.REPAIR_LIMIT_STEP lower for each
--- earlier seal, and its OnTest refuses a module at that cap. Reglaze Module's new glass brings a
--- module with light cracks back to new, and one with heavy cracks or seals, whose cracks reached
--- the cells, to the cells-cracked share of new; the old glass's seals no longer count, and its
--- OnTest refuses glass that shows no cracks, so a module reglazed over cracked cells can't be
--- reglazed again to new. Only a shattered module comes apart: one that still makes power is worth
+-- earlier seal, and its OnTest refuses a module at that cap. Reglaze Module's new glass brings any
+-- damaged module, heavily cracked and sealed or barely scratched, back to new, and the old glass's
+-- seals no longer count; its OnTest refuses only a module at new. Only a shattered module comes apart: one that still makes power is worth
 -- more whole. A homemade module differs only in its watts.
 local SEAL, REGLAZE, TAKE_APART = "RenewableEnergy_RepairCrackedModule", "RenewableEnergy_ReglazeModule",
     "RenewableEnergy_TakeApartShatteredModule"
 local CAP = ModuleRepair.SEAL_CAP
 local function sealCap(seals) return CAP - seals * Wear.REPAIR_LIMIT_STEP end
 local function share(part) return math.floor(Items.conditionMaxOf(T.FACTORY_MODULE) * part) end
-local LOOKS, GLASS = Specs.crackLooks, ModuleRepair.REGLAZE
-local HEAVY, LIGHT = share(LOOKS.heavyBelow) - 1, share((LOOKS.heavyBelow + LOOKS.lightBelow) / 2)
-local NEW, CELLS_CRACKED = share(GLASS.glassOnly), share(GLASS.cellsCracked)
+local HEAVY, NEW = share(Specs.crackLooks.heavyBelow) - 1, share(1)
 T.conditionCraftsTest("renewable_energy_solar_craft_module_by_condition_and_seals", T.FACTORY_MODULE, {
     { SEAL, "adds a step", before = CAP - ModuleRepair.SEAL_ADDS - 1, repaired = 0, after = CAP - 1, repairedAfter = 1 },
     { SEAL, "after two seals stops at the lower cap", before = sealCap(2) - 1, repaired = 2, after = sealCap(2), repairedAfter = 3 },
     { SEAL, "at the cap refused", before = CAP, repaired = 0, refused = true },
-    { REGLAZE, "heavy cracks leave the cells cracked", before = HEAVY, repaired = 0, after = CELLS_CRACKED, repairedAfter = 0 },
-    { REGLAZE, "light cracks come back as new", before = LIGHT, repaired = 0, after = NEW, repairedAfter = 0 },
-    { REGLAZE, "seals leave the cells cracked and go", before = LIGHT, repaired = 3, after = CELLS_CRACKED, repairedAfter = 0 },
+    { REGLAZE, "heavy cracks and seals come back as new", before = HEAVY, repaired = 3, after = NEW, repairedAfter = 0 },
+    { REGLAZE, "a little wear comes back as new", before = NEW - 5, repaired = 0, after = NEW, repairedAfter = 0 },
     { REGLAZE, "at new refused", before = NEW, repaired = 0, refused = true },
-    { REGLAZE, "new glass over cracked cells refused", before = CELLS_CRACKED, repaired = 0, refused = true },
     { TAKE_APART, "a working module refused", before = 1, repaired = 0, refused = true },
     { TAKE_APART, "a shattered module comes apart", before = 0, repaired = 0, used = true },
-})
-
--- A module reglazed over cracked cells remembers them (Panel.CELLS_CRACKED_KEY): reglazing heavy
--- cracks marks it, and once it cracks lightly again new glass brings it only to the cells-cracked
--- share, not to new, and it stays marked.
-test("renewable_energy_solar_craft_reglaze_remembers_cracked_cells", {
-    instant = true,
-    run = function(self)
-        local recipes = T.readyToCraft(self, { REGLAZE })
-        if not recipes then return end
-        self.heavy = T.craftFrom(self, recipes[REGLAZE], { type = T.FACTORY_MODULE, condition = HEAVY })
-        self.light = T.craftFrom(self, recipes[REGLAZE], { type = T.FACTORY_MODULE, condition = LIGHT,
-            modData = { [Panel.CELLS_CRACKED_KEY] = true } })
-    end,
-    validate = function(self)
-        for _, craft in ipairs({ { self.heavy, "heavy cracks" }, { self.light, "light cracks over cracked cells" } }) do
-            local what = "reglazing " .. craft[2]
-            if T.expectCrafted(craft[1], what) and expect(craft[1].item ~= nil, what .. ": the module is gone") then
-                expectModule(what, recordOf(craft[1].item, T.FACTORY_MODULE),
-                    { type = T.FACTORY_MODULE, condition = CELLS_CRACKED, cellsCracked = true })
-            end
-        end
-    end,
 })
 
 -- Take Out Window Glass's OnTest. Every picked-up tile is the same script item, so only the

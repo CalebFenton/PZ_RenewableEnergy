@@ -66,7 +66,7 @@ test("renewable_energy_world_rural_finds_found_worn", {
             T.giveMaterials(self, "bags", DigesterJobs.materials(T.player(), DigesterJobs.FIT_BAGS))
             T.actionJob(self, "digester", digester, DigesterJobs.FIT_BAGS)
             T.batch(function()
-                T.fillRecord(self, digester, { hopper = { { type = "Base.Dung_Cow", count = 2 } } })
+                T.fillRecord(self, digester, { hopper = { { type = "Base.Dung_Cow", count = 1 } } })
                 T.runDigester(self, digester, 2, 30)
                 T.readRecord(self, digester, "fed")
             end)

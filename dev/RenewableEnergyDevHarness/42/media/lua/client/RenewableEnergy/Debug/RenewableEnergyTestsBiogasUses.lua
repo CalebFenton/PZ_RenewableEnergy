@@ -169,8 +169,9 @@ test("renewable_energy_biogas_pump_fills_tank_to_limit", {
 -- Fill With Compressor runs the compressor fitted to the digester, which takes the carried one in,
 -- on power at the digester: refused with none fitted, and with one fitted while the digester has
 -- no power. A powered compressor won't fill a tank past the pump's share with unscrubbed gas. A
--- scrubber, fitted with a sound bucket (a broken one doesn't count) and charged, lets it; each m³
--- it scrubs uses up its charge and its steel wool. Removing the compressor gives it back.
+-- scrubber, fitted with a sound bucket (a broken one doesn't count) and charged from a bucket of
+-- tainted water, which drains it, lets it; each m³ it scrubs uses up its charge and its steel wool.
+-- Removing the compressor gives it back.
 test("renewable_energy_biogas_compressor_fills_past_pump_with_scrubber", {
     instant = true,
     run = function(self)
@@ -216,11 +217,11 @@ test("renewable_energy_biogas_compressor_fills_past_pump_with_scrubber", {
         T.giveMaterials(self, "scrubber", scrubber)
         T.actionJob(self, "digester", handle, DigesterJobs.FIT_SCRUBBER)
         T.readRecord(self, handle, "fitted")
-        -- Fitting took the bucket; the charge's water comes in another.
+        -- Fitting took the bucket; the charge's water comes in another, tainted.
         T.batch(function()
             T.giveMaterials(self, "charge", DigesterJobs.materials(T.player(), DigesterJobs.REFILL_LIME))
             T.give(self, "water", { { type = "Base.Bucket" } })
-            T.fillCarried(self, "Base.Bucket", "Water", Digester.SCRUB_WATER)
+            T.fillCarried(self, "Base.Bucket", "TaintedWater", Digester.SCRUB_WATER)
         end)
         -- Each job's action checks this client's copies, of the digester and the water.
         T.waitFor(self, function()
@@ -232,7 +233,7 @@ test("renewable_energy_biogas_compressor_fills_past_pump_with_scrubber", {
         T.waitForSummary(self, handle, function(summary) return summary.scrubCO2 > 0 end, "this client's summary of the charged scrubber")
         T.actionJob(self, "digester", handle, DigesterJobs.FILL_COMPRESSOR, function() return self.items.fill[1] end)
         T.readRecord(self, handle, "filled")
-        T.readCarried(self, { Digester.TANK })
+        T.readCarried(self, { Digester.TANK, "Base.Bucket" })
         T.actionJob(self, "digester", handle, DigesterJobs.REMOVE_COMPRESSOR)
         T.readRecord(self, handle, "removed")
         T.count(self, "removed", { Digester.COMPRESSOR })
@@ -258,6 +259,8 @@ test("renewable_energy_biogas_compressor_fills_past_pump_with_scrubber", {
         if T.expect(tank ~= nil, "the tank is gone") then
             T.expectNear("tank after compressing " .. self.gas .. " m³", tank.uses, Digester.PUMP_FILL + self.gas / Digester.M3_PER_TANK, 0.002)
         end
+        local bucket = T.carriedFirst(self, "Base.Bucket")
+        T.expectNear("tainted water left after charging the scrubber", bucket and bucket.litres, 0, 0.01)
         T.expectNear("scrubber charge left", filled.scrubCO2, Digester.SCRUB_M3.lime - self.gas, 0.02)
         T.expectNear("steel wool left", filled.scrubWool, Digester.WOOL_M3 - self.gas, 0.02)
         T.expect(not self.reads.removed.compressor, "the compressor is still fitted after removing it")
@@ -400,11 +403,11 @@ test("renewable_energy_biogas_propane_refill_moves_whole_tank_uses", {
 T.craftTest("renewable_energy_biogas_air_out_iron_sponge", {
     recipe = "RenewableEnergy_AirOutIronSponge",
     from = Digester.SPENT_SPONGE,
-    -- The water's any-item input takes the bottle, which the setup fills.
+    -- The water's any-item input takes the bottle, which the setup fills with tainted water.
     prefer = { "Base.PopBottle" },
     setup = function(self)
         T.changeItem(self, T.inputsOf(self, Digester.SPENT_SPONGE)[1], { condition = 2 })
-        T.fillCarried(self, "Base.PopBottle", "Water", 1)
+        T.fillCarried(self, "Base.PopBottle", "TaintedWater", 1)
     end,
     counts = { [Digester.IRON_SPONGE] = 1 },
     after = function(self)

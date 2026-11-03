@@ -146,20 +146,16 @@ function Recipes.repairModule(craftRecipeData, character)
     setRepairs(module, repaired)
 end
 
--- OnTest of Reglaze Module: the module's glass must show cracks.
+-- OnTest of Reglaze Module: the module must be damaged.
 function Recipes.isReglazableModule(item, character)
     return not isModule(item) or ModuleRepair.reglazable(item:getFullType(), item:getCondition())
 end
 
--- OnCreate of Reglaze Module: new glass, so the seals on the old no longer count, and the module
--- remembers cells cracked under it (Panel.CELLS_CRACKED_KEY).
+-- OnCreate of Reglaze Module: new glass brings the module back to new, and the seals on the old no
+-- longer count.
 function Recipes.reglazeModule(craftRecipeData, character)
     local module = Items.firstInput(craftRecipeData, isModule)
-    local data = module:getModData()
-    local condition, cellsCracked = ModuleRepair.reglazed(module:getFullType(), module:getCondition(),
-        module:getHaveBeenRepaired(), data[Panel.CELLS_CRACKED_KEY] == true)
-    data[Panel.CELLS_CRACKED_KEY] = cellsCracked or nil
-    Wear.setCondition(module, condition)
+    Wear.setCondition(module, module:getConditionMax())
     setRepairs(module, 0)
 end
 

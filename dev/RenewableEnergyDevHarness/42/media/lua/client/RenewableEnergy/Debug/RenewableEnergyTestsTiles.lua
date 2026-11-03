@@ -352,7 +352,7 @@ end
 -- What an item keeps in its modData from item to placed object and back.
 local MODULES = {
     { type = "RenewableEnergy.HomemadeSolarModule", condition = 41 },
-    { type = "RenewableEnergy.SolarModule", condition = 72, cellsCracked = true, mounted = true, connected = true },
+    { type = "RenewableEnergy.SolarModule", condition = 72, mounted = true, connected = true },
 }
 local CARRIED = {
     ["RenewableEnergy.SolarRackWood"] = { key = Panel.MODULES_KEY, value = MODULES },
@@ -367,8 +367,7 @@ local function describe(value)
     local parts = {}
     for _, module in ipairs(value) do
         table.insert(parts, tostring(module.type) .. "@" .. tostring(module.condition)
-            .. (module.cellsCracked and " cellsCracked" or "") .. (module.mounted and " mounted" or "")
-            .. (module.connected and " connected" or ""))
+            .. (module.mounted and " mounted" or "") .. (module.connected and " connected" or ""))
     end
     return "{" .. table.concat(parts, ", ") .. "}"
 end

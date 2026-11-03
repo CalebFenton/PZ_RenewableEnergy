@@ -59,6 +59,13 @@ local SOURCE = {
         PanelSource.writeModules(object, modules, bank and recordOf(bank, object))
         return true
     end,
+    -- As Reglaze Module reglazes one in hand: back to new, its seals gone with the old glass.
+    [SourceJobs.REGLAZE_MODULE] = function(character, bank, row, object, slot)
+        local module, modules = SourceJobs.reglazableModule(object, slot)
+        module.condition, module.repaired = Items.conditionMaxOf(module.type), 0
+        PanelSource.writeModules(object, modules, bank and recordOf(bank, object))
+        return true
+    end,
     [SourceJobs.BRAKE] = function(character, bank, row, object)
         WindSource.setBraked(object, row.braked, bank and recordOf(bank, object))
         return true

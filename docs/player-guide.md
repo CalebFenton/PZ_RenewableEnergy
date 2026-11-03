@@ -117,7 +117,7 @@ Car batteries come first, then **Deep Cycle Batteries**, which hold twice as muc
 | Digesters | Barrel Digester | Insulated Digester: three times the barrel, built new or upgraded from a barrel | Brick Dome Digester: three times again, buried and warm |
 | Gasifiers | Primitive Gasifier (trash can) | Gasifier (steel drum) | Advanced Gasifier (welded sheet metal) |
 
-A bigger digester holds more feed and gas and rides out cold snaps. **Upgrade to Insulated Digester** keeps what's inside the barrel, which goes in a box of planks and straw under a second drum that floats on top to hold the gas. A tarp gas bag on the barrel comes back to you. The brick dome is laid in clay bricks, stone blocks or any mix of the two, and sits in a pit you dig, so it goes only where you could dig a grave: earth, grass or sand at ground level, not a floor or pavement. A bigger gasifier carries more fuel and makes less ash.
+A bigger digester holds more feed and gas, takes feed in faster and rides out cold snaps. **Upgrade to Insulated Digester** keeps what's inside the barrel, which goes in a box of planks and straw under a second drum that floats on top to hold the gas. A tarp gas bag on the barrel comes back to you. The brick dome is laid in clay bricks, stone blocks or any mix of the two, and sits in a pit you dig, so it goes only where you could dig a grave: earth, grass or sand at ground level, not a floor or pavement. A bigger gasifier carries more fuel and makes less ash.
 
 ### Sizing a bank
 
@@ -287,11 +287,11 @@ The glass shows how worn a module is: whole down to 85 condition, a few fine cra
 Sealing is the cheap fix, reglazing the good one.
 
 - **Seal Cracked Module** takes a screwdriver and either 1 use of epoxy or 2 of glue. Seal a loose module in the crafting window (with glue, pick **Seal Cracked Module With Glue**), or one still on a placed panel from the panel's menu. Each seal adds 20 condition, up to 55, less 10 for each earlier seal, for either kind of module; the glass still looks cracked. Once a module is at its ceiling, the panel's menu greys its seal out: reglaze it instead.
-- **Reglaze Module** puts on a new pane of glass. **Unmount** the module first. Only a module whose glass shows cracks can be reglazed. It looks whole again, and its seal count clears. If its cracks were light, it's as good as new. If they were heavy, or you'd sealed it, the cells underneath cracked too and it comes back to 90% of new. A module remembers cracked cells: every later reglaze also brings it back to 90%, never to new.
+- **Reglaze Module** puts on a new pane of glass, with a screwdriver, a glass pane or car window, 1 use of epoxy or 2 of glue, and electric wire. Reglaze a loose module in the crafting window, or one still on a placed panel or on the arrow board trailer from its menu. Any damaged module can be reglazed, cracked or not. It comes back as new, looks whole, and its seal count clears.
 
 **Unmount** always gives back the same modules at the same condition, plus some of the frame.
 
-Sealing in place follows the crafting window's item protections: favorite adhesives and items excluded from recipes are not used. A favorite screwdriver is allowed because the job keeps it.
+Sealing and reglazing in place follow the crafting window's item protections: favorite adhesives and items excluded from recipes are not used. A favorite screwdriver is allowed because the job keeps it.
 
 ### Makeshift modules
 
@@ -417,11 +417,11 @@ A lit gasifier counts as fuel for a **Solar Failsafe**, even with an empty tank.
 
 ## Biogas
 
-A digester turns manure and rotten food into gas, slowly and steadily, for weeks. It's the backup that needs no trip to town, as long as you keep animals and keep it warm.
+A digester turns manure and food scraps into gas, slowly and steadily, for weeks. It's the backup that needs no trip to town, as long as you keep animals and keep it warm.
 
 ### How it works
 
-1. **Feed it.** Put feed in the hopper. One item goes into the tank each hour, while there's room; the rest waits in the hopper. It keeps feeding while you're away, and what it ate is gone when you return.
+1. **Feed it.** Put feed in the hopper. It goes into the tank by weight, a whole item at a time, while there's room: a barrel takes about 2 kg a day, an insulated digester 4 kg and a dome 6 kg. The rest waits in the hopper. It keeps feeding while you're away, and what went in is gone from the hopper when you return. Feed that leaves the hopper isn't used up: it's stored in the tank and turns to gas over the following weeks. The status window's **Feed in the tank** shows how full the tank is and about how much gas is still to come from it.
 2. **Wait for it to start.** A new digester takes as long as vanilla compost (two weeks by default) before it makes any gas. The clock runs only while it's fed and warmer than 10 °C. Cow and pig manure bring their own bacteria: each cow pat takes a day off and each pig dropping half a day, down to at most seven tenths of the wait.
 3. **Keep it warm.** It digests what's in the tank a little each day, faster the warmer it is, so gas keeps coming for weeks after a feeding.
 4. **Pipe it to a generator**, or bottle it.
@@ -436,12 +436,12 @@ A digester turns manure and rotten food into gas, slowly and steadily, for weeks
 | Sheep or deer manure | 0.1 m³ | Settles it a little |
 | Chicken or turkey manure | Very little | Barely |
 | Grass, hay | Very little | None |
-| Rotten or compostable food | 0.12 m³ a kg | Sours it |
-| Rotten meat and fish | 0.2 m³ a kg | Sours it twice as fast |
+| Food, fresh, stale or rotten | 0.12 m³ a kg | Sours it |
+| Meat and fish | 0.2 m³ a kg | Sours it twice as fast |
 | Wood ash, baking soda | None | Settles it |
 | Quicklime | None | Settles it twice as much |
 
-Each manure item stands for about a day of what the animal makes. Hens drop nothing inside their hutch, only out in their pen. Fresh food is refused. Sandbox: **Biogas Multiplier**.
+Each manure item stands for about a day of what the animal makes. Hens drop nothing inside their hutch, only out in their pen. Any food goes in, fresh or rotten, except worms, as with vanilla's composter. Very light things, like chicken droppings or a use of baking soda, count as a tenth of a kilogram each against the daily intake. Sandbox: **Biogas Multiplier**.
 
 For scale: 1.6 m³ of gas runs a generator as long as a litre of gasoline, and a full propane tank holds 16 m³, a generator's full tank. A cow pat is worth about 0.6 litres of gasoline.
 
@@ -496,8 +496,8 @@ A digester fills propane tanks, welding torches and propane lantern bottles. Gen
 
 - **Fill With Tire Pump** fills a tank, torch or bottle only a quarter of the way, and it's tiring work. That's enough to keep a torch going: weld, then pump it up again.
 - **Fit Compressor** wires a **Fridge Compressor** to the digester (Electricity 1, a screwdriver); salvage one by cutting up a fridge. **Fill With Compressor** then fills a tank, torch or bottle all the way while the digester has power, using scrubbed gas past the first quarter. The digester's **Status** says whether its compressor is fitted and has power. **Remove Compressor** gives it back.
-- **Fit Scrubber**, then keep it going from **Refill Scrubber**. Its water cleans about 5 m³, with wood ash 15 m³ and with quicklime 30 m³, and new water replaces the old. Its packing cleans about 10 m³ before it needs more: a use of **Steel Wool**, or an **Iron Sponge**. The water and the packing wear out separately.
-- **Make Iron Sponge** (Metalworking 1, with a file) from two pieces of any kind of scrap metal or ten nails, three wood splinters and half a litre of water. A spent sponge comes back out at the next packing; **Air Out Iron Sponge** with a little water revives it, twice before it crumbles.
+- **Fit Scrubber**, then keep it going from **Refill Scrubber**. Each refill takes 4 L of water, clean or tainted, from any container you carry. Its water cleans about 5 m³, with wood ash 15 m³ and with quicklime 30 m³, and new water replaces the old. Its packing cleans about 10 m³ before it needs more: a use of **Steel Wool**, or an **Iron Sponge**. The water and the packing wear out separately.
+- **Make Iron Sponge** (Metalworking 1, with a file) from two pieces of any kind of scrap metal or ten nails, three wood splinters and half a litre of water, clean or tainted. A spent sponge comes back out at the next packing; **Air Out Iron Sponge** with a little water, clean or tainted, revives it, twice before it crumbles.
 
 A full torch takes about 2.2 m³ and a lantern bottle 0.8 m³, what refilling them from a tank would. A propane tank still refills lantern bottles and torches the vanilla way. Bottle refills transfer whole uses of the tank; if the bottle has less room than one tank use, neither store changes. Where there's power, a Fridge Compressor you carry inflates tires too.
 
@@ -544,7 +544,7 @@ Gadgets charge only while someone is near enough for the area to be loaded. A ca
 Road crews left solar arrow board trailers behind at road works, checkpoints and traffic jams, still flashing. Each has two panels on top and a box of worn deep cycles on its tongue, usually with a charge controller. The panels keep the batteries charged and the arrow lit, and after dark the lamps light the ground around it.
 
 - **The box** is usually padlocked: cut the lock or unbolt the lid.
-- **The panels** come off in the mechanics window and give their modules, and any module goes back on. **Seal Cracked Panel** fixes a cracked one in place.
+- **The panels** come off in the mechanics window and give their modules, and any module goes back on. **Seal Cracked Panel** fixes a cracked one in place, and **Reglaze Panel** brings a damaged one back to new.
 - **Crashes** crack the panels. A hard crash while you tow it does; bumps and hard braking don't. **Repair Frame** fixes a dented frame.
 
 Tow it home and it keeps charging its batteries on the way, or strip it for parts.

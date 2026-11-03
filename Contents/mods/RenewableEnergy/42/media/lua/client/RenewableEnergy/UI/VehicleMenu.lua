@@ -22,16 +22,22 @@ end
 
 --- Seal Cracked Panel for each cracked panel of an arrow board trailer, listing what the seal
 --- takes and greyed out when the character can't do it; a panel sealed as far as sealing goes,
---- greyed out saying to reglaze its module, as a placed panel's Seal Cracked Module.
+--- greyed out saying to reglaze its module, as a placed panel's Seal Cracked Module. Reglaze Panel
+--- for each damaged panel, as a placed panel's Reglaze Module.
 function VehicleMenu.addSealPanelOptions(playerNum, context, vehicle)
     if not ArrowBoard.isTrailer(vehicle) then
         return
     end
     for _, partId in ipairs(ArrowBoard.PANELS) do
         local part = vehicle:getPartById(partId)
+        local name = getText("IGUI_VehiclePart" .. partId)
         if part and ArrowBoard.crackLookOf(part) then
             JobOptions.add(context, playerNum, VehicleJobs, VehicleJobs.SEAL_PANEL, vehicle, partId,
-                getText("ContextMenu_RenewableEnergy_RepairPanel", getText("IGUI_VehiclePart" .. partId), Format.partCondition(part)))
+                getText("ContextMenu_RenewableEnergy_RepairPanel", name, Format.partCondition(part)))
+        end
+        if ArrowBoard.reglazablePanel(vehicle, partId) then
+            JobOptions.add(context, playerNum, VehicleJobs, VehicleJobs.REGLAZE_PANEL, vehicle, partId,
+                getText("ContextMenu_RenewableEnergy_ReglazePanel", name, Format.partCondition(part)))
         end
     end
 end

@@ -324,6 +324,69 @@ test("renewable_energy_world_arrow_board_seal_mends_a_cracked_panel", {
     end,
 })
 
+-- The trailer menu `context`'s Reglaze Panel option for its left panel, or nil: the right panel
+-- may be damaged too.
+local function reglazeLeftOption(context)
+    for _, option in ipairs(context.options) do
+        if option.param2 == VehicleJobs.REGLAZE_PANEL and option.param4 == LEFT then
+            return option
+        end
+    end
+    return nil
+end
+
+-- Reglaze Panel, chosen from the trailer's menu, brings a heavily cracked, sealed panel back to new
+-- and whole, clearing its seals, and takes Reglaze Module's inputs (keeping the screwdriver) and
+-- gives its XP. The new panel is offered no more reglazing.
+test("renewable_energy_world_arrow_board_reglaze_panel_in_place", {
+    instant = true,
+    run = function(self)
+        if not spawnTrailer(self) then return end
+        local trailer = self.trailer
+        T.setRecipeSkills(self, ModuleRepair.reglazeRecipe())
+        T.knowRecipes(self, { ModuleRepair.REGLAZE_RECIPE })
+        T.onVehicle(self, trailer, "setTrailer",
+            { panels = { [LEFT] = { type = T.FACTORY_MODULE, condition = 30, repaired = 2 } } })
+        waitForPanelsCopy(self, trailer)
+        T.give(self, "inputs", { { type = "Base.Screwdriver" }, { type = "Base.GlassPanel" }, { type = "Base.Epoxy" },
+            { type = "Base.ElectricWire" } })
+        T.readCharacter(self, "before", { perks = { "Electricity" } })
+        T.step(function()
+            local context = T.newContext()
+            VehicleMenu.addSealPanelOptions(0, context, trailer.vehicle)
+            self.offered = T.optionState(reglazeLeftOption(context))
+            context:closeAll()
+            ISTimedActionQueue.add(RenewableEnergyAction:new(player(), "vehicle", VehicleJobs.REGLAZE_PANEL,
+                trailer.vehicle, LEFT))
+        end)
+        T.awaitVehicleState(self, trailer, function(state) return panelCondition(state, LEFT) ~= 30 end)
+        T.count(self, "left", { "Base.Screwdriver", "Base.GlassPanel", "Base.ElectricWire", "Base.Epoxy" })
+        T.readCharacter(self, "after", { perks = { "Electricity" } })
+        waitForPanelsCopy(self, trailer)
+        T.step(function()
+            local context = T.newContext()
+            VehicleMenu.addSealPanelOptions(0, context, trailer.vehicle)
+            self.offeredAfter = reglazeLeftOption(context) ~= nil
+            context:closeAll()
+        end)
+    end,
+    validate = function(self)
+        expect(self.offered.shown and not self.offered.greyed, "Reglaze Panel isn't offered for a cracked panel ("
+            .. tostring(self.offered.reason) .. ")")
+        local state = self.trailer.state
+        expectEqual("the reglazed panel's condition", panelCondition(state, LEFT), 100)
+        expectEqual("the model the reglazed panel shows", panelShown(state, LEFT), "Whole")
+        expectEqual("the reglazed panel's seal count", state.panels[LEFT].repaired or 0, 0)
+        expect(not self.offeredAfter, "the new panel is still offered Reglaze Panel")
+        local left = self.counts.left
+        expectEqual("screwdrivers left", left["Base.Screwdriver"], 1)
+        expectEqual("glass panes left", left["Base.GlassPanel"], 0)
+        expectEqual("electric wire left", left["Base.ElectricWire"], 0)
+        local gainedXp = self.reads.after.xp.Electricity - self.reads.before.xp.Electricity
+        expect(gainedXp > 0, "reglazing gave no Electricity XP")
+    end,
+})
+
 -- Repair Frame offers each dented end of the frame, and the sheet metal fix it offers, vanilla's
 -- welding, walks there and welds it whole at high skill; a whole frame offers nothing.
 test("renewable_energy_world_arrow_board_frame_welds", {

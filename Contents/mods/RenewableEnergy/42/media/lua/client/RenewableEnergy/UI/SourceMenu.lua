@@ -79,12 +79,18 @@ end
 
 -- Seal Cracked Module for each cracked module of a placed panel, listing what the seal takes, as a
 -- trailer's Seal Cracked Panel. A module sealed as far as sealing goes still looks cracked, so it
--- keeps its option, greyed out saying to reglaze it, rather than vanishing from the menu.
+-- keeps its option, greyed out saying to reglaze it, rather than vanishing from the menu. Reglaze
+-- Module for each damaged module, cracked or not, since new glass brings any back to new.
 local function addSealOptions(playerNum, menu, source)
     for slot, module in ipairs(Panel.placedModules(source) or {}) do
+        local condition = Format.condition(module.type, module.condition)
         if ModuleRepair.crackLookOf(module.type, module.condition) then
             JobOptions.add(menu, playerNum, SourceJobs, SourceJobs.SEAL_MODULE, source, slot,
-                getText("ContextMenu_RenewableEnergy_SealModule", slot, Format.condition(module.type, module.condition)))
+                getText("ContextMenu_RenewableEnergy_SealModule", slot, condition))
+        end
+        if ModuleRepair.reglazable(module.type, module.condition) then
+            JobOptions.add(menu, playerNum, SourceJobs, SourceJobs.REGLAZE_MODULE, source, slot,
+                getText("ContextMenu_RenewableEnergy_ReglazeModule", slot, condition))
         end
     end
 end

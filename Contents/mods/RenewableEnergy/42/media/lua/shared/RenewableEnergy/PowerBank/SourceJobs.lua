@@ -18,6 +18,7 @@ SourceJobs.CONNECT = "ConnectSource"
 SourceJobs.DISCONNECT = "DisconnectSource"
 SourceJobs.CLEAR_SNOW = "ClearSnow"
 SourceJobs.SEAL_MODULE = "SealModule"
+SourceJobs.REGLAZE_MODULE = "ReglazeModule"
 SourceJobs.BRAKE = "Brake"
 SourceJobs.RELEASE_BRAKE = "ReleaseBrake"
 SourceJobs.REPLACE_BLADES = "ReplaceBlades"
@@ -57,15 +58,26 @@ function SourceJobs.bladesFor(character, source)
     return blades, names
 end
 
---- The module record in `slot` of the placed panel `panel` if a seal can help it, else nil;
---- second, the panel's whole list of module records it was read from.
-function SourceJobs.sealableModule(panel, slot)
+-- The module record in `slot` of the placed panel `panel` if `allowed(type, condition, repaired)`
+-- holds for it, else nil; second, the panel's whole list of module records it was read from.
+local function moduleIf(allowed, panel, slot)
     local modules = Panel.placedModules(panel)
     local module = modules and type(slot) == "number" and modules[slot]
-    if module and ModuleRepair.sealable(module.type, module.condition, module.repaired) then
+    if module and allowed(module.type, module.condition, module.repaired) then
         return module, modules
     end
     return nil
+end
+
+--- The module record in `slot` of the placed panel `panel` if a seal can help it, else nil;
+--- second, the panel's whole list of module records it was read from.
+function SourceJobs.sealableModule(panel, slot)
+    return moduleIf(ModuleRepair.sealable, panel, slot)
+end
+
+--- As SourceJobs.sealableModule, for a module Reglaze Module takes.
+function SourceJobs.reglazableModule(panel, slot)
+    return moduleIf(ModuleRepair.reglazable, panel, slot)
 end
 
 local function connectMinutes(character)
@@ -86,7 +98,7 @@ local function brakeJob(braked)
 end
 
 -- Every job, by name (Jobs.define), at the source's tile; `with` is the bank Connect Source wires
--- it to, the tool or blades a job works with, or the module slot Seal Cracked Module seals.
+-- it to, the tool or blades a job works with, or the module slot Seal Cracked Module or Reglaze Module mends.
 SourceJobs.JOBS = {
     -- A source feeds one bank, and connecting it again to the bank it feeds leaves it as it is,
     -- snow and all.
@@ -123,9 +135,11 @@ SourceJobs.JOBS = {
         end,
         with = SourceJobs.isSnowTool, withMissing = "Tooltip_RenewableEnergy_NeedSnowTool",
     },
-    -- Seal Cracked Module's twin for a module on a placed panel, as long as the crafting window
-    -- takes for it.
-    [SourceJobs.SEAL_MODULE] = ModuleRepair.sealRow(SourceJobs.sealableModule, "Tooltip_RenewableEnergy_ModuleSealedFully"),
+    -- Seal Cracked Module's and Reglaze Module's twins for a module on a placed panel, as long as
+    -- the crafting window takes for each.
+    [SourceJobs.SEAL_MODULE] = ModuleRepair.jobRow(ModuleRepair.SEAL, SourceJobs.sealableModule,
+        "Tooltip_RenewableEnergy_ModuleSealedFully"),
+    [SourceJobs.REGLAZE_MODULE] = ModuleRepair.jobRow(ModuleRepair.REGLAZE, SourceJobs.reglazableModule, "not damaged"),
     [SourceJobs.BRAKE] = brakeJob(true),
     [SourceJobs.RELEASE_BRAKE] = brakeJob(false),
     -- Lowering the head, unbolting the broken blades and bolting new ones on.

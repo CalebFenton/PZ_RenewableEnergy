@@ -33,8 +33,9 @@ local STEEL_WOOL = "Base.SteelWool"
 -- The scrubber's packing column: any length of pipe holds the steel wool, the junk kinds taken
 -- first and the iron pipe, a good weapon, last.
 local PIPES = { "Base.Pipe", "Base.ClayPipeSegment", "Base.LeadPipe", "Base.MetalPipe" }
--- The water a scrubber charge takes, named in litres in the tooltip.
-local SCRUB_WATER = { water = Digester.SCRUB_WATER, labelKey = "IGUI_RenewableEnergy_WaterLitres" }
+-- The water a scrubber charge takes, named in litres in the tooltip. Nobody drinks it, so tainted
+-- water does as well as clean.
+local SCRUB_WATER = { water = Digester.SCRUB_WATER, tainted = true, labelKey = "IGUI_RenewableEnergy_WaterLitres" }
 
 -- The barrels a barrel digester can be built from, each with its own tile, in a steady order for
 -- the tooltip: the Metal Drum, whose entity the build menu builds on, first.
