@@ -114,7 +114,7 @@ module Base
                 item 1 [Base.RubberHose],
                 item 1 [Base.Funnel],
                 item 2 [Base.DuctTape],
-                item 1 [Base.Glue;Base.Woodglue],
+                item 1 tags[base:glue],
                 item 3 tags[base:garbagebag],
             }
         }

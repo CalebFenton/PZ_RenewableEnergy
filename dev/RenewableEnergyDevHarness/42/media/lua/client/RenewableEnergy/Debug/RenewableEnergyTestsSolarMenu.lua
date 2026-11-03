@@ -176,8 +176,8 @@ test("renewable_energy_solar_disconnect_panel", {
 -- Seal Cracked Module, chosen from a connected rack's menu, seals the one cracked module still on
 -- its mount as the recipe seals one in hand (ModuleRepair.sealed), counting the seal and still
 -- showing cracked. The whole module isn't offered, and the bank's record takes the sealed module at
--- once. Its tooltip names both adhesives, and with both carried the seal takes the glue twin's uses
--- of glue and leaves the epoxy (ModuleRepair.SEAL, a cf_commonlib Materials craft).
+-- once. With two kinds of adhesive carried, the seal takes one use of one of them (ModuleRepair.SEAL,
+-- a cf_commonlib Materials craft).
 test("renewable_energy_solar_seal_module_in_place", {
     instant = true,
     run = function(self)
@@ -215,7 +215,7 @@ test("renewable_energy_solar_seal_module_in_place", {
         if not T.expectConnected(self.panel) then return end
         expect(not self.wholeOffered, "the whole module is offered a seal")
         if not T.expectOffered(self, "Seal Cracked Module") then return end
-        local modules, tooltip = self.reads.panel.modules, self.menu["Seal Cracked Module"].tooltip
+        local modules = self.reads.panel.modules
         local condition, seals = ModuleRepair.sealed(self.cracked.type, self.cracked.condition, self.cracked.repaired)
         expectEqual("the whole module's condition", modules[1].condition, 100)
         expectEqual("the sealed module's condition", modules[2].condition, condition)
@@ -223,15 +223,13 @@ test("renewable_energy_solar_seal_module_in_place", {
         expect(#self.reads.panel.overlays > 0, "the sealed module shows whole")
         local listed = self.bank.state.status.sources[1]
         expectEqual("the bank's record of the sealed module", listed and listed.modules[2] and listed.modules[2].condition, condition)
-        for _, adhesive in ipairs({ "Base.Glue", "Base.Epoxy" }) do
-            expect(tooltip:find(getItemNameFromFullType(adhesive), 1, true) ~= nil,
-                "the seal's tooltip doesn't name " .. adhesive .. ": " .. tooltip)
-        end
         -- One full tube of each was given; T.readCarried's `uses` is the fraction of it left.
-        local glue, epoxy = T.carriedFirst(self, "Base.Glue"), T.carriedFirst(self, "Base.Epoxy")
-        expectNear("the glue left of a full tube", glue and glue.uses or 0,
-            1 - 2 * getScriptManager():FindItem("Base.Glue"):getUseDelta(), 0.001)
-        expectNear("the epoxy left of a full tube", epoxy and epoxy.uses or 0, 1, 0.001)
+        local taken = 0
+        for _, adhesive in ipairs({ "Base.Glue", "Base.Epoxy" }) do
+            local tube = T.carriedFirst(self, adhesive)
+            taken = taken + (1 - (tube and tube.uses or 0)) / getScriptManager():FindItem(adhesive):getUseDelta()
+        end
+        expectNear("the uses of adhesive the seal took", taken, 1, 0.001)
     end,
 })
 
@@ -332,7 +330,7 @@ test("renewable_energy_solar_seal_respects_protected_inputs", {
 -- A rack with both modules cracked offers to seal each. Once one is sealed as far as sealing goes
 -- the menu built again still offers the other, which seals in turn, and keeps the sealed one's
 -- option greyed out saying to reglaze it, since its glass still looks cracked: each module keeps
--- its own option. The tooltip keeps a gap on both sides of the "or" between the adhesives.
+-- its own option.
 test("renewable_energy_solar_seal_each_module_in_place", {
     instant = true,
     run = function(self)
@@ -372,8 +370,6 @@ test("renewable_energy_solar_seal_each_module_in_place", {
                     expectEqual(what .. "the tooltip", offer.reason, sealedFully)
                 else
                     expect(not offer.greyed, what .. "greyed out (" .. tostring(offer.reason) .. ")")
-                    local touching = T.runTogether(offer.reason or "")
-                    expect(#touching == 0, what .. "the tooltip runs words together: " .. table.concat(touching, ", "))
                 end
             end
             sealed[self.order[round] or 0] = true

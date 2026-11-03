@@ -53,13 +53,8 @@ function ModuleRepair.sealed(fullType, condition, repaired)
     return math.min(sealCap(fullType, repaired), condition + ModuleRepair.SEAL_ADDS), (repaired or 0) + 1
 end
 
--- Seal Cracked Module, whose skill, time and XP the jobs in place take, and its glue twin
--- (Recipes.txt says why there are two), in the order the jobs in place try their inputs: glue
--- first, the commoner tube, keeping epoxy for what only it does, such as vanilla's Fix With Epoxy
--- (recipes_fixing.txt). MetaRecipe makes the twin known with it. Reglaze Module takes either
--- adhesive on one line, so it has no twin.
+-- Seal Cracked Module, whose skill, time and XP the jobs in place take, and Reglaze Module.
 ModuleRepair.SEAL_RECIPE = "RenewableEnergy_RepairCrackedModule"
-local SEAL_TWINS = { "RenewableEnergy_RepairCrackedModuleWithGlue", ModuleRepair.SEAL_RECIPE }
 ModuleRepair.REGLAZE_RECIPE = "RenewableEnergy_ReglazeModule"
 
 -- The module itself is the job's target, not something carried.
@@ -69,8 +64,8 @@ end
 
 --- What sealing or reglazing a module in place takes, as a material (cf_commonlib's Materials
 --- craft): the recipe's inputs but the module, paid and taught as the crafting window would.
-ModuleRepair.SEAL = { craft = ModuleRepair.SEAL_RECIPE, twins = SEAL_TWINS, except = isModuleInput }
-ModuleRepair.REGLAZE = { craft = ModuleRepair.REGLAZE_RECIPE, twins = { ModuleRepair.REGLAZE_RECIPE }, except = isModuleInput }
+ModuleRepair.SEAL = { craft = ModuleRepair.SEAL_RECIPE, except = isModuleInput }
+ModuleRepair.REGLAZE = { craft = ModuleRepair.REGLAZE_RECIPE, except = isModuleInput }
 
 --- Seal Cracked Module's CraftRecipe.
 function ModuleRepair.sealRecipe()

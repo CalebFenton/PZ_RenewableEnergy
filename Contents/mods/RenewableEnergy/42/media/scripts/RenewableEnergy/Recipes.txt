@@ -444,7 +444,9 @@ module Base
     /**************************** Solar modules *****************************/
 
     /* Epoxy or glue over the cracks keeps the water out. The glass stays cracked, so the module
-       still shows cracked; new glass is Reglaze Module. */
+       still shows cracked; new glass is Reglaze Module. The module recipes take one use of any
+       adhesive, by vanilla's tags as its gas mask recipes take glue: rare epoxy is worth more to
+       vanilla's Fix With Epoxy than here. */
     craftRecipe RenewableEnergy_RepairCrackedModule
     {
         timedAction = MakingElectrical,
@@ -462,39 +464,7 @@ module Base
         {
             item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],
             item 1 [RenewableEnergy.SolarModule;RenewableEnergy.HomemadeSolarModule] mode:keep,
-            item 1 [Base.Epoxy],
-        }
-        outputs
-        {
-        }
-    }
-
-    /* Seal Cracked Module with glue in place of epoxy. A recipe of its own, as vanilla has
-       FixWithGlue beside FixWithEpoxy (recipes_fixing.txt): no one line takes either adhesive
-       exactly, since [Base.Epoxy;2:Base.Glue] takes 1 use of glue and [Base.Glue;1:Base.Epoxy]
-       refuses a last use of epoxy (DEVELOPMENT.md, craftRecipe). MetaRecipe makes it known
-       whenever Seal Cracked Module is, so what teaches that teaches this, in older saves too. Keep
-       everything but the glue as Seal Cracked Module has it: the jobs in place take their skill,
-       time and XP from that one (ModuleRepair.lua). */
-    craftRecipe RenewableEnergy_RepairCrackedModuleWithGlue
-    {
-        timedAction = MakingElectrical,
-        time = 120,
-        Tags = AnySurfaceCraft,
-        category = Electrical,
-        NeedToBeLearn = true,
-        MetaRecipe = RenewableEnergy_RepairCrackedModule,
-        AutoLearnAny = Electricity:3,
-        SkillRequired = Electricity:2,
-        xpAward = Electricity:10,
-        Tooltip = Tooltip_RenewableEnergy_RepairCrackedModule,
-        OnTest = RenewableEnergy.Recipes.isModuleBelowRepairCap,
-        OnCreate = RenewableEnergy.Recipes.repairModule,
-        inputs
-        {
-            item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],
-            item 1 [RenewableEnergy.SolarModule;RenewableEnergy.HomemadeSolarModule] mode:keep,
-            item 2 [Base.Glue;Base.Woodglue],
+            item 1 tags[base:glue;base:epoxy],
         }
         outputs
         {
@@ -524,7 +494,7 @@ module Base
             item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],
             item 1 [RenewableEnergy.SolarModule;RenewableEnergy.HomemadeSolarModule] mode:keep,
             item 1 [Base.GlassPanel;Base.Windshield1;Base.Windshield2;Base.Windshield3;Base.RearWindshield1;Base.RearWindshield2;Base.RearWindshield3;Base.FrontWindow1;Base.FrontWindow2;Base.FrontWindow3;Base.RearWindow1;Base.RearWindow2;Base.RearWindow3],
-            item 1 [Base.Epoxy;2:Base.Glue;2:Base.Woodglue],
+            item 1 tags[base:glue;base:epoxy],
             item 1 [Base.ElectricWire],
         }
         outputs
@@ -551,7 +521,7 @@ module Base
             item 16 [RenewableEnergy.SolarCells],
             item 1 [Base.GlassPanel;Base.Windshield1;Base.Windshield2;Base.Windshield3;Base.RearWindshield1;Base.RearWindshield2;Base.RearWindshield3;Base.FrontWindow1;Base.FrontWindow2;Base.FrontWindow3;Base.RearWindow1;Base.RearWindow2;Base.RearWindow3],
             item 1 [Base.SmallSheetMetal;4:Base.Plank],
-            item 1 [Base.Epoxy;2:Base.Glue;2:Base.Woodglue],
+            item 1 tags[base:glue;base:epoxy],
             item 2 [Base.ElectricWire],
         }
         outputs

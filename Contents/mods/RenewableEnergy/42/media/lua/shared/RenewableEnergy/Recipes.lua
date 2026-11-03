@@ -131,13 +131,13 @@ function Recipes.unmountModules(craftRecipeData, character)
     end
 end
 
--- OnTest of Seal Cracked Module and its glue twin: a module must be one a seal can help.
+-- OnTest of Seal Cracked Module: a module must be one a seal can help.
 function Recipes.isModuleBelowRepairCap(item, character)
     return not isModule(item)
         or ModuleRepair.sealable(item:getFullType(), item:getCondition(), item:getHaveBeenRepaired())
 end
 
--- OnCreate of Seal Cracked Module and its glue twin.
+-- OnCreate of Seal Cracked Module.
 function Recipes.repairModule(craftRecipeData, character)
     local module = Items.firstInput(craftRecipeData, isModule)
     local condition, repaired = ModuleRepair.sealed(module:getFullType(), module:getCondition(),
