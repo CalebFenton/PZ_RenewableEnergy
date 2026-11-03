@@ -286,8 +286,8 @@ The glass shows how worn a module is: whole down to 85 condition, a few fine cra
 
 Sealing is the cheap fix, reglazing the good one.
 
-- **Seal Cracked Module** takes a screwdriver and either 1 use of epoxy or 2 of glue. Seal a loose module in the crafting window (with glue, pick **Seal Cracked Module With Glue**), or one still on a placed panel from the panel's menu. Each seal adds 20 condition, up to 55, less 10 for each earlier seal, for either kind of module; the glass still looks cracked. Once a module is at its ceiling, the panel's menu greys its seal out: reglaze it instead.
-- **Reglaze Module** puts on a new pane of glass, with a screwdriver, a glass pane or car window, 1 use of epoxy or 2 of glue, and electric wire. Reglaze a loose module in the crafting window, or one still on a placed panel or on the arrow board trailer from its menu. Any damaged module can be reglazed, cracked or not. It comes back as new, looks whole, and its seal count clears.
+- **Seal Cracked Module** takes a screwdriver and either 1 use of epoxy or 2 of glue or wood glue. Seal a loose module in the crafting window (with glue or wood glue, pick **Seal Cracked Module With Glue**), or one still on a placed panel from the panel's menu. Each seal adds 20 condition, up to 55, less 10 for each earlier seal, for either kind of module; the glass still looks cracked. Once a module is at its ceiling, the panel's menu greys its seal out: reglaze it instead.
+- **Reglaze Module** puts on a new pane of glass, with a screwdriver, a glass pane or car window, 1 use of epoxy or 2 of glue or wood glue, and electric wire. Reglaze a loose module in the crafting window, or one still on a placed panel or on the arrow board trailer from its menu. Any damaged module can be reglazed, cracked or not. It comes back as new, looks whole, and its seal count clears.
 
 **Unmount** always gives back the same modules at the same condition, plus some of the frame.
 
@@ -480,7 +480,7 @@ The gas waits in a holder until something burns it. Gas made past what the holde
 | Floating drum | Insulated digester | 1.5 m³ | Never wears out |
 | The dome itself | Brick dome | 4 m³ | Never wears out |
 
-A barrel's **Gas Bag** menu fits new garbage bags or a **Tarp Gas Bag**, sewn in the crafting menu (Tailoring 2) from a tarp, thread and duct tape. A bag goes on or comes off only once its gas is out, so **Vent Gas** first. **Take Off Gas Bag** gives a tarp bag back with its wear, to repair with duct tape, glue, epoxy or a tarp piece as any vanilla item is repaired; garbage bags are thrown away. With no bag on, a barrel's gas is wasted.
+A barrel's **Gas Bag** menu fits new garbage bags or a **Tarp Gas Bag**, sewn in the crafting menu (Tailoring 2) from a tarp, thread and duct tape. A bag goes on or comes off only once its gas is out, so **Vent Gas** first. **Take Off Gas Bag** gives a tarp bag back with its wear, to repair with duct tape, glue, wood glue, epoxy or a tarp piece as any vanilla item is repaired; garbage bags are thrown away. With no bag on, a barrel's gas is wasted.
 
 ### Smell and fumes
 
