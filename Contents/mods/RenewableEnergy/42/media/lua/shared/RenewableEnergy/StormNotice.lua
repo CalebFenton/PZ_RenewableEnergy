@@ -14,16 +14,16 @@ StormNotice.CRACKED_MODULE = "module"
 -- Squares within which a player is told of the damage: about as far as the sound carries.
 local EARSHOT = 30
 
-local function noticeOf(what)
+local function noticeOf(what, worn)
     local blades = Wind.SPEC.blades[what]
     if blades then
-        return blades.breakSound, "IGUI_RenewableEnergy_BladesBroke"
+        return blades.breakSound, worn and "IGUI_RenewableEnergy_BladesWoreOut" or "IGUI_RenewableEnergy_BladesBroke"
     end
     return Specs.storm.crackSound, "IGUI_RenewableEnergy_ModuleCracked"
 end
 
 local function hear(args)
-    local sound, text = noticeOf(args.what)
+    local sound, text = noticeOf(args.what, args.worn)
     local square = getCell():getGridSquare(args.x, args.y, args.z)
     if square then
         square:playSound(sound)
@@ -40,9 +40,10 @@ local function hear(args)
 end
 
 --- On the authority: a storm did `what` at x, y, z, breaking the blades of that material
---- (Wind.SPEC.blades) or cracking a module (StormNotice.CRACKED_MODULE).
-function StormNotice.tell(what, x, y, z)
-    local args = { what = what, x = x, y = y, z = z }
+--- (Wind.SPEC.blades) or cracking a module (StormNotice.CRACKED_MODULE); or, `worn`, the blades
+--- wore out.
+function StormNotice.tell(what, x, y, z, worn)
+    local args = { what = what, x = x, y = y, z = z, worn = worn }
     if isServer() then
         sendServerCommand(StormNotice.COMMAND_MODULE, StormNotice.DAMAGE_COMMAND, args)
     else

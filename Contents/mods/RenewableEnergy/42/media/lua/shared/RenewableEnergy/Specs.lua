@@ -25,8 +25,9 @@ Specs.batteries = {
     ["Base.CarBattery3"] = { wh = 600, cyclesAt50 = 300 },
     ["RenewableEnergy.DeepCycleBattery"] = { wh = 1260, cyclesAt50 = 750 },
     ["RenewableEnergy.L16Battery"] = { wh = 2100, cyclesAt50 = 1500, wiring = { tools = { Specs.SCREWDRIVER, Specs.WRENCH } } },
-    -- Homemade from open glass jars and soft pipe lead: heavy for what it holds, and short-lived.
-    ["RenewableEnergy.JarBattery"] = { wh = 400, cyclesAt50 = 150 },
+    -- Homemade from open glass jars and thick cast plates, as farm light-plant cells were: heavy for
+    -- what it holds, but long-lived.
+    ["RenewableEnergy.JarBattery"] = { wh = 400, cyclesAt50 = 900 },
 }
 
 -- Inverters by item type: watts carried (a bank's limit sums its working inverters), idle draw while

@@ -25,7 +25,7 @@ Keep the lights on after the grid and the gas are gone, with what a Kentucky far
 | The first weeks | The TV and the lights, and a mini fridge while the sun's up | A battery box, two car batteries, a plug-in inverter, two panels or a treadmill |
 | A month or so in | The kitchen fridge through the night | A battery rack of deep cycles, a bigger inverter, a charge controller, a handful of panels, a scoop rotor |
 | Months later | The freezer, the washer, and a backup that needs no gasoline | A bank of L-16s, an inverter/charger, two controllers, a treadmill wind charger, a generator with a failsafe on digester or wood gas |
-| The long haul | The whole house, all winter | A metal bank, two inverter/chargers, four controllers, every panel you can find, homebuilt wind turbines on the high ground, a brick dome digester |
+| The long haul | The whole house, all winter | A metal bank, two inverter/chargers, four controllers, every panel you can find, homemade wind turbines on the high ground, a brick dome digester |
 
 ## Everything you can find or build
 
@@ -53,11 +53,11 @@ The bank powers everything a generator in its spot would, the neighbours' fridge
 
 ## Wind
 
-![A scoop rotor, a treadmill wind charger with carved blades, a car alternator wind charger with pipe blades and a homebuilt wind turbine on its tower, turning on open ground](art/promo/images/wind.png)
+![A scoop rotor, a treadmill wind charger with carved blades, a car alternator wind charger with plastic blades and a homemade wind turbine on its tower, on open ground](art/promo/images/wind.png)
 
 Build them on the **Welding** page. A scoop rotor turns in any breeze and never breaks. A treadmill's motor, a car's alternator or a homemade alternator on a mast makes real power, most in winter, via a charge controller. Put them up high, clear of trees and buildings and four squares apart, or they steal each other's wind.
 
-When a gale sets the blades creaking and rattling, **Set the Brake** or you'll be replacing them: carved, cut from pipe, or forged steel that breaks last. The turbine swings itself out of the worst of it.
+When a gale sets the blades creaking and rattling, **Set the Brake** or you'll be replacing them: carved, cut from plastic pipe, or forged steel that breaks last. The turbine swings out of the worst of it.
 
 ## Treadmills
 

@@ -62,7 +62,7 @@ local function addSnowOption(playerNum, menu, source, entry)
     end
 end
 
--- Replace Blades, for a wind charger a storm broke, with the blades the character would fit
+-- Replace Blades, for a wind charger whose blades broke or wore out, with the blades the character would fit
 -- (SourceJobs.bladesFor), or the option greyed, naming all it takes.
 local function addBladesOption(playerNum, menu, source)
     if not (Wind.bladesOfObject(source) and Wind.isBroken(source)) then
@@ -126,10 +126,14 @@ function SourceMenu.addSourceOptions(playerNum, context, source)
         end
         addSnowOption(playerNum, menu, source, sourceSummary(connected, here))
     end
-    -- A wind charger's brake, set or let go, connected or not.
+    -- A wind charger's brake, set or let go, connected or not, and the life its blades have left.
     if Wind.isCharger(source) then
         JobOptions.add(menu, playerNum, SourceJobs, Wind.isBraked(source) and SourceJobs.RELEASE_BRAKE or SourceJobs.BRAKE,
             source)
+        local blades = Wind.bladesOfObject(source)
+        if blades and not Wind.isBroken(source) then
+            menu:addOption(getText("ContextMenu_RenewableEnergy_BladesLeft", Wind.bladesLeftPct(blades, Wind.bladeHours(source))))
+        end
     end
     addBladesOption(playerNum, menu, source)
     addSealOptions(playerNum, menu, source)

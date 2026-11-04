@@ -86,15 +86,15 @@ def model_sheet():
     # A vehicle shows as its body with its part models, once whole and once with each look of
     # cracks, heavy then light, in place of the parts it replaces. A sprite model shows from one
     # side: one mesh at each of its yaws, as the game spins it whole, or the first skin's each spin
-    # step, then each other skin's first step.
+    # step, then each other skin's first step, the broken ones among them.
     models = [("WorldItems", name, name, [name], None) for name in {**items.ITEMS, **items.GROUND_MODELS}]
     for name, spec in wind.SPRITE_MODELS.items():
-        (texture, meshes), *others = wind.sprite_model_names(name)[0]
+        (texture, _, meshes), *others = wind.sprite_model_names(name)[0]
         if len(meshes) == 1:
-            models.append(("WorldItems", name, texture, meshes, list(spec["yaws"].values())))
+            models.append(("WorldItems", name, texture, [meshes[0][0]], list(spec["yaws"].values())))
             continue
-        models += [("WorldItems", mesh, texture, [mesh], [0]) for mesh in meshes]
-        models += [("WorldItems", texture, texture, meshes[:1], [0]) for texture, meshes in others]
+        models += [("WorldItems", mesh, texture, [mesh], [0]) for mesh, _ in meshes]
+        models += [("WorldItems", texture, texture, [meshes[0][0]], [0]) for texture, _, meshes in others]
     for name, spec in trailer.VEHICLES.items():
         whole = [s for s in spec["pieces"] if not s.endswith("Cracked")]
         models.append(("vehicles", name, name, [name + s for s in [""] + whole], None))

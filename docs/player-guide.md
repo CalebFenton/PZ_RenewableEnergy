@@ -261,7 +261,7 @@ Inverters lose condition every hour the bank powers its area, about one Scrap El
 - The load against the limit, and the inputs used.
 - What draws, by kind. Once something in another building draws too, the list splits into this building and other buildings, with how far away the nearest is.
 - Batteries by type: how many, their charge together, and the condition of the most worn one.
-- Sources by kind: how many, and their output together. A source short for a reason you can fix, such as a cracked module, snow or a braked charger, also gets a red row of its own with where it stands and why. Click a row to see where its sources stand.
+- Sources by kind: how many, and their output together. For wind chargers it also gives the life left in the most worn blades still turning ("blades 40% left"). A source short for a reason you can fix, such as a cracked module, snow or a braked charger, also gets a red row of its own with where it stands and why. Click a row to see where its sources stand.
 
 While grid power reaches the bank, the window says so, and whether the chargers are filling from it. **Rename** gives a bank a name of your own, which helps once you have several.
 
@@ -272,7 +272,7 @@ While grid power reaches the bank, the window says so, and whether the chargers 
 | Car battery | 600 Wh | 0.4 (1.6) | Yes |
 | Deep Cycle Battery | 1260 Wh | 1 (4) | Yes |
 | L-16 Battery | 2100 Wh | 2 (8) | No |
-| Jar Battery | 400 Wh | 0.2 (0.8) | No |
+| Jar Battery | 400 Wh | 1.2 (4.9) | No |
 
 The tooltip shows each battery's capacity and stored charge. Capacity falls with condition.
 
@@ -308,7 +308,7 @@ A bank found in a room comes stocked, connected and switched off. Its batteries 
 
 ### Jar battery
 
-Six glass jars, one set of plates (three lead pipes cast a set), acid and water, at Electricity 4. It's small and short-lived, but everything except the acid can be made.
+Six glass jars, one set of plates (three lead pipes cast a set), acid and water, at Electricity 4. It holds two-thirds of a car battery but lasts three times as many charge cycles, and everything except the acid can be made.
 
 ### In a car
 
@@ -376,7 +376,7 @@ Reglazing and makeshift modules each take a flat pane of glass. Car windows are 
 
 ## Wind chargers
 
-Wind blows day and night, and hardest in winter, just when the panels give the least. Wind chargers are built on the **Welding** page of the build menu, and each needs a generator: a treadmill's motor, a car's alternator, or an alternator you make yourself. Every charger but the scoop rotor also takes a set of blades, wooden, pipe or steel, and stands with whichever set the build used. Those bladed chargers take 3 inputs, so their bank needs a charge controller.
+Wind blows day and night, and hardest in winter, just when the panels give the least. Wind chargers are built on the **Welding** page of the build menu, and each needs a generator: a treadmill's motor, a car's alternator, or an alternator you make yourself. Every charger but the scoop rotor also takes a set of blades, wooden, plastic pipe or steel, and stands with whichever set the build used. Those bladed chargers take 3 inputs, so their bank needs a charge controller.
 
 ### The four kinds
 
@@ -384,7 +384,7 @@ The figures here are at the default **Wind Multiplier** of 2, which scales them 
 
 | Charger | Generator | Full output | Inputs | Breaks in storms |
 |---|---|---|---|---|
-| Scoop Rotor Wind Charger | Treadmill Motor | 200 W at 50 km/h | 1 | Never |
+| Scoop Rotor Wind Charger | Treadmill Motor | 300 W at 45 km/h | 1 | Never |
 | Treadmill Wind Charger | Treadmill Motor | 600 W at 40 km/h | 3 | Yes |
 | Car Alternator Wind Charger | Car Alternator | 800 W at 40 km/h | 3 | Yes |
 | Homemade Wind Turbine | Homemade Alternator | 1600 W at 40 km/h | 3 | Yes, but turns aside in a gale |
@@ -400,11 +400,11 @@ A charger makes nothing below its starting speed, and output climbs with the cub
 
 | Wind | Scoop | Treadmill | Car alternator | Turbine |
 |---|---|---|---|---|
-| 20 km/h | 5 W | 22 W | 30 W | 72 W |
-| 25 km/h | 13 W | 75 W | 100 W | 220 W |
-| 30 km/h | 29 W | 178 W | 237 W | 498 W |
-| 35 km/h | 53 W | 347 W | 463 W | 944 W |
-| 40 km/h | 88 W | 600 W | 800 W | 1600 W |
+| 20 km/h | 10 W | 22 W | 30 W | 72 W |
+| 25 km/h | 29 W | 75 W | 100 W | 220 W |
+| 30 km/h | 63 W | 178 W | 237 W | 498 W |
+| 35 km/h | 117 W | 347 W | 463 W | 944 W |
+| 40 km/h | 194 W | 600 W | 800 W | 1600 W |
 
 That's in the open on the ground. The status window shows the wind in km/h next to each charger's output.
 
@@ -412,7 +412,7 @@ The everyday wind averages about 12 km/h in July and 19 in December, so a charge
 
 | | July | December |
 |---|---|---|
-| Scoop rotor | 0.1 kWh | 0.5 kWh |
+| Scoop rotor | 0.2 kWh | 1 kWh |
 | Treadmill wind charger | 0.5 kWh | 2.6 kWh |
 | Car alternator wind charger | 0.7 kWh | 3.5 kWh |
 | Homemade wind turbine | 1.5 kWh | 7.1 kWh |
@@ -431,21 +431,23 @@ Placement matters as much as the charger: get it high, get it clear, and give it
 
 Blades break in gales. **Set the Brake** before one and **Release the Brake** after it. A braked charger makes nothing, and its blades can't break.
 
-A charger warns you when the wind gets strong enough to break its blades. Wooden blades creak and pipe or steel blades rattle every few seconds, and the status window says "gale, set the brake". The stronger the wind, the likelier they break. When they go, there's a loud crack, and anyone within about 30 squares sees "A wind charger's blades broke in the gale".
+A charger warns you when the wind gets strong enough to break its blades. Wooden blades creak and plastic or steel blades rattle every few seconds, and the status window says "gale, set the brake". The stronger the wind, the likelier they break. When they go, there's a loud crack, and anyone within about 30 squares sees "A wind charger's blades broke in the gale".
 
 | Blade set | On the treadmill and car alternator chargers | On the turbine |
 |---|---|---|
-| Pipe Blade Set | At risk above 60 km/h: strong thunderstorms | Above 80 km/h |
+| Plastic Pipe Blade Set | At risk above 60 km/h: strong thunderstorms | Above 80 km/h |
 | Wooden Blade Set | Above 70 km/h: the worst thunderstorms | Above 90 km/h: safe in every thunderstorm |
 | Steel Blade Set | Above 90 km/h: only blizzards and tropical storms | Above 110 km/h: all but the worst blizzards |
 
-Once at risk, steel blades break a quarter as often as pipe, and wood half as often. Thunderstorms top out around 84 km/h. Blizzards blow 90 to 120 km/h for a day or two and are the real danger, though even the longest breaks unbraked pipe blades at most about one time in seven at the default Storm Damage Rate. Blades never change the power, only how much wind they stand.
+Once at risk, steel blades break a quarter as often as plastic pipe, and wood half as often. Thunderstorms top out around 84 km/h. Blizzards blow 90 to 120 km/h for a day or two and are the real danger, though even the longest breaks unbraked plastic pipe blades at most about one time in seven at the default Storm Damage Rate. Blades never change the power, only how much wind they stand.
+
+Blades also wear out with use. Every hour a connected charger turns, unbraked and above its cut-in wind, counts against them: plastic pipe lasts 1500 hours of turning, wood 3000 and steel 8000. That's about two months, four months and eleven months of turning without a break. Braked or calm hours don't count, and the brake still keeps gales off them. Its menu says "Blades: 73% left". When they wear out they break as a gale breaks them, with the same crack and "A wind charger's blades wore out". Worn blades are no likelier to break in a gale.
 
 From 55 km/h, the homemade turbine's tail swings its head out of the wind ("turned out of the wind"). It keeps 85% of its full output, and its blades take less of the gale, which is why they hold 20 km/h longer.
 
 ### Replacing blades
 
-**Replace Blades** fits a spare set onto a charger whose blades broke. It takes any kind the charger can use, its own kind first if you carry them, so a broken pipe-blade charger can come back with steel. You get the broken set back: broken wood burns in a campfire, fireplace or wood stove, broken pipe is junk, and broken steel melts down at a blast furnace. Blades that are still whole can't be swapped, so to change kinds on a working charger, build a new one.
+**Replace Blades** fits a spare set onto a charger whose blades broke or wore out, and the new set starts with all its hours. A charger with broken blades shows them, hanging still. It takes any kind the charger can use, its own kind first if you carry them, so a broken plastic-blade charger can come back with steel. You get the broken set back: broken wood burns in a campfire, fireplace or wood stove, broken pipe is junk, and broken steel melts down at a blast furnace. Blades that are still whole can't be swapped, so to change kinds on a working charger, build a new one.
 
 ### Making the generators
 
@@ -641,7 +643,7 @@ Tow it home and it keeps charging its batteries on the way, or strip it for part
   - Battery work, inverters, the controller, the failsafe and makeshift modules come from Electricity; reconditioning from Mechanics too, and making the plate mold, casting plates and reducing dross from Blacksmith too. Reglazing takes Electricity and Glassmaking together.
   - The barrel digester comes from Farming or Mechanics, the insulated digester from Woodwork and Farming together, the dome from Masonry and Farming together. The Gas Conversion Kit comes from Mechanics, the Gas Heater from Metalworking and Mechanics together.
   - The primitive gasifier comes from Mechanics, the bigger two from Metalworking and Mechanics together, and the advanced one takes Blacksmith as well.
-  - Wind chargers take Metalworking and Electricity together, and the car alternator wind charger Mechanics too; the homemade alternator takes Electricity and Mechanics. Wooden and pipe blades come from Carving, steel ones from Blacksmith.
+  - Wind chargers take Metalworking and Electricity together, and the car alternator wind charger Mechanics too; the homemade alternator takes Electricity and Mechanics. Wooden and plastic pipe blades come from Carving, steel ones from Blacksmith.
 - **Research.** Researching a found module teaches the panel mounts and sealing, and a makeshift one teaches sealing. A plug-in inverter teaches battery boxes and the Makeshift Plug-in Inverter, a power inverter racks and the Makeshift Power Inverter, and an inverter/charger cabinets and the failsafe.
 
 ### What a recipe needs around it
@@ -652,7 +654,7 @@ Light is also needed for wiring and fittings: wiring parts in and out, connectin
 
 ### Blades
 
-A blade set is all three blades of a charger, so a charger takes one. **Carve Wooden Blade Set** (Carving) and **Cut Pipe Blade Set** are in the crafting window. **Forge Steel Blade Set** (Blacksmith 3) is only in a Forge's or an Advanced Forge's own crafting window, not the primitive forge's. Whole steel sets melt down at a smelting or blast furnace; broken ones, like a broken sword blade, only at a blast furnace.
+A blade set is all three blades of a charger, so a charger takes one. **Carve Wooden Blade Set** (Carving) and **Cut Plastic Pipe Blade Set** are in the crafting window. **Forge Steel Blade Set** (Blacksmith 3) is only in a Forge's or an Advanced Forge's own crafting window, not the primitive forge's. Whole steel sets melt down at a smelting or blast furnace; broken ones, like a broken sword blade, only at a blast furnace.
 
 ### What you can't craft
 
@@ -673,7 +675,7 @@ Found inverters, the maintainer, the solar battery charger, garden lights, facto
 | too close to another charger | Other chargers within three squares, at the same height | Move them four squares apart |
 | gale, set the brake | The wind can break its blades | **Set the Brake** |
 | braked | You set the brake | **Release the Brake** once the gale has passed |
-| blades broken | A gale broke them | **Replace Blades** |
+| blades broken | A gale broke them, or they wore out | **Replace Blades** |
 | turned out of the wind | The turbine furled in a gale | Nothing; it keeps most of its power |
 | nobody running | A treadmill | **Run on Treadmill** |
 

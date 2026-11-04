@@ -26,7 +26,7 @@ RenewableEnergy.Wind = Wind
 -- saved records and tiles from before they were renamed).
 Wind.SPEC = {
     turbines = {
-        scoop = { slots = 1, watts = 100, cutInKph = 8, ratedKph = 50, rotorAbove = 0 },
+        scoop = { slots = 1, watts = 150, cutInKph = 8, ratedKph = 45, rotorAbove = 0 },
         propeller = { slots = 3, watts = 300, cutInKph = 10, ratedKph = 40, rotorAbove = 1,
             blades = { "wood", "pipe", "steel" } },
         carAlternator = { slots = 3, watts = 400, cutInKph = 10, ratedKph = 40, rotorAbove = 1,
@@ -36,15 +36,16 @@ Wind.SPEC = {
     },
     -- Blades by material: the item that makes and mends them, and the `broken` item a mend hands
     -- back; the wind above which unbraked they can break (Specs.storm), and their stormShare of the
-    -- weakest blades' chance; the sound they make straining in that wind and breaking. Plastic pipe
+    -- weakest blades' chance; the sound they make straining in that wind and breaking; lifeHours,
+    -- the hours they turn (WindSource) before they wear out and break all the same. Plastic pipe
     -- goes brittle and snaps first, carved wood flexes, and forged steel holds through all but the worst.
     blades = {
         pipe = { item = "RenewableEnergy.PipeBlades", broken = "RenewableEnergy.BrokenPipeBlades", breakKph = 60,
-            stormShare = 1, strainSound = "WindowRattle", breakSound = "BreakObject" },
+            stormShare = 1, lifeHours = 1500, strainSound = "WindowRattle", breakSound = "BreakObject" },
         wood = { item = "RenewableEnergy.WoodenBlades", broken = "RenewableEnergy.BrokenWoodenBlades", breakKph = 70,
-            stormShare = 0.5, strainSound = "WoodDoorCreak", breakSound = "BreakBarricadePlank" },
+            stormShare = 0.5, lifeHours = 3000, strainSound = "WoodDoorCreak", breakSound = "BreakBarricadePlank" },
         steel = { item = "RenewableEnergy.SteelBlades", broken = "RenewableEnergy.BrokenSteelBlades", breakKph = 90,
-            stormShare = 0.25, strainSound = "WindowRattle", breakSound = "BreakBarricadeMetal" },
+            stormShare = 0.25, lifeHours = 8000, strainSound = "WindowRattle", breakSound = "BreakBarricadeMetal" },
     },
     -- Share added per level above ground, capped at maxBonusLevel.
     heightBonusPerLevel = 0.15,
@@ -66,9 +67,11 @@ Wind.SPEC = {
 }
 local SPEC = Wind.SPEC
 
--- Placed wind charger modData: its brake is on; its blades are broken.
+-- Placed wind charger modData: its brake is on; its blades are broken; the hours its blades have
+-- turned (WindSource).
 Wind.BRAKED_KEY = "RenewableEnergy_braked"
 Wind.BROKEN_KEY = "RenewableEnergy_bladesBroken"
+Wind.HOURS_KEY = "RenewableEnergy_bladeHours"
 
 -- A wind charger's kind is its tile's (Sprites.kindOf); every wind kind is a source as placed, so
 -- this needs nothing of Sources, which reads SPEC.
@@ -91,6 +94,16 @@ end
 
 function Wind.isBroken(isoObject)
     return isoObject:getModData()[Wind.BROKEN_KEY] == true
+end
+
+function Wind.bladeHours(isoObject)
+    return isoObject:getModData()[Wind.HOURS_KEY] or 0
+end
+
+--- The whole percent of their life left to `blades` (a Wind.SPEC.blades material) that have turned
+--- `hours`, rounded up so blades not yet worn out never read 0.
+function Wind.bladesLeftPct(blades, hours)
+    return math.max(0, math.ceil(100 * (1 - hours / SPEC.blades[blades].lifeHours)))
 end
 
 --- The blades (a Wind.SPEC.blades material) a wind charger of `kind` built of `material` (its

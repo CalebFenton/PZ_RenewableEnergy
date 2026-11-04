@@ -272,20 +272,23 @@ test("renewable_energy_world_arrow_board_cycle_ends_at_midnight", {
             return { call = "runLamps", with = { hours, true } }
         end
         -- The clock stands still at the same minutes past the hour on both sides of midnight, so
-        -- the gadgets' ten-minute pass never runs (GameTime.update) and the test's pass is the one
-        -- that crosses midnight; a server frame between them lets the clock step at 23:30 first
-        -- (as in renewable_energy_battery_depth_of_discharge_wears_batteries).
+        -- its jump past midnight runs no ten-minute pass (GameTime.update) and the test's pass is
+        -- the one that crosses it. Setting 23:30 changes the tens of minutes, so the server's next
+        -- frame runs the gadgets' pass, which draws up to an hour of the lamps from the box
+        -- (GadgetCharging.update); the box is set up only after that frame. A server serves
+        -- commands between its world updates, so without the wait it could set up the box and
+        -- read the evening before that pass drew from it.
         T.step(function()
             T.setMultiplier(self, 0)
             T.setTime(self, 23.5)
         end)
+        T.awaitServerFrame(self)
         batchOnTrailer(function()
             T.onVehicle(self, trailer, "setTrailer", { box = { { type = T.CAR_BATTERY, charge = 1 } }, switchOn = true })
             T.onVehicle(self, trailer, "arrowBoardRun", lampsArgs(0))
             T.onVehicle(self, trailer, "setTrailer", { box = { { type = T.CAR_BATTERY, charge = EVENING_CHARGE } } })
             T.onVehicle(self, trailer, "arrowBoardRun", lampsArgs(0), "evening")
         end)
-        T.awaitServerFrame(self)
         T.step(function() T.setTime(self, 24 + PAST_MIDNIGHT) end)
         T.serverUntil(self, "vehicleState", function() return T.at(trailer, { id = trailer.id }) end, function(reply)
             return reply.state.calendarDay ~= self.reads.evening.state.calendarDay

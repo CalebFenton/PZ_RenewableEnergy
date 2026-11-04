@@ -1,6 +1,6 @@
 -- How a bank runs a wind charger (the "wind" family of Sources) on the authority:
--- its output in the wind and its blades breaking in a gale. Sets a charger's brake and broken
--- blades on the object and on its bank's record alike.
+-- its output in the wind and its blades breaking in a gale or wearing out. Sets a charger's brake,
+-- broken blades and their hours on the object and on its bank's record alike.
 
 if isClient() then return end
 
@@ -156,13 +156,29 @@ function WindSource.setBroken(isoObject, broken, source)
     end
 end
 
---- Fits blades of `material` (Wind.SPEC.blades), which its kind takes, to the wind charger
+-- Sets the hours the blades of the wind charger `isoObject` have turned (none for new blades), and
+-- of `source`, its bank's record, if it feeds one (else nil). Sent only as their whole percent left
+-- changes, which is all a client shows of them.
+local function setHours(isoObject, hours, source)
+    if source then
+        source.bladeHours = hours
+    end
+    local data, blades = isoObject:getModData(), Wind.bladesOfObject(isoObject)
+    local before = data[Wind.HOURS_KEY] or 0
+    data[Wind.HOURS_KEY] = hours > 0 and hours or nil
+    if blades and Wind.bladesLeftPct(blades, before) ~= Wind.bladesLeftPct(blades, hours) then
+        isoObject:transmitModData()
+    end
+end
+
+--- Fits new blades of `material` (Wind.SPEC.blades), which its kind takes, to the wind charger
 --- `isoObject`, and to `source`, its bank's record, if it feeds one (else nil). Blades of another
 --- material than it turns make it that material's tile (Wind.setBladesTile), on every side.
 function WindSource.fitBlades(isoObject, material, source)
     if source then
         source.blades = material
     end
+    setHours(isoObject, 0, source)
     if Wind.bladesOfObject(isoObject) == material or not Wind.setBladesTile(isoObject, material) then return end
     isoObject:transmitUpdatedSpriteToClients()
     -- After the tile, as DigesterObject:upgrade sends it: a client's SpriteConfig checks its new
@@ -197,12 +213,13 @@ local function breaks(source, kph, hours)
     return chance > 0 and Chance.hit(chance)
 end
 
---- A newly connected wind charger's record: its broken blades as the object has them, the rest as
---- WindSource.reconcile reads them. A charger teaches its wiring the first time a player connects
---- it; the world wires a site's charger with no player (SolarSites), which leaves the lesson to the
---- one who rewires it.
+--- A newly connected wind charger's record: its broken blades and their hours as the object has
+--- them, the rest as WindSource.reconcile reads them. A charger teaches its wiring the first time a
+--- player connects it; the world wires a site's charger with no player (SolarSites), which leaves
+--- the lesson to the one who rewires it.
 function WindSource.connect(player, source, isoObject)
     source.broken = Wind.isBroken(isoObject)
+    source.bladeHours = Wind.bladeHours(isoObject)
     WindSource.reconcile(source, isoObject)
     if player and Utilities.teachOnce(player, isoObject, Panel.CONNECTED_ONCE_KEY, Perks.Electricity,
         Specs.connectXp * Sources.slotsOf(source.kind)) then
@@ -210,16 +227,19 @@ function WindSource.connect(player, source, isoObject)
     end
 end
 
--- Its broken blades are the record's, which a gale may break while the object is unloaded, and go
--- to the object when it is loaded.
-local function showBroken(source, object)
+-- Its broken blades and their hours are the record's, which go on while the object is unloaded,
+-- and go to the object when it is loaded.
+local function showWear(source, object)
     if Wind.isBroken(object) ~= (source.broken == true) then
         WindSource.setBroken(object, source.broken == true, source)
+    end
+    if Wind.bladeHours(object) ~= (source.bladeHours or 0) then
+        setHours(object, source.bladeHours or 0, source)
     end
 end
 
 --- Brings the record `source` and its loaded charger `object` into step: its brake and blades are
---- the object's (setBraked sets both), its broken blades the record's (showBroken), and its
+--- the object's (setBraked sets both), its broken blades and their hours the record's (showWear), and its
 --- shelter and crowding are counted again, since trees, buildings, walls and chargers around it
 --- change.
 function WindSource.reconcile(source, object)
@@ -227,23 +247,31 @@ function WindSource.reconcile(source, object)
     source.blades = Wind.bladesOfObject(object)
     source.shelter = shelterAt(source.kind, source.x, source.y, source.z)
     source.crowding = crowdingAt(source.kind, source.x, source.y, source.z)
-    showBroken(source, object)
+    showWear(source, object)
 end
 
 --- The charger's output over the pass, and why it makes nothing or little: in a gale that can
---- break its blades, braked, broken, calm, furled, sheltered or crowded. Blades breaking tell the
+--- break its blades, braked, broken, calm, furled, sheltered or crowded. Its blades break in a
+--- gale, or wear out after their lifeHours of turning above the cut-in, unbraked; either tells the
 --- players in earshot (StormNotice).
 function WindSource.update(source, object, inSlot, hours, context)
     local spec = Wind.SPEC.turbines[source.kind]
     if object then
         WindSource.reconcile(source, object)
     end
+    local blades = bladesOf(source)
     if breaks(source, context.windKph, hours) then
         source.broken = true
-        StormNotice.tell(bladesOf(source), source.x, source.y, source.z)
-        if object then
-            showBroken(source, object)
+        StormNotice.tell(blades, source.x, source.y, source.z)
+    elseif blades and not (source.braked or source.broken) and context.windKph > spec.cutInKph then
+        source.bladeHours = (source.bladeHours or 0) + hours
+        if source.bladeHours >= Wind.SPEC.blades[blades].lifeHours then
+            source.broken = true
+            StormNotice.tell(blades, source.x, source.y, source.z, true)
         end
+    end
+    if object then
+        showWear(source, object)
     end
     local watts = Wind.watts(spec, context.windKph, source.z, source.shelter or 0, source.crowding)
     source.watts = (inSlot and not source.braked and not source.broken) and watts or 0
@@ -268,9 +296,12 @@ function WindSource.update(source, object, inSlot, hours, context)
     end
 end
 
---- The charger's part of its status entry: its brake, blades, shelter and crowding.
+--- The charger's part of its status entry: its brake, blades and their life left (nil for a
+--- scoop rotor), shelter and crowding.
 function WindSource.status(entry, source)
+    local blades = bladesOf(source)
     entry.braked, entry.broken = source.braked == true, source.broken == true
+    entry.bladesLeftPct = blades and Wind.bladesLeftPct(blades, source.bladeHours or 0)
     entry.shelterPct = round(100 * (source.shelter or 0))
     entry.crowdingPct = round(100 * (source.crowding or 0))
 end

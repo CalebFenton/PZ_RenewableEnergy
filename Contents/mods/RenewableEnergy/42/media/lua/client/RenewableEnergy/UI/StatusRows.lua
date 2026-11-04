@@ -353,17 +353,30 @@ local function sourceValue(source, status, reason)
     return getText("IGUI_RenewableEnergy_SourceOutputReason", value, getText(reason.key))
 end
 
+-- "100 W" for a kind's sources, with "blades 40% left" for the most worn blades among them that
+-- still turn, so chargers due new blades show before they break.
+local function groupValue(entries)
+    local watts, leftPct = 0, nil
+    for _, source in ipairs(entries) do
+        watts = watts + source.watts
+        if source.bladesLeftPct and not source.broken then
+            leftPct = math.min(leftPct or 100, source.bladesLeftPct)
+        end
+    end
+    if not leftPct then
+        return Format.watts(watts)
+    end
+    return getText("IGUI_RenewableEnergy_SourceOutputReason", Format.watts(watts),
+        getText("IGUI_RenewableEnergy_BladesLeft", leftPct))
+end
+
 -- One row per kind of source with their watts together, and after it a red row of its own for each
 -- source short for a reason the player can fix, so a cracked module or braked charger stands out
 -- of a long list. Each row's `sources` are what clicking it highlights.
 local function sourceRows(rows, status, bankPosition)
     header(rows, "IGUI_RenewableEnergy_Sources", #status.sources)
     for _, group in ipairs(groupBy(status.sources, sourceName)) do
-        local watts = 0
-        for _, source in ipairs(group.entries) do
-            watts = watts + source.watts
-        end
-        table.insert(rows, { label = counted(group.name, #group.entries), value = Format.watts(watts),
+        table.insert(rows, { label = counted(group.name, #group.entries), value = groupValue(group.entries),
             sources = group.entries })
         for _, source in ipairs(group.entries) do
             local reason = REASONS[source.reason]

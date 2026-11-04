@@ -10,7 +10,7 @@ Renewable Energy pushes slightly against that opening. It gives the player a way
 
 ## What follows from it
 
-**Entropy is the opponent.** Everything wears: batteries with each deep drain, modules in storms, parts while they run, digesters and gasifiers with use. Nothing is lost for good to a player who keeps at it, but keeping at it is the price.
+**Entropy is the opponent.** Everything wears: batteries with each deep drain, modules in storms, wind charger blades as they turn, parts while they run, digesters and gasifiers with use. Nothing is lost for good to a player who keeps at it, but keeping at it is the price.
 - **Patching lowers a ceiling** where it already does (batteries, modules). Each patch-up brings a thing back less far than the last, the way vanilla's `FixingManager` restores less and fails more often with every repair an item has had. Patching forever is not a strategy.
 - **Remaking resets, and costs more.** Remaking a thing with fresh parts brings it back and clears its patches: new plates in a battery, new glass on a module. Remaking takes more skill, tools and stations than patching, and that high bar is what makes forever possible.
 - **Inverters and controllers keep vanilla generator parity.** Each Electronics Scrap repair adds the same condition however often the part was repaired, as vanilla's generator does. This is on purpose.

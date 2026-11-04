@@ -221,11 +221,11 @@ end
 
 -- Placing copies an item's modData onto the object, but picking up copies an object's back only
 -- for an IsoThumpable. These keys go back with the item, so a mount keeps its modules'
--- conditions, a garden light its charge and bulb, and a wind charger its broken blades, its brake
--- and that its first connection already taught its XP.
+-- conditions, a garden light its charge and bulb, and a wind charger its broken blades, their
+-- hours, its brake and that its first connection already taught its XP.
 
 local CARRIED_KEYS = { Panel.MODULES_KEY, SolarGardenLight.CHARGE_KEY, SolarGardenLight.BULB_KEY, Wind.BROKEN_KEY,
-    Wind.BRAKED_KEY, Panel.CONNECTED_ONCE_KEY }
+    Wind.BRAKED_KEY, Wind.HOURS_KEY, Panel.CONNECTED_ONCE_KEY }
 
 -- The record of `isoObject` if it is a digester or gasifier, on the authority; nil elsewhere.
 local function recordOf(isoObject)

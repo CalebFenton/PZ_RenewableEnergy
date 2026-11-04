@@ -103,6 +103,10 @@ def solar_module(col, name="Module", snow=False, cracked=False, cracks=False, li
 # A homemade module on a mount's overlay tile is drawn over the factory module the mount's own tile
 # shows in that slot, so it is this much bigger every way and lies in front of it from any side.
 COVER = 0.002
+# The overlay's holdout keeps the factory module, so a homemade module's cells hide behind its glass
+# unless they lie above it: on a mount its back is as thick as a factory module, and its frame
+# stands this far proud of its cells, short of the wooden wall mount's cleats.
+MOUNTED_LIP = 0.012
 
 
 def _mount_module(col, name, homemade=False, cover=False):
@@ -112,7 +116,9 @@ def _mount_module(col, name, homemade=False, cover=False):
     if not (homemade or cover):
         return solar_module(col, name)
     grow = COVER if cover else 0
-    parts = homemade_module(col, name, size=tuple(side + 2 * grow for side in MODULE), leads=False)
+    back = MODULE[2] + 2 * COVER
+    size = (MODULE[0] + 2 * grow, MODULE[1] + 2 * grow, back + MOUNTED_LIP)
+    parts = homemade_module(col, name, size=size, back=back, leads=False)
     for obj in parts:
         obj.location.z -= grow
     return parts
@@ -282,16 +288,16 @@ def solar_crate(col, frame=True, contents=False, closed=False):
 HOMEMADE = (0.92, 0.42, 0.04)
 
 
-def homemade_module(col, name="Homemade", size=HOMEMADE, leads=True):
-    """A module built at home from salvaged cells: a plywood back in a frame of pine strips, window
-    glass held down by clips, and 12 big cells of two kinds, uneven and a little askew, a strip of
-    tabbing along each row, its leads out through the frame (without `leads`, as it is wired on a
-    mount). `size` makes it as big as a factory module, to take one's place on a mount. Returns
-    its parts."""
+def homemade_module(col, name="Homemade", size=HOMEMADE, back=0.012, leads=True):
+    """A module built at home from salvaged cells: a plywood back `back` thick in a frame of pine
+    strips, window glass held down by clips, and 12 big cells of two kinds, uneven and a little
+    askew, a strip of tabbing along each row, its leads out through the frame (without `leads`, as it
+    is wired on a mount). `size` makes it as big as a factory module, to take one's place on a
+    mount. Returns its parts."""
     width, depth, height = size
     strip = 0.032
     rng = random.Random(42)
-    parts = [box(col, name + "_Back", M("plywood"), (width, depth, 0.012), bevel=0.002)]
+    parts = [box(col, name + "_Back", M("plywood"), (width, depth, back), bevel=0.002)]
     for sign in (-1, 1):
         parts.append(box(col, name + "_FrameLong", M("pine"), (width, strip, height), at=(0, sign * (depth - strip) / 2, 0),
                          bevel=0.004))
@@ -307,9 +313,9 @@ def homemade_module(col, name="Homemade", size=HOMEMADE, leads=True):
             # Thin enough to bake into the back's texture, as the factory module's cells do.
             parts.append(box(col, name + "_Cell", M("mono" if rng.random() < 0.25 else "cells"),
                              (pitch_x * rng.uniform(0.84, 0.93), pitch_y * rng.uniform(0.84, 0.93), 0.002),
-                             at=(x + rng.uniform(-0.006, 0.006), y + rng.uniform(-0.005, 0.005), 0.012),
+                             at=(x + rng.uniform(-0.006, 0.006), y + rng.uniform(-0.005, 0.005), back),
                              rotate=(0, 0, rng.uniform(-4, 4))))
-        parts.append(box(col, name + "_Tab", M("busbar"), (inner_w - 0.02, 0.003, 0.0008), at=(0, y, 0.0142)))
+        parts.append(box(col, name + "_Tab", M("busbar"), (inner_w - 0.02, 0.003, 0.0008), at=(0, y, back + 0.0022)))
     for x in (-width / 2 + 0.12, 0, width / 2 - 0.12):
         for sign in (-1, 1):
             parts.append(box(col, name + "_Clip", M("aluminium"), (0.03, 0.045, 0.004), at=(x, sign * (depth / 2 - 0.02), height)))

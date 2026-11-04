@@ -379,7 +379,8 @@ end
 test("renewable_energy_bank_unloaded_bank_carries_on_and_writes_back_on_load", {
     spOnly = T.CHUNK_RELOAD_SP_ONLY,
     timeoutSeconds = T.CHUNK_RELOAD_SECONDS,
-    sandbox = { BatteryWear = 100 },
+    -- Six times normal, so a long-lived jar battery's one deep day still wears a whole point.
+    sandbox = { BatteryWear = 600 },
     run = function(self)
         T.setGrid(self, true)
         -- Batteries enough that the hours away drain less than the discharge the day already saw,

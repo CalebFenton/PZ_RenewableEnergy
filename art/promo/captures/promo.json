@@ -53,7 +53,7 @@
     {
       "fullType": "RenewableEnergy.BrokenPipeBlades",
       "icon": "icon_RenewableEnergy_BrokenPipeBlades",
-      "name": "Broken Pipe Blade Set"
+      "name": "Broken Plastic Pipe Blade Set"
     },
     {
       "fullType": "RenewableEnergy.BrokenSteelBlades",
@@ -188,7 +188,7 @@
     {
       "fullType": "RenewableEnergy.PipeBlades",
       "icon": "icon_RenewableEnergy_PipeBlades",
-      "name": "Pipe Blade Set"
+      "name": "Plastic Pipe Blade Set"
     },
     {
       "fullType": "RenewableEnergy.PlugInInverter",
@@ -310,10 +310,10 @@
     {
       "name": "model_RenewableEnergy_BatteryBankMetal",
       "box": [
-        105,
-        105,
+        106,
+        106,
         316,
-        407
+        406
       ]
     },
     {
@@ -400,10 +400,10 @@
     {
       "name": "model_RenewableEnergy_BrokenPipeBlades",
       "box": [
-        77,
-        77,
-        298,
-        150
+        78,
+        78,
+        300,
+        151
       ]
     },
     {
@@ -430,7 +430,7 @@
         25,
         25,
         73,
-        97
+        96
       ]
     },
     {
@@ -481,10 +481,10 @@
     {
       "name": "model_RenewableEnergy_FridgeCompressor",
       "box": [
-        42,
-        42,
-        144,
-        161
+        41,
+        41,
+        143,
+        159
       ]
     },
     {
@@ -502,7 +502,7 @@
         78,
         78,
         270,
-        300
+        301
       ]
     },
     {
@@ -511,16 +511,16 @@
         59,
         59,
         229,
-        171
+        172
       ]
     },
     {
       "name": "model_RenewableEnergy_HomemadeInverter",
       "box": [
-        39,
-        39,
-        150,
-        107
+        40,
+        40,
+        154,
+        108
       ]
     },
     {
@@ -574,7 +574,7 @@
         76,
         76,
         294,
-        196
+        197
       ]
     },
     {
@@ -598,10 +598,10 @@
     {
       "name": "model_RenewableEnergy_L16Battery",
       "box": [
-        59,
-        59,
-        209,
-        229
+        60,
+        60,
+        210,
+        231
       ]
     },
     {
@@ -628,7 +628,7 @@
         27,
         27,
         103,
-        80
+        81
       ]
     },
     {
@@ -718,7 +718,7 @@
         63,
         63,
         243,
-        156
+        155
       ]
     },
     {
@@ -744,7 +744,7 @@
       "box": [
         105,
         105,
-        376,
+        377,
         407
       ]
     },
@@ -787,10 +787,10 @@
     {
       "name": "model_RenewableEnergy_TarpGasBag",
       "box": [
-        69,
-        69,
-        265,
-        164
+        68,
+        68,
+        262,
+        163
       ]
     },
     {
@@ -843,7 +843,7 @@
       "box": [
         24,
         24,
-        78,
+        79,
         93
       ]
     },
@@ -852,7 +852,7 @@
       "box": [
         43,
         43,
-        120,
+        119,
         166
       ]
     }
@@ -6562,16 +6562,16 @@
         ],
         "needed": true,
         "research": [
-          "Pipe Blade Set"
+          "Plastic Pipe Blade Set"
         ]
       },
-      "name": "Cut Pipe Blade Set",
+      "name": "Cut Plastic Pipe Blade Set",
       "outputs": [
         {
           "count": 1,
           "fullType": "RenewableEnergy.PipeBlades",
           "icon": "icon_RenewableEnergy_PipeBlades",
-          "name": "Pipe Blade Set"
+          "name": "Plastic Pipe Blade Set"
         }
       ],
       "skills": []
@@ -7063,7 +7063,7 @@
               "count": 1,
               "fullType": "RenewableEnergy.PipeBlades",
               "icon": "icon_RenewableEnergy_PipeBlades",
-              "name": "Pipe Blade Set"
+              "name": "Plastic Pipe Blade Set"
             },
             {
               "count": 1,
@@ -7399,7 +7399,7 @@
               "count": 1,
               "fullType": "RenewableEnergy.PipeBlades",
               "icon": "icon_RenewableEnergy_PipeBlades",
-              "name": "Pipe Blade Set"
+              "name": "Plastic Pipe Blade Set"
             },
             {
               "count": 1,
@@ -7936,7 +7936,7 @@
               "count": 1,
               "fullType": "RenewableEnergy.PipeBlades",
               "icon": "icon_RenewableEnergy_PipeBlades",
-              "name": "Pipe Blade Set"
+              "name": "Plastic Pipe Blade Set"
             },
             {
               "count": 1,

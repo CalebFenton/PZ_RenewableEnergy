@@ -144,6 +144,15 @@ handler("setCharge", function(_, args)
     return stateOf(record)
 end)
 
+-- The wind tests' "setBladeHours": the hours the blades of the charger at `args.source` have
+-- turned, in its bank's record, which the next pass gives the charger. Answers the bank's read.
+handler("setBladeHours", function(_, args)
+    local record = bankRecord(args)
+    local source = need(record:findSource(args.source.x, args.source.y, args.source.z), "the charger in the bank's record")
+    source.bladeHours = args.hours
+    return stateOf(record)
+end)
+
 -- RenewableEnergyTest.bankPart's handler, past the bank's own commands. Wear.take keeps a fraction
 -- pending on the item. Answers the bank's read.
 handler("bankPart", function(_, args)

@@ -315,8 +315,8 @@ def models_txt(specs, sprite_models):
              " sprite models' models. */"]
     models = [(name + "_Ground", name, name, spec.get("ground_scale", GROUND_SCALE)) for name, spec in specs.items()]
     for name in sprite_models:
-        for texture, meshes in wind.sprite_model_names(name)[0]:
-            models += [(mesh, mesh, texture, SPRITE_MESH_SCALE) for mesh in meshes]
+        for texture, _, meshes in wind.sprite_model_names(name)[0]:
+            models += [(mesh, mesh, texture, SPRITE_MESH_SCALE) for mesh, _ in meshes]
     for model, mesh, texture, scale in models:
         lines += ["    model %s" % model, "    {",
                   "        mesh = WorldItems/%s%s," % (PREFIX, mesh),
@@ -350,16 +350,16 @@ def sprite_models_txt(sprite_models):
 def build_sprite_model(stage, name, spec):
     """Bakes and exports a sprite model about its builder's own origin, the square's centre, which
     the game turns it about. Each skin builds its own parts, a mesh and texture of its own: skins
-    differ in shape as well as colour, as the blade sets do. No light is painted in, or a model the
-    game turns would turn its lit side with it. Each spin step's mesh is the skin's mesh with the
-    rotor's parts (named with wind.ROTOR) turned about the hub's axis, along Y at the spec's "hub"
-    height."""
+    differ in shape as well as colour, as the blade sets and their broken ones do. No light is
+    painted in, or a model the game turns would turn its lit side with it. Each spin step's mesh is
+    the skin's mesh with the rotor's parts (named with wind.ROTOR) turned about the hub's axis, along
+    Y at the spec's "hub" height."""
     size = SPRITE_MODEL_TEXTURE_SIZE
-    for (texture, meshes), options in zip(wind.sprite_model_names(name)[0], (spec.get("skins") or {"": {}}).values()):
+    for texture, options, meshes in wind.sprite_model_names(name)[0]:
         low, colour, solid = build_baked(stage, lambda col: spec["model"](col, **options), texture, size, to_ground=False)
         rotor = [kit.part_name(obj).startswith(wind.ROTOR) for obj in solid]
         kit.save_pixels(os.path.join(TEXTURE_DIR, PREFIX + texture + ".png"), colour[::-1], alpha=False)
-        for mesh, spin in zip(meshes, spec.get("spins", (0,))):
+        for mesh, spin in meshes:
             def turn(bm):
                 layer = bm.faces.layers.int["part"]
                 turning = {v for face in bm.faces if rotor[face[layer]] for v in face.verts}

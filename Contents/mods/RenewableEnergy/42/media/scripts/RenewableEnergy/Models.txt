@@ -469,6 +469,12 @@ module RenewableEnergy
         texture = WorldItems/RenewableEnergy_PropellerWood,
         scale = 1,
     }
+    model PropellerWoodBroken
+    {
+        mesh = WorldItems/RenewableEnergy_PropellerWoodBroken,
+        texture = WorldItems/RenewableEnergy_PropellerWoodBroken,
+        scale = 1,
+    }
     model PropellerPipe0
     {
         mesh = WorldItems/RenewableEnergy_PropellerPipe0,
@@ -503,6 +509,12 @@ module RenewableEnergy
     {
         mesh = WorldItems/RenewableEnergy_PropellerPipe5,
         texture = WorldItems/RenewableEnergy_PropellerPipe,
+        scale = 1,
+    }
+    model PropellerPipeBroken
+    {
+        mesh = WorldItems/RenewableEnergy_PropellerPipeBroken,
+        texture = WorldItems/RenewableEnergy_PropellerPipeBroken,
         scale = 1,
     }
     model PropellerSteel0
@@ -541,6 +553,12 @@ module RenewableEnergy
         texture = WorldItems/RenewableEnergy_PropellerSteel,
         scale = 1,
     }
+    model PropellerSteelBroken
+    {
+        mesh = WorldItems/RenewableEnergy_PropellerSteelBroken,
+        texture = WorldItems/RenewableEnergy_PropellerSteelBroken,
+        scale = 1,
+    }
     model CarAlternatorWood0
     {
         mesh = WorldItems/RenewableEnergy_CarAlternatorWood0,
@@ -575,6 +593,12 @@ module RenewableEnergy
     {
         mesh = WorldItems/RenewableEnergy_CarAlternatorWood5,
         texture = WorldItems/RenewableEnergy_CarAlternatorWood,
+        scale = 1,
+    }
+    model CarAlternatorWoodBroken
+    {
+        mesh = WorldItems/RenewableEnergy_CarAlternatorWoodBroken,
+        texture = WorldItems/RenewableEnergy_CarAlternatorWoodBroken,
         scale = 1,
     }
     model CarAlternatorPipe0
@@ -613,6 +637,12 @@ module RenewableEnergy
         texture = WorldItems/RenewableEnergy_CarAlternatorPipe,
         scale = 1,
     }
+    model CarAlternatorPipeBroken
+    {
+        mesh = WorldItems/RenewableEnergy_CarAlternatorPipeBroken,
+        texture = WorldItems/RenewableEnergy_CarAlternatorPipeBroken,
+        scale = 1,
+    }
     model CarAlternatorSteel0
     {
         mesh = WorldItems/RenewableEnergy_CarAlternatorSteel0,
@@ -647,6 +677,12 @@ module RenewableEnergy
     {
         mesh = WorldItems/RenewableEnergy_CarAlternatorSteel5,
         texture = WorldItems/RenewableEnergy_CarAlternatorSteel,
+        scale = 1,
+    }
+    model CarAlternatorSteelBroken
+    {
+        mesh = WorldItems/RenewableEnergy_CarAlternatorSteelBroken,
+        texture = WorldItems/RenewableEnergy_CarAlternatorSteelBroken,
         scale = 1,
     }
     model AlternatorWood0
@@ -685,6 +721,12 @@ module RenewableEnergy
         texture = WorldItems/RenewableEnergy_AlternatorWood,
         scale = 1,
     }
+    model AlternatorWoodBroken
+    {
+        mesh = WorldItems/RenewableEnergy_AlternatorWoodBroken,
+        texture = WorldItems/RenewableEnergy_AlternatorWoodBroken,
+        scale = 1,
+    }
     model AlternatorPipe0
     {
         mesh = WorldItems/RenewableEnergy_AlternatorPipe0,
@@ -721,6 +763,12 @@ module RenewableEnergy
         texture = WorldItems/RenewableEnergy_AlternatorPipe,
         scale = 1,
     }
+    model AlternatorPipeBroken
+    {
+        mesh = WorldItems/RenewableEnergy_AlternatorPipeBroken,
+        texture = WorldItems/RenewableEnergy_AlternatorPipeBroken,
+        scale = 1,
+    }
     model AlternatorSteel0
     {
         mesh = WorldItems/RenewableEnergy_AlternatorSteel0,
@@ -755,6 +803,12 @@ module RenewableEnergy
     {
         mesh = WorldItems/RenewableEnergy_AlternatorSteel5,
         texture = WorldItems/RenewableEnergy_AlternatorSteel,
+        scale = 1,
+    }
+    model AlternatorSteelBroken
+    {
+        mesh = WorldItems/RenewableEnergy_AlternatorSteelBroken,
+        texture = WorldItems/RenewableEnergy_AlternatorSteelBroken,
         scale = 1,
     }
 }

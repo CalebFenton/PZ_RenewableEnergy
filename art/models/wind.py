@@ -103,7 +103,13 @@ def _section(points, turn, shift):
     return [(x * c - y * s + shift, x * s + y * c) for x, y in points]
 
 
-def _blade(col, name, kind, size, kept=None):
+# A blade is lofted through this many lengths, from its foot, how far past its root block, strap or
+# plate it starts, by material.
+BLADE_PIECES = 6
+BLADE_FOOT = {"wood": 0.08, "pipe": 0.06, "steel": 0.05}
+
+
+def _blade(col, name, kind, size, kept=BLADE_PIECES, start=0):
     """A blade along +Z from its root at the origin, its chord along X, made the way its material
     allows, so each reads apart at a glance:
     - "wood": carved from a plank, thick at a square root block bolted on, a twisted airfoil
@@ -113,35 +119,36 @@ def _blade(col, name, kind, size, kept=None):
     - "steel": hammered from sheet, thin, flat and narrow to a point, a welded strap at its root,
       bare steel pocked by the hammer.
     Each blade is one mesh lofted through its sections (kit.loft), so the bake gives it one long
-    stretch of texture. A blade a storm snapped keeps only its first `kept` of `pieces` lengths
-    from the root, and no tip."""
+    stretch of texture. A blade a storm snapped keeps only its first `kept` of BLADE_PIECES lengths
+    from the root, and no tip; `start` gives only the lengths from there out, the piece that broke
+    off, without the root."""
     length, chord, thick = size
-    pieces = 6
-    kept = pieces if kept is None else kept
+    foot = BLADE_FOOT[kind]
     bolt = M("weld")
     parts = []
+    stations = [(j / BLADE_PIECES, foot + j * length / BLADE_PIECES) for j in range(start, kept + 1)]
 
-    def stations(foot):
-        return [(j / pieces, foot + j * length / pieces) for j in range(kept + 1)]
-
+    # The root's bolts go last: the parts' order fixes the bake's.
     if kind == "wood":
         mat = M("carvedwood")
-        parts.append(box(col, name, mat, (chord * 0.9, thick * 2.2, 0.1), bevel=0.006))
+        if not start:
+            parts.append(box(col, name, mat, (chord * 0.9, thick * 2.2, 0.1), bevel=0.006))
         # An airfoil as thick as the plank's piece there: round at the leading edge (-X), thinning
         # to the trailing edge.
         foil = [(math.cos(a) / 2, math.sin(a) * (0.45 - 0.27 * math.cos(a)))
                 for a in (2 * math.pi * k / 10 for k in range(10))]
         parts.append(loft(col, name, mat, [(z, _section([(x * chord * (1 - 0.55 * t), y * thick * (1.6 - 0.9 * t))
                                                          for x, y in foil], 26 - 20 * t, chord * 0.18 * t))
-                                           for t, z in stations(0.08)]))
-        if kept == pieces:
-            parts.append(mound(col, name, mat, (chord * 0.22, thick * 0.35, 0.05), at=(chord * 0.18, 0, 0.08 + length - 0.004),
+                                           for t, z in stations]))
+        if kept == BLADE_PIECES:
+            parts.append(mound(col, name, mat, (chord * 0.22, thick * 0.35, 0.05), at=(chord * 0.18, 0, foot + length - 0.004),
                                rotate=(0, 0, 6), segments=10, rings=3))
-        for z in (0.03, 0.07):
-            parts.append(cylinder(col, name, bolt, 0.01, 0.006, at=(0, -thick * 1.1, z), rotate=(90, 0, 0), segments=6))
+        bolts = [cylinder(col, name, bolt, 0.01, 0.006, at=(0, -thick * 1.1, z), rotate=(90, 0, 0), segments=6)
+                 for z in (0.03, 0.07) if not start]
     elif kind == "pipe":
         mat = M("pvc")
-        parts.append(box(col, name, M("rawsteel"), (chord * 0.6, 0.006, 0.12), at=(0, 0.004, -0.02)))
+        if not start:
+            parts.append(box(col, name, M("rawsteel"), (chord * 0.6, 0.006, 0.12), at=(0, 0.004, -0.02)))
         wall, arcs = 0.005, 6
 
         def shell(width):
@@ -154,26 +161,46 @@ def _blade(col, name, kind, size, kept=None):
                      for a in reversed(angles)]
             return outer + inner
         parts.append(loft(col, name, mat, [(z, _section(shell(chord * (1 - 0.6 * t)), 12, chord * 0.2 * t))
-                                           for t, z in stations(0.06)]))
-        for z in (0.0, 0.06):
-            parts.append(cylinder(col, name, bolt, 0.008, 0.006, at=(0, -0.003, z), rotate=(90, 0, 0), segments=6))
+                                           for t, z in stations]))
+        bolts = [cylinder(col, name, bolt, 0.008, 0.006, at=(0, -0.003, z), rotate=(90, 0, 0), segments=6)
+                 for z in (0.0, 0.06) if not start]
     else:
         mat = M("hammered")
-        parts.append(box(col, name, M("weld"), (chord * 0.7, thick * 3, 0.07), bevel=0.002))
+        if not start:
+            parts.append(box(col, name, M("weld"), (chord * 0.7, thick * 3, 0.07), bevel=0.002))
 
         def plate(width):
             return [(-width / 2, -thick / 2), (width / 2, -thick / 2), (width / 2, thick / 2), (-width / 2, thick / 2)]
         parts.append(loft(col, name, mat, [(z, _section(plate(chord * (1 - 0.85 * t)), 14 - 10 * t, chord * 0.1 * t))
-                                           for t, z in stations(0.05)]))
-        for z in (0.02, 0.05):
-            parts.append(cylinder(col, name, M("galvanised"), 0.008, 0.005, at=(0, -thick * 1.5, z), rotate=(90, 0, 0), segments=6))
-    return parts
+                                           for t, z in stations]))
+        bolts = [cylinder(col, name, M("galvanised"), 0.008, 0.005, at=(0, -thick * 1.5, z), rotate=(90, 0, 0), segments=6)
+                 for z in (0.02, 0.05) if not start]
+    return parts + bolts
 
 
-def _rotor_blades(col, hub, kind, size):
-    """Three blades of `kind` (_blade) bolted round `hub`, turning in the plane that faces -Y."""
-    for k in range(3):
-        group(col, ROTOR + "Blade", _blade(col, ROTOR + "Blade", kind, size), at=hub, rotate=(0, 120 * k, 0))
+# A broken rotor, still, as a storm left it: the blade on top split this many lengths out, its outer
+# part hanging down in front by a splinter or a bend, turned this far about its chord at the split;
+# the next snapped off near the root and the last halfway.
+BROKEN_SPLIT, BROKEN_HANG = 2, 150
+BROKEN_KEPT = (1, 3)
+
+
+def _rotor_blades(col, hub, kind, size, broken=False):
+    """Three blades of `kind` (_blade) bolted round `hub`, turning in the plane that faces -Y;
+    `broken` leaves them as a storm does (BROKEN_SPLIT)."""
+    name = ROTOR + "Blade"
+    if not broken:
+        for k in range(3):
+            group(col, name, _blade(col, name, kind, size), at=hub, rotate=(0, 120 * k, 0))
+        return
+    split = BLADE_FOOT[kind] + BROKEN_SPLIT * size[0] / BLADE_PIECES
+    hanging = _blade(col, name, kind, size, start=BROKEN_SPLIT)
+    for obj in hanging:
+        obj.location.z -= split
+    top = _blade(col, name, kind, size, kept=BROKEN_SPLIT) + [group(col, name, hanging, at=(0, 0, split), rotate=(BROKEN_HANG, 0, 0))]
+    group(col, name, top, at=hub)
+    for k, kept in enumerate(BROKEN_KEPT, 1):
+        group(col, name, _blade(col, name, kind, size, kept=kept), at=hub, rotate=(0, 120 * k, 0))
 
 
 def _tail(col, name, start, length, vane, z):
@@ -212,11 +239,12 @@ def _spinner(col, y, hub):
     cylinder(col, ROTOR + "Nose", M("rawsteel"), 0.07, 0.05, at=(0, y - 0.05, hub), rotate=(90, 0, 0), radius_top=0.02, segments=16)
 
 
-def propeller_charger(col, blades="wood", stub=None):
+def propeller_charger(col, blades="wood", stub=None, broken=False):
     """The treadmill wind charger: a welded pipe mast on a concrete footing, a yaw bearing on top,
     the treadmill motor as its generator, three blades on its shaft, carved from pine planks
     ("wood"), cut from plastic pipe ("pipe") or forged from sheet steel ("steel"), to the same shape,
-    and a tail vane behind. `stub` draws only the head on the top of its mast (_pipe_mast)."""
+    and a tail vane behind. `stub` draws only the head on the top of its mast (_pipe_mast);
+    `broken` its blades as a storm leaves them (_rotor_blades)."""
     hub = PROPELLER_HUB
     top = hub - 0.12
     _pipe_mast(col, "Prop", top, stub)
@@ -228,7 +256,7 @@ def propeller_charger(col, blades="wood", stub=None):
     _down_cable(col, "Prop_Cable", [(0.04, 0.04, hub - 0.07), (0.055, 0.0, top), (0.055, 0.0, 0.3), (0.12, 0.08, 0.09),
                                     (0.2, 0.2, 0.0)], 0 if stub is None else top - stub)
     _spinner(col, -0.255, hub)
-    _rotor_blades(col, (0, -0.28, hub), blades, PROPELLER_BLADE)
+    _rotor_blades(col, (0, -0.28, hub), blades, PROPELLER_BLADE, broken)
 
 
 CAR_ALTERNATOR_RADIUS = 0.065  # its case's
@@ -303,12 +331,13 @@ CAR_ALTERNATOR_PULLEY_RADIUS = 0.22  # the rotor's pulley, many times the altern
 CAR_ALTERNATOR_X = 0.2  # the alternator beside the mast, clear of the rotor's pulley
 
 
-def car_alternator_charger(col, blades="wood", stub=None):
+def car_alternator_charger(col, blades="wood", stub=None, broken=False):
     """The car alternator wind charger: the treadmill charger's welded pipe mast with a sheet-metal
     head plate on its yaw bearing, three blades on a short shaft in two pillow-block bearings and
     a large flat pulley behind them, a leather flat belt down to the small pulley of a car's
     alternator bolted to the plate beside the mast, and a sheet-metal tail vane clamped rigid
-    behind. `stub` draws only the head on the top of its mast (_pipe_mast)."""
+    behind. `stub` draws only the head on the top of its mast (_pipe_mast); `broken` its blades as
+    a storm leaves them (_rotor_blades)."""
     hub = PROPELLER_HUB
     deck = hub - CAR_ALTERNATOR_RAISE
     top = deck - 0.08
@@ -342,7 +371,7 @@ def car_alternator_charger(col, blades="wood", stub=None):
                                       (0.055, 0.0, top - 0.3), (0.055, 0.0, 0.3), (0.12, 0.08, 0.09), (0.2, 0.2, 0.0)],
                 0 if stub is None else top - stub)
     _spinner(col, -0.28, hub)
-    _rotor_blades(col, (0, -0.305, hub), blades, PROPELLER_BLADE)
+    _rotor_blades(col, (0, -0.305, hub), blades, PROPELLER_BLADE, broken)
 
 
 def _alternator_head(col, rotor):
@@ -370,11 +399,12 @@ def _alternator_head(col, rotor):
 ALTERNATOR_HEAD_Y = -0.32  # the hub's face, in front of the mast
 
 
-def alternator_charger(col, blades="steel", stub=None):
+def alternator_charger(col, blades="steel", stub=None, broken=False):
     """The homebuilt wind turbine, the best of the homestead wind chargers: a two-storey braced
     tripod of welded angle iron, kept inside its own square, a homemade alternator on its head,
     three long blades of any kind _blade makes and a tail vane that folds it out of a storm.
-    `stub` draws only the head and that many metres of the tripod under it, for a build icon."""
+    `stub` draws only the head and that many metres of the tripod under it, for a build icon;
+    `broken` its blades as a storm leaves them (_rotor_blades)."""
     hub = ALTERNATOR_HUB
     top = hub - 0.2
     low = 0.05 if stub is None else top - stub
@@ -405,7 +435,7 @@ def alternator_charger(col, blades="steel", stub=None):
     _tail(col, "Alt_Tail", (0, 0.05), 1.05, (0.55, 0.42), hub)
     _down_cable(col, "Alt_Cable", [(0.03, 0.05, hub - 0.1), on_leg(0, top - 0.05), on_leg(0, 0.3), (feet[0][0] + 0.05, feet[0][1], 0.0)],
                 0 if stub is None else low)
-    _rotor_blades(col, (0, ALTERNATOR_HEAD_Y - 0.01, hub), blades, ALTERNATOR_BLADE)
+    _rotor_blades(col, (0, ALTERNATOR_HEAD_Y - 0.01, hub), blades, ALTERNATOR_BLADE, broken)
 
 
 # Each kind of blade's size, and how far apart its blades stack in a bundle: their roots'
@@ -467,6 +497,8 @@ FACING_YAWS = {"N": 0, "E": -90, "S": 180, "W": 90}
 # the scoop rotor, the same after half a turn and spun by turning it whole, is ScoopRotor and an
 # index. Every blade machine takes every blade set, a skin each: each set's blades are shaped
 # their own way (_blade), and baked onto another set's shape they would leave its edges uncoloured.
+# A machine whose rotor spins has a broken skin of each skin too, its blades as a storm leaves
+# them and still: one mesh, named "Broken" where the spin's index goes (PropellerWoodNBroken).
 BLADE_SKINS = {"Wood": {"blades": "wood"}, "Pipe": {"blades": "pipe"}, "Steel": {"blades": "steel"}}
 SPRITE_MODELS = {
     "ScoopRotor": {"model": scoop_rotor, "yaws": {str(step): SCOOP_SPIN[0] * step for step in range(SCOOP_SPIN[1])}},
@@ -478,12 +510,18 @@ SPRITE_MODELS = {
 
 
 def sprite_model_names(name):
-    """A sprite model's skins as (texture, meshes), a mesh per spin step, and its sprite models as
-    (name, mesh, texture, yaw)."""
+    """A sprite model's skins as (texture, builder options, [(mesh, spin)]), a mesh per spin step,
+    and its sprite models as (name, mesh, texture, yaw)."""
     spec = SPRITE_MODELS[name]
     spins = spec.get("spins", (0,))
     steps = [str(index) if len(spins) > 1 else "" for index in range(len(spins))]
-    skins = [(name + skin, [name + skin + step for step in steps]) for skin in spec.get("skins") or {"": {}}]
-    sprites = [(texture + label + step, mesh, texture, yaw)
-               for texture, meshes in skins for label, yaw in spec["yaws"].items() for step, mesh in zip(steps, meshes)]
+    skins, sprites = [], []
+    for skin, options in (spec.get("skins") or {"": {}}).items():
+        base = name + skin
+        looks = [(base, options, list(zip(steps, spins)))]
+        if len(spins) > 1:
+            looks.append((base + "Broken", {**options, "broken": True}, [("Broken", 0)]))
+        for texture, look, shown in looks:
+            skins.append((texture, look, [(base + step, spin) for step, spin in shown]))
+            sprites += [(base + label + step, base + step, texture, yaw) for label, yaw in spec["yaws"].items() for step, _ in shown]
     return skins, sprites

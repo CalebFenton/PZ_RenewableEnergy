@@ -1,10 +1,11 @@
 -- Turns the wind chargers this client can see, a cosmetic only it draws. Each charger is drawn as a
 -- 3D model through a sprite model (Sprites.windModels), and the rotor turns by stepping the object
 -- through models yawed a step apart (IsoObject.setSpriteModelName); animating keeps a turning one
--- out of the cached chunk, so each step shows at once, and a still one goes back into it. An
+-- out of the cached chunk, so each step shows at once, and a still one goes back into it. A charger
+-- with broken blades shows its rotor's broken model (the prefix with "Broken" for the step). An
 -- unbraked charger in a wind that can break its blades strains audibly now and then, the warning
--- to set the brake. The game's wind is the same on every client, and a charger's brake is in its
--- modData, so nothing needs sending.
+-- to set the brake. The game's wind is the same on every client, and a charger's brake and broken
+-- blades are in its modData, so nothing needs sending.
 
 local Sprites = require "RenewableEnergy/Sprites"
 local Wind = require "RenewableEnergy/Wind"
@@ -37,12 +38,24 @@ local function modelNames(prefix, model)
 end
 
 -- A charger's turning state for the tile `name`, shown at its first step; nil for any other tile.
+-- `brokenName` is its broken rotor's model, nil for a scoop rotor, which has no blades to break.
 local function stateFor(name)
     local prefix, model = Sprites.windModelOf(name)
     if not prefix then return nil end
     local kind, _, material = Sprites.kindOf(name)
-    return { sprite = name, spec = Wind.SPEC.turbines[kind], blades = Wind.bladesOf(kind, material),
-        model = model, names = modelNames(prefix, model), phase = 0, shown = 0, strainIn = 0 }
+    local blades = Wind.bladesOf(kind, material)
+    return { sprite = name, spec = Wind.SPEC.turbines[kind], blades = blades, model = model,
+        names = modelNames(prefix, model), brokenName = blades and prefix .. "Broken", phase = 0, shown = 0,
+        strainIn = 0, broken = false }
+end
+
+-- Shows the broken rotor or the whole one at its step, as the blades break or are replaced.
+local function showBroken(object, state)
+    local broken = state.brokenName ~= nil and Wind.isBroken(object)
+    if state.broken == broken then return end
+    state.broken = broken
+    object:setSpriteModelName(broken and state.brokenName or state.names[state.shown + 1])
+    object:invalidateRenderChunkLevel(FBORenderChunk.DIRTY_OBJECT_MODIFY)
 end
 
 -- Puts the charger in or out of the cached chunk as it starts or stops turning. The chunk caches
@@ -63,6 +76,7 @@ function WindSpin.track(object)
     chargers[object] = state
     tracked = tracked + 1
     object:setSpriteModelName(state.names[1])
+    showBroken(object, state)
 end
 
 local function turnsPerSecond(spec, kph)
@@ -108,14 +122,16 @@ local function spin()
                 state.turning = turning
                 object:setSpriteModelName(state.names[1])
                 object:invalidateRenderChunkLevel(FBORenderChunk.DIRTY_OBJECT_MODIFY)
+                showBroken(object, state)
             end
         end
         if not (name and state) then
             chargers[object] = nil
             tracked = tracked - 1
         else
+            showBroken(object, state)
             local turns = turnsPerSecond(state.spec, kph)
-            local turning = turns > 0 and not (Wind.isBraked(object) or Wind.isBroken(object))
+            local turning = turns > 0 and not (Wind.isBraked(object) or state.broken)
             setTurning(object, state, turning)
             if turning then
                 local model = state.model

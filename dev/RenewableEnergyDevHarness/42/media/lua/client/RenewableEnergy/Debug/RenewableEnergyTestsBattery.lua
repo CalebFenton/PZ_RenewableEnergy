@@ -58,7 +58,8 @@ test("renewable_energy_battery_wear", {
 -- Batteries enough that the pass leaves them some charge.
 local EVENING_CHARGE, PASS_HOURS, PAST_MIDNIGHT = 0.3, 0.6, 0.5
 test("renewable_energy_battery_depth_of_discharge_wears_batteries", {
-    sandbox = { BatteryWear = 100 },
+    -- Six times normal, so a long-lived jar battery's one deep day still wears a whole point.
+    sandbox = { BatteryWear = 600 },
     run = function(self)
         T.setGrid(self, false)
         local parts = { T.INVERTER_CHARGER }

@@ -425,6 +425,67 @@ test("renewable_energy_wind_propeller_breaks_in_storm_and_blades_mend", {
     end,
 })
 
+-- Plastic pipe blades half an hour short of their lifeHours: an hour at the cut-in wind and the
+-- braked charger's hours don't count; a quarter hour turning leaves them 1% left, and the next
+-- wears them out, broken as a gale breaks them, which this client's copy shows with the broken
+-- rotor's model. Replace Blades brings them back to 100% and the turning model.
+test("renewable_energy_wind_blades_wear_out_and_blades_mend", {
+    instant = true,
+    run = function(self)
+        local bank = T.bank(self, "batteryRackWood", { T.CAR_BATTERY, T.PLUG_IN_INVERTER, CONTROLLER })
+        if not bank then return end
+        self.charger = T.panel(self, Sprites.windCharger.propeller.pipe.S, { near = bank, connect = true })
+        self.braked = T.panel(self, Sprites.windCharger.propeller.pipe.N, { near = bank, connect = true })
+        if not (self.charger and self.braked) then return end
+        local spec, life = Wind.SPEC.turbines.propeller, Wind.SPEC.blades.pipe.lifeHours
+        T.job(self, "source", SourceJobs.BRAKE, self.braked)
+        for _, charger in ipairs({ self.charger, self.braked }) do
+            T.onRecord(self, bank, "setBladeHours", { source = { x = charger.x, y = charger.y, z = charger.z }, hours = life - 0.5 })
+        end
+        T.bankPass(self, bank, 0, { hours = 1, windKph = spec.cutInKph, label = "calm" })
+        T.bankPass(self, bank, 0, { hours = 0.25, windKph = spec.ratedKph, label = "worn" })
+        T.bankPass(self, bank, 0, { hours = 0.25, windKph = spec.ratedKph, label = "wornOut" })
+        local prefix = Sprites.windModelOf(Sprites.windCharger.propeller.pipe.S)
+        local brokenModel = getScriptManager():getSpriteModel(prefix .. "Broken")
+        T.waitFor(self, function()
+            local object = self.charger.object
+            return Wind.isBroken(object) and object:getSpriteModel() == brokenModel
+        end, "this client's copy of the worn-out blades, drawn broken")
+        T.give(self, "blades", { { type = PIPE_BLADES } })
+        T.actionJob(self, "source", self.charger, SourceJobs.REPLACE_BLADES, function() return self.items.blades[1] end)
+        T.waitFor(self, function()
+            local object = self.charger.object
+            return not Wind.isBroken(object) and Wind.bladeHours(object) == 0
+                and isStepOf(object:getSpriteModel(), Sprites.windCharger.propeller.pipe.S)
+        end, "this client's copy of the new blades, drawn turning")
+        T.bankPass(self, bank, 0, { hours = 0.25, windKph = spec.ratedKph, label = "mended" })
+    end,
+    validate = function(self)
+        if not (T.expectConnected(self.charger) and T.expectConnected(self.braked)) then return end
+        for label, pct in pairs({ calm = 1, worn = 1 }) do
+            local source = T.stateSource(self.reads[label], self.charger)
+            if expect(source ~= nil and not source.broken, label .. ", the charger is missing or broken") then
+                T.expectEqual("the charger's blades left " .. label, source.bladesLeftPct, pct)
+            end
+        end
+        local wornOut = T.stateSource(self.reads.wornOut, self.charger)
+        if expect(wornOut ~= nil, "the bank's status lists no charger once worn out") then
+            expect(wornOut.broken, "at its lifeHours of turning the blades are still whole")
+            T.expectEqual("the worn-out charger's reason", wornOut.reason, "broken")
+            T.expectEqual("the worn-out charger's watts", wornOut.watts, 0)
+        end
+        local braked = T.stateSource(self.reads.wornOut, self.braked)
+        if expect(braked ~= nil, "the bank's status lists no braked charger") then
+            expect(not braked.broken, "braked, its blades wore out")
+            T.expectEqual("the braked charger's blades left", braked.bladesLeftPct, 1)
+        end
+        local mended = T.stateSource(self.reads.mended, self.charger)
+        if expect(mended ~= nil and not mended.broken, "with new blades the charger is missing or broken") then
+            T.expectEqual("the new blades left", mended.bladesLeftPct, 100)
+        end
+    end,
+})
+
 -- Blades a gale breaks while the charger's chunk is unloaded are broken in its bank's record alone;
 -- loaded again, the bank's next pass shows them broken on the charger, which still makes nothing.
 -- Catches a pass that takes the object's whole blades over the record's broken ones: a charger

@@ -212,6 +212,8 @@
     "IGUI_RenewableEnergy_ReasonFurled": "turned out of the wind",
     "IGUI_RenewableEnergy_ReasonGale": "gale, set the brake",
     "IGUI_RenewableEnergy_BladesBroke": "A wind charger's blades broke in the gale",
+    "IGUI_RenewableEnergy_BladesWoreOut": "A wind charger's blades wore out",
+    "IGUI_RenewableEnergy_BladesLeft": "blades %1%% left",
     "IGUI_RenewableEnergy_ModuleCracked": "A solar module cracked in the storm",
     "IGUI_RenewableEnergy_TakeOutAlternator": "Take Out Alternator",
     "IGUI_RenewableEnergy_PutBackAlternator": "Put Back Alternator"

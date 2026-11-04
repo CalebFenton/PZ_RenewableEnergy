@@ -241,6 +241,38 @@ module RenewableEnergy
         rotate = 0.0 90 0.0,
         scale = 0.6667,
     }
+    spriteModel PropellerWoodNBroken
+    {
+        modelScript = RenewableEnergy.PropellerWoodBroken,
+        texture = WorldItems/RenewableEnergy_PropellerWoodBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel PropellerWoodEBroken
+    {
+        modelScript = RenewableEnergy.PropellerWoodBroken,
+        texture = WorldItems/RenewableEnergy_PropellerWoodBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel PropellerWoodSBroken
+    {
+        modelScript = RenewableEnergy.PropellerWoodBroken,
+        texture = WorldItems/RenewableEnergy_PropellerWoodBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel PropellerWoodWBroken
+    {
+        modelScript = RenewableEnergy.PropellerWoodBroken,
+        texture = WorldItems/RenewableEnergy_PropellerWoodBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
     spriteModel PropellerPipeN0
     {
         modelScript = RenewableEnergy.PropellerPipe0,
@@ -429,6 +461,38 @@ module RenewableEnergy
     {
         modelScript = RenewableEnergy.PropellerPipe5,
         texture = WorldItems/RenewableEnergy_PropellerPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel PropellerPipeNBroken
+    {
+        modelScript = RenewableEnergy.PropellerPipeBroken,
+        texture = WorldItems/RenewableEnergy_PropellerPipeBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel PropellerPipeEBroken
+    {
+        modelScript = RenewableEnergy.PropellerPipeBroken,
+        texture = WorldItems/RenewableEnergy_PropellerPipeBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel PropellerPipeSBroken
+    {
+        modelScript = RenewableEnergy.PropellerPipeBroken,
+        texture = WorldItems/RenewableEnergy_PropellerPipeBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel PropellerPipeWBroken
+    {
+        modelScript = RenewableEnergy.PropellerPipeBroken,
+        texture = WorldItems/RenewableEnergy_PropellerPipeBroken,
         translate = 0.0 0.0 0.0,
         rotate = 0.0 90 0.0,
         scale = 0.6667,
@@ -625,6 +689,38 @@ module RenewableEnergy
         rotate = 0.0 90 0.0,
         scale = 0.6667,
     }
+    spriteModel PropellerSteelNBroken
+    {
+        modelScript = RenewableEnergy.PropellerSteelBroken,
+        texture = WorldItems/RenewableEnergy_PropellerSteelBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel PropellerSteelEBroken
+    {
+        modelScript = RenewableEnergy.PropellerSteelBroken,
+        texture = WorldItems/RenewableEnergy_PropellerSteelBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel PropellerSteelSBroken
+    {
+        modelScript = RenewableEnergy.PropellerSteelBroken,
+        texture = WorldItems/RenewableEnergy_PropellerSteelBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel PropellerSteelWBroken
+    {
+        modelScript = RenewableEnergy.PropellerSteelBroken,
+        texture = WorldItems/RenewableEnergy_PropellerSteelBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
     spriteModel CarAlternatorWoodN0
     {
         modelScript = RenewableEnergy.CarAlternatorWood0,
@@ -813,6 +909,38 @@ module RenewableEnergy
     {
         modelScript = RenewableEnergy.CarAlternatorWood5,
         texture = WorldItems/RenewableEnergy_CarAlternatorWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel CarAlternatorWoodNBroken
+    {
+        modelScript = RenewableEnergy.CarAlternatorWoodBroken,
+        texture = WorldItems/RenewableEnergy_CarAlternatorWoodBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel CarAlternatorWoodEBroken
+    {
+        modelScript = RenewableEnergy.CarAlternatorWoodBroken,
+        texture = WorldItems/RenewableEnergy_CarAlternatorWoodBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel CarAlternatorWoodSBroken
+    {
+        modelScript = RenewableEnergy.CarAlternatorWoodBroken,
+        texture = WorldItems/RenewableEnergy_CarAlternatorWoodBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel CarAlternatorWoodWBroken
+    {
+        modelScript = RenewableEnergy.CarAlternatorWoodBroken,
+        texture = WorldItems/RenewableEnergy_CarAlternatorWoodBroken,
         translate = 0.0 0.0 0.0,
         rotate = 0.0 90 0.0,
         scale = 0.6667,
@@ -1009,6 +1137,38 @@ module RenewableEnergy
         rotate = 0.0 90 0.0,
         scale = 0.6667,
     }
+    spriteModel CarAlternatorPipeNBroken
+    {
+        modelScript = RenewableEnergy.CarAlternatorPipeBroken,
+        texture = WorldItems/RenewableEnergy_CarAlternatorPipeBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel CarAlternatorPipeEBroken
+    {
+        modelScript = RenewableEnergy.CarAlternatorPipeBroken,
+        texture = WorldItems/RenewableEnergy_CarAlternatorPipeBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel CarAlternatorPipeSBroken
+    {
+        modelScript = RenewableEnergy.CarAlternatorPipeBroken,
+        texture = WorldItems/RenewableEnergy_CarAlternatorPipeBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel CarAlternatorPipeWBroken
+    {
+        modelScript = RenewableEnergy.CarAlternatorPipeBroken,
+        texture = WorldItems/RenewableEnergy_CarAlternatorPipeBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
     spriteModel CarAlternatorSteelN0
     {
         modelScript = RenewableEnergy.CarAlternatorSteel0,
@@ -1197,6 +1357,38 @@ module RenewableEnergy
     {
         modelScript = RenewableEnergy.CarAlternatorSteel5,
         texture = WorldItems/RenewableEnergy_CarAlternatorSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel CarAlternatorSteelNBroken
+    {
+        modelScript = RenewableEnergy.CarAlternatorSteelBroken,
+        texture = WorldItems/RenewableEnergy_CarAlternatorSteelBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel CarAlternatorSteelEBroken
+    {
+        modelScript = RenewableEnergy.CarAlternatorSteelBroken,
+        texture = WorldItems/RenewableEnergy_CarAlternatorSteelBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel CarAlternatorSteelSBroken
+    {
+        modelScript = RenewableEnergy.CarAlternatorSteelBroken,
+        texture = WorldItems/RenewableEnergy_CarAlternatorSteelBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel CarAlternatorSteelWBroken
+    {
+        modelScript = RenewableEnergy.CarAlternatorSteelBroken,
+        texture = WorldItems/RenewableEnergy_CarAlternatorSteelBroken,
         translate = 0.0 0.0 0.0,
         rotate = 0.0 90 0.0,
         scale = 0.6667,
@@ -1393,6 +1585,38 @@ module RenewableEnergy
         rotate = 0.0 90 0.0,
         scale = 0.6667,
     }
+    spriteModel AlternatorWoodNBroken
+    {
+        modelScript = RenewableEnergy.AlternatorWoodBroken,
+        texture = WorldItems/RenewableEnergy_AlternatorWoodBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel AlternatorWoodEBroken
+    {
+        modelScript = RenewableEnergy.AlternatorWoodBroken,
+        texture = WorldItems/RenewableEnergy_AlternatorWoodBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel AlternatorWoodSBroken
+    {
+        modelScript = RenewableEnergy.AlternatorWoodBroken,
+        texture = WorldItems/RenewableEnergy_AlternatorWoodBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel AlternatorWoodWBroken
+    {
+        modelScript = RenewableEnergy.AlternatorWoodBroken,
+        texture = WorldItems/RenewableEnergy_AlternatorWoodBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
     spriteModel AlternatorPipeN0
     {
         modelScript = RenewableEnergy.AlternatorPipe0,
@@ -1585,6 +1809,38 @@ module RenewableEnergy
         rotate = 0.0 90 0.0,
         scale = 0.6667,
     }
+    spriteModel AlternatorPipeNBroken
+    {
+        modelScript = RenewableEnergy.AlternatorPipeBroken,
+        texture = WorldItems/RenewableEnergy_AlternatorPipeBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel AlternatorPipeEBroken
+    {
+        modelScript = RenewableEnergy.AlternatorPipeBroken,
+        texture = WorldItems/RenewableEnergy_AlternatorPipeBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel AlternatorPipeSBroken
+    {
+        modelScript = RenewableEnergy.AlternatorPipeBroken,
+        texture = WorldItems/RenewableEnergy_AlternatorPipeBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel AlternatorPipeWBroken
+    {
+        modelScript = RenewableEnergy.AlternatorPipeBroken,
+        texture = WorldItems/RenewableEnergy_AlternatorPipeBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
     spriteModel AlternatorSteelN0
     {
         modelScript = RenewableEnergy.AlternatorSteel0,
@@ -1773,6 +2029,38 @@ module RenewableEnergy
     {
         modelScript = RenewableEnergy.AlternatorSteel5,
         texture = WorldItems/RenewableEnergy_AlternatorSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel AlternatorSteelNBroken
+    {
+        modelScript = RenewableEnergy.AlternatorSteelBroken,
+        texture = WorldItems/RenewableEnergy_AlternatorSteelBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel AlternatorSteelEBroken
+    {
+        modelScript = RenewableEnergy.AlternatorSteelBroken,
+        texture = WorldItems/RenewableEnergy_AlternatorSteelBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel AlternatorSteelSBroken
+    {
+        modelScript = RenewableEnergy.AlternatorSteelBroken,
+        texture = WorldItems/RenewableEnergy_AlternatorSteelBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel AlternatorSteelWBroken
+    {
+        modelScript = RenewableEnergy.AlternatorSteelBroken,
+        texture = WorldItems/RenewableEnergy_AlternatorSteelBroken,
         translate = 0.0 0.0 0.0,
         rotate = 0.0 90 0.0,
         scale = 0.6667,
