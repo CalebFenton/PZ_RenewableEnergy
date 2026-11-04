@@ -4,7 +4,7 @@ import random
 
 from mathutils import Vector
 
-from art.kit import around, box, cylinder, mound, ring, spline, tube
+from art.kit import around, box, cylinder, lathe, loft, mound, place, ring, spline, tube
 from biogas import generator_fit
 from palette import M
 from parts import DRUM, arch, drum, drum_patch
@@ -258,74 +258,126 @@ def generator_gas_pipe(col, side, body=None, facing="S"):
     _pipe(col, "GenPipe", route)
 
 
-# The tarry packing's oakum rope: a ply's radius, its distance off the rope's centre line, and the
-# length of one turn of the twist.
-OAKUM = (0.013, 0.011, 0.065)
+# The tarry packing: one tuft of the hay, grass or splinters a filter is packed with, once tar has
+# soaked it and matted it: shorter than the game's hay tuft as it lies on the ground (0.41 m long,
+# 0.12 wide, 0.18 high), pressed down into a filter bucket 0.3 m across. Its half length, its half
+# width where its ends splay, and its height at the middle.
+TARRY_TUFT = (0.11, 0.075, 0.06)
 
 
 def tarry_packing(col):
-    """A hank of oakum out of a gasifier's filter: hemp fibre twisted loosely into a rope of three
-    plies and bent round on itself, gummed glossy black-brown with tar where the gas ran through
-    it, one ply browner where it soaked less, its ends frayed out into loose fibres, some soaked
-    dark and some still pale."""
-    ply, lay, pitch = OAKUM
-    z = ply + lay
-    path = spline([(-0.075, -0.05, z), (-0.07, 0.015, z), (-0.03, 0.05, z), (0.03, 0.048, z), (0.068, 0.005, z),
-                   (0.05, -0.04, z), (0.005, -0.055, z)], 8)
-    along, frames = 0.0, []
-    for i, point in enumerate(path):
-        if i:
-            along += (point - path[i - 1]).length
-        ahead = (path[min(i + 1, len(path) - 1)] - path[max(i - 1, 0)]).normalized()
-        frames.append((point, along, Vector((-ahead.y, ahead.x, 0)).normalized()))
-    for k, name in enumerate(("tar", "tar", "tarstraw")):
-        points = []
-        for point, s, side in frames:
-            turn = 2 * math.pi * (s / pitch + k / 3)
-            points.append(point + (side * math.cos(turn) + Vector((0, 0, 1)) * math.sin(turn)) * lay)
-        tube(col, "Tarry_Ply", M(name), points, ply, 8)
+    """A tuft of a gasifier filter's packing once tar has soaked it, in the game's hay tuft's form:
+    its strands glued by the tar into thick locks lying side by side in layers, drawn in at the
+    middle and fanning out and up at both ends, glossy black-brown, a few browner where they soaked
+    less; loose strands cross them, and at each lock's ends a few strands stand free of the tar,
+    still the colour of straw on some, soaked brown on others."""
+    half, flare, height = TARRY_TUFT
     rng = random.Random(61)
-    # Each end frayed into a brush of fibres fanning out along the rope and drooping to the ground.
-    for end, before in ((path[0], path[1]), (path[-1], path[-2])):
-        out = (end - before).normalized()
+    # The locks, layer on layer up the tuft, each a little askew of the rest and kinked, drawn in to
+    # the waist and fanning out at the ends, the upper layers' ends lifting.
+    for layer, count in enumerate((5, 5, 5, 4)):
+        up = (layer + 0.5) / 4
+        for j in range(count):
+            lane = -1 + 2 * (j + 0.5) / count + rng.uniform(-0.12, 0.12)
+            start, end = -half * rng.uniform(0.75, 1.0), half * rng.uniform(0.75, 1.0)
+            wave, phase = rng.uniform(0.002, 0.005), rng.uniform(0, 2 * math.pi)
+            slope, lift = rng.uniform(-0.1, 0.1), up * rng.uniform(0.5, 1.1)
+            points = []
+            for k in range(11):
+                x = start + (end - start) * k / 10
+                t = x / half
+                y = lane * flare * (0.6 + 0.4 * t * t) + slope * x + wave * math.sin(3 * math.pi * k / 10 + phase)
+                z = 0.008 + height * 0.75 * up * (1 - 0.3 * t * t) + lift * height * 1.4 * abs(t) ** 3
+                points.append(Vector((x, y, z)))
+            radius = rng.uniform(0.0075, 0.009)
+            tube(col, "Tarry_Lock", M("tarstraw") if rng.random() < 0.3 else M("tar"), spline(points, 3), radius, 8)
+            _free_ends(col, rng, points, radius, rng.randint(2, 4))
+    # Loose strands through the clump, crossing the locks at a slant, sticking out further.
+    for i in range(30):
+        lane, up = rng.uniform(-1, 1), rng.random()
+        start, end = -half * rng.uniform(0.85, 1.15), half * rng.uniform(0.85, 1.15)
+        slope, lift = rng.uniform(-0.25, 0.25), up * rng.uniform(0.4, 1.2)
+        points = []
+        for k in range(9):
+            x = start + (end - start) * k / 8
+            t = x / half
+            y = lane * flare * (0.55 + 0.45 * t * t) + slope * x
+            z = 0.004 + height * 0.9 * up * (1 - 0.3 * t * t) + lift * height * 1.4 * abs(t) ** 3
+            points.append(Vector((x, y, z)))
+        tube(col, "Tarry_Loose", M("tar"), spline(points, 3), rng.uniform(0.0022, 0.003), 5)
+        _free_ends(col, rng, points, 0.002, 1)
+
+
+def _free_ends(col, rng, points, radius, count):
+    """`count` strands standing free of the tar at each end of a lock or strand along `points`,
+    spreading out of it and mostly up: straw on some, soaked brown or tarred on others."""
+    for tip, before in ((points[0], points[1]), (points[-1], points[-2])):
+        out = (tip - before).normalized()
         side = Vector((-out.y, out.x, 0))
-        for k in range(6):
-            spread, length = rng.uniform(-0.9, 0.9), rng.uniform(0.03, 0.05)
-            start = end + side * spread * lay + Vector((0, 0, rng.uniform(-0.6, 0.6) * lay))
-            tip = start + (out + side * spread * 0.8) * length
-            tip.z = max(0.004, start.z - rng.uniform(0.008, 0.02))
-            fibre = M("straw" if k % 3 == 0 else "tarstraw" if k % 3 == 1 else "tar")
-            tube(col, "Tarry_Fibre", fibre, spline([start, (start + tip) / 2 + Vector((0, 0, 0.004)), tip], 3), 0.003, 5)
+        for _ in range(count):
+            length, spread = rng.uniform(0.022, 0.045), rng.uniform(-0.6, 0.6)
+            root = tip - out * 0.006 + side * spread * radius
+            free = root + (out + side * spread + Vector((0, 0, rng.uniform(-0.3, 0.4)))).normalized() * length
+            free.z = max(free.z, 0.003)
+            shade = rng.random()
+            strand = M("straw") if shade < 0.45 else M("tarstraw") if shade < 0.75 else M("tar")
+            tube(col, "Tarry_Strand", strand, [root, (root + free) / 2 + Vector((0, 0, 0.002)), free], 0.0022, 5)
+
+
+# A heap of wood ash as it is raked out of a gasifier's ash pit or a fire: half a kilo, slumped to a
+# low cone between the heaps the game lays its quicklime (0.26 m across, 0.10 high) and gunpowder
+# (0.16 m, 0.04 high) down as. Its radius at the foot and its height.
+ASH_HEAP = (0.09, 0.07)
+# The heap's profile up from its foot, as fractions of its radius and height: its slopes straight as
+# a poured heap's, easing in at the foot and rounding off at the peak.
+ASH_PROFILE = ((1.0, 0.0), (0.86, 0.1), (0.66, 0.33), (0.46, 0.58), (0.27, 0.8), (0.1, 0.96), (0.0, 1.0))
 
 
 def wood_ash(col):
-    """Wood ash out of a stove, kept in an old can painted black: its rolled rim and two ribs
-    catching the light, heaped above the rim with soft pale grey ash flecked white where it burnt
-    clean, with bits of charcoal in it."""
-    radius, height = 0.055, 0.085
-    cylinder(col, "Ash_Can", M("roundbin"), radius, height, segments=24)
-    ring(col, "Ash_CanRim", M("roundbin"), (0, 0), radius, height, 0.003)
-    for z in (0.025, 0.06):
-        ring(col, "Ash_CanRib", M("roundbin"), (0, 0), radius, z, 0.0018)
-    heap = 0.045
-    # Sunk into the can, below its lid's plane, which would otherwise meet the heap's base and shade black.
-    base = height - 0.01
-    mound(col, "Ash_Heap", M("ash"), (radius - 0.002, radius - 0.002, heap + 0.01), at=(0, 0, base), lumps=0.06, seed=50,
-          segments=20, rings=6)
-    rng = random.Random(51)
+    """Wood ash in a bare heap, as the game lays its quicklime and gunpowder down: soft pale grey
+    powder slumped into a low cone, its foot uneven, bits of charcoal half buried in it, a few flecks
+    white where it burnt clean, and a few crumbs spilt round its foot."""
+    radius, height = ASH_HEAP
+    rng = random.Random(50)
+    waves = [(rng.uniform(0.03, 0.06), rng.uniform(0, 360), k) for k in (2, 3, 5)]
 
-    def on_heap(spread):
-        # Clear of the heap's lumps, which raise its surface by up to a sixteenth.
-        return base + (heap + 0.01) * math.sqrt(1 - spread * spread) * 1.04
+    def reach(angle):
+        # How far the heap's foot runs out that way, as a fraction of its radius.
+        return 1 + sum(a * math.cos(math.radians(k * angle + phase)) for a, phase, k in waves)
+
+    def shape(angle, row):
+        # The foot pushed out or drawn in with the outline, every row but the foot and the top
+        # raised or lowered a little, so the heap isn't turned as on a lathe.
+        out, _ = ASH_PROFILE[row]
+        lump = rng.uniform(-0.03, 0.03) if 0 < row < len(ASH_PROFILE) - 1 else 0.0
+        return radius * out * (reach(angle) - 1), height * lump
+    lathe(col, "Ash_Heap", M("ash"), [(radius * out, height * up) for out, up in ASH_PROFILE], segments=32, shape=shape)
+
+    def on_heap(spread, angle):
+        # The point on the heap a fraction `spread` of the way out to its foot that way.
+        for (r0, z0), (r1, z1) in zip(ASH_PROFILE, ASH_PROFILE[1:]):
+            if r1 <= spread <= r0:
+                z = height * (z0 + (z1 - z0) * (r0 - spread) / (r0 - r1))
+                return (*around((0, 0), angle, spread * radius * reach(angle)), z)
+        return (*around((0, 0), angle, spread * radius * reach(angle)), 0.0)
     # Spread over the heap on a golden-angle spiral, so no side of it is bare.
-    for i in range(5):
-        spread = 0.7 * math.sqrt((i + 0.5) / 5)
-        u, v = around((0, 0), i * 137.5, spread * (radius - 0.002))
-        size = (rng.uniform(0.008, 0.013), rng.uniform(0.006, 0.009), 0.007)
-        box(col, "Ash_Charcoal", M("charcoal"), size, at=(u, v, on_heap(spread) - 0.004),
-            rotate=(rng.uniform(-20, 20), rng.uniform(-20, 20), rng.uniform(0, 180)))
+    for i in range(11):
+        spread, angle = 0.85 * math.sqrt((i + 0.5) / 11), i * 137.5
+        x, y, z = on_heap(spread, angle)
+        size = (rng.uniform(0.007, 0.012), rng.uniform(0.005, 0.009), rng.uniform(0.005, 0.007))
+        box(col, "Ash_Charcoal", M("charcoal"), size, at=(x, y, z - size[2] * 0.7),
+            rotate=(rng.uniform(-25, 25), rng.uniform(-25, 25), rng.uniform(0, 180)))
     for i in range(6):
-        spread = 0.8 * math.sqrt((i + 0.3) / 6)
-        u, v = around((0, 0), 60 + i * 137.5, spread * (radius - 0.002))
-        mound(col, "Ash_Fleck", M("ashwhite"), (rng.uniform(0.005, 0.009), rng.uniform(0.004, 0.007), 0.003),
-              at=(u, v, on_heap(spread) - 0.002), rotate=(0, 0, rng.uniform(0, 180)), segments=8, rings=2)
+        spread, angle = 0.8 * math.sqrt((i + 0.3) / 6), 60 + i * 137.5
+        x, y, z = on_heap(spread, angle)
+        mound(col, "Ash_Fleck", M("ashwhite"), (rng.uniform(0.007, 0.01), rng.uniform(0.005, 0.007), 0.0025),
+              at=(x, y, z - 0.002), rotate=(0, 0, rng.uniform(0, 180)), segments=8, rings=2)
+    # Crumbs of ash and charcoal spilt round the foot.
+    for i in range(5):
+        angle = 20 + i * 71 + rng.uniform(-10, 10)
+        x, y = around((0, 0), angle, radius * reach(angle) * rng.uniform(1.08, 1.25))
+        if i % 2:
+            box(col, "Ash_Crumb", M("charcoal"), (0.007, 0.005, 0.004), at=(x, y, 0), rotate=(0, 0, rng.uniform(0, 180)))
+        else:
+            mound(col, "Ash_Crumb", M("ashdark"), (0.008, 0.006, 0.004), at=(x, y, 0), rotate=(0, 0, rng.uniform(0, 180)),
+                  segments=8, rings=2)

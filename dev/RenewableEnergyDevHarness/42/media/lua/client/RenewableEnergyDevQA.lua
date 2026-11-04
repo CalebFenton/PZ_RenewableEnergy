@@ -87,7 +87,7 @@ local WORKED_ON = {
     { "Base.Quicklime", 1 }, { "Base.BakingSoda", 2 }, { "Base.EmptySandbag", 4 },
     { "Base.Log", 4 }, { "Base.FirewoodBundle", 4 }, { "Base.TwigsBundle", 2 }, { "Base.Twigs", 10 },
     { "Base.LargeBranch", 4 }, { "Base.Pinecone", 10 }, { "Base.Splinters", 10 }, { "Base.Charcoal", 10 },
-    { "Base.Straw2", 10 }, { "RenewableEnergy.TarpGasBag", 1 }, { "RenewableEnergy.IronSponge", 1 },
+    { "Base.HayTuft", 10 }, { "RenewableEnergy.TarpGasBag", 1 }, { "RenewableEnergy.IronSponge", 1 },
     { "RenewableEnergy.SpentIronSponge", 1 }, { "Base.IronScrap", 4 },
     { "Base.LightBulb", 4 }, { "Base.Battery", 6 }, { "Base.Thread", 2 },
 }
@@ -150,7 +150,7 @@ local GROUP_TYPES = {
     -- Gasifiers, their fuel and filter, cleaning them out, and wood vinegar.
     woodgas = {
         "RenewableEnergy.WoodAsh", "RenewableEnergy.TarryPacking", "Base.Log", "Base.FirewoodBundle",
-        "Base.TwigsBundle", "Base.Twigs", "Base.LargeBranch", "Base.Pinecone", "Base.Splinters", "Base.Straw2",
+        "Base.TwigsBundle", "Base.Twigs", "Base.LargeBranch", "Base.Pinecone", "Base.Splinters", "Base.HayTuft",
         "Base.Charcoal", "Base.LargeBellows", "Base.Shovel", "Base.Mov_BinRound", "Base.Strainer",
         "Base.NutsBolts", "Base.GardeningSprayEmpty",
     },

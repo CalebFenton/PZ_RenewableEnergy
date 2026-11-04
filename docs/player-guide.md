@@ -179,7 +179,7 @@ Car batteries come first, then **Deep Cycle Batteries**, which hold twice as muc
 | Digesters | Barrel Digester | Insulated Digester: three times the barrel, built new or upgraded from a barrel | Brick Dome Digester: three times again, buried and warm |
 | Gasifiers | Primitive Gasifier (trash can) | Gasifier (steel drum) | Advanced Gasifier (welded sheet metal) |
 
-A bigger digester holds more feed and gas, takes feed in faster and rides out cold snaps. **Upgrade to Insulated Digester** keeps what's inside the barrel, which goes in a box of planks and straw under a second drum that floats on top to hold the gas. A tarp gas bag on the barrel comes back to you. The brick dome is laid in clay bricks, stone blocks or any mix of the two, and sits in a pit you dig, so it goes only where you could dig a grave: earth, grass or sand at ground level, not a floor or pavement. A bigger gasifier carries more fuel and makes less ash.
+A bigger digester holds more feed and gas, takes feed in faster and rides out cold snaps. **Upgrade to Insulated Digester** keeps what's inside the barrel, which goes in a box of planks packed with hay under a second drum that floats on top to hold the gas. A tarp gas bag on the barrel comes back to you. The brick dome is laid in clay bricks, stone blocks or any mix of the two, and sits in a pit you dig, so it goes only where you could dig a grave: earth, grass or sand at ground level, not a floor or pavement. A bigger gasifier carries more fuel and makes less ash.
 
 ### Sizing a bank
 
@@ -600,7 +600,7 @@ Logs, branches, planks, firewood, twigs, pinecones, charcoal, and anything a cha
 ### Gasifier upkeep
 
 - **Ash.** The ash pit fills as it burns, fastest in the primitive gasifier. A full pit halves the gas. **Clean Out Ash** with a shovel, trowel or broom gives **Wood Ash**, which settles a sour digester, goes in a scrubber's water, or stands in for baking soda when you service a battery.
-- **Filter.** The filter holds hay, straw, grass or splinters, which turn into **Tarry Packing** as it burns. Change the packing in time: once no clean packing is left, tar reaches the engine, for half the gas and fast wear. Tarry packing wears the generator faster even before then.
+- **Filter.** The filter holds hay, grass or splinters, which turn into **Tarry Packing** as tar soaks them. Change the packing in time: once no clean packing is left, tar reaches the engine, for half the gas and fast wear. Tarry packing wears the generator faster even before then.
 - **Condensate.** Burning fills a condensate drain, and while it's full, tar builds up twice as fast. **Drain Condensate** into a metal or glass container while the gasifier is lit. It's wood vinegar: poisonous to drink, but mixed with water it makes mildew spray and aphid spray.
 
 A lit gasifier inside a building poisons the whole building. While nobody is near, it burns only what's already in its firebox, then goes out and cools, and the generator stops.
@@ -697,7 +697,7 @@ Found inverters, the maintainer, the solar battery charger, garden lights, facto
 ## Moving things and your save
 
 - **Picking up.** Panels keep their modules, and garden lights keep their charge. Anything connected (a bank, a panel, a wind charger or a treadmill) must be disconnected before you can pick it up or turn it, as with a generator, and goes down again unconnected. A bank must also be emptied; a sledgehammer dumps what's in it on the floor. A generator with a gas kit fitted can't be picked up. A digester, gasifier or wind charger goes down again just as it was picked up, gas, feed, fittings, wear and all; nothing changes while you carry it. Its hopper must be empty, and a gasifier must be put out and its gas line disconnected. A gas heater goes out when its digester is picked up.
-- **Scrapping.** A digester, gasifier or wind charger taken apart with the Moveables tool's Scrap mode gives back what built it: each piece comes back 70% of the time at level 0 of its recipe's first skill, 2% more for each level. Glue, tape, garbage bags, straw, cement and welding fuel are used up for good. A wind charger's motor or alternator and its blades always come off whole, broken blades broken, and a digester's Tarp Gas Bag, compressor and packed Iron Sponge come back as they were.
+- **Scrapping.** A digester, gasifier or wind charger taken apart with the Moveables tool's Scrap mode gives back what built it: each piece comes back 70% of the time at level 0 of its recipe's first skill, 2% more for each level. Glue, tape, garbage bags, hay, cement and welding fuel are used up for good. A wind charger's motor or alternator and its blades always come off whole, broken blades broken, and a digester's Tarp Gas Bag, compressor and packed Iron Sponge come back as they were.
 - **Adding to a save.** Loot and stocked rooms turn up only in containers and rooms nobody has opened or seen yet. Solar sites, rural finds and garden lights appear anywhere, explored or not.
 - **Removing from a save.** What the mod built into your world goes with it.
 

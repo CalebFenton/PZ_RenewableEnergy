@@ -237,7 +237,7 @@ module Base
                 item 6 [Base.Plank],
                 item 12 [Base.Nails],
                 item 1 [Base.Tarp],
-                item 10 [Base.HayTuft;Base.Straw2],
+                item 10 [Base.HayTuft],
                 item 1 [Base.RubberHose],
             }
         }

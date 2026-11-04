@@ -262,7 +262,7 @@ DigesterJobs.JOBS = {
             { item = "Base.Plank", need = 6 },
             { item = "Base.Nails", need = 12 },
             { item = "Base.Tarp", need = 1 },
-            { item = Gasifier.HAY[1], types = Gasifier.HAY, need = 10 },
+            { item = Gasifier.HAY, need = 10 },
         },
         xp = { perk = "Woodwork", amount = 30 },
     },

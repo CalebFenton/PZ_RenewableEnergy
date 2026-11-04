@@ -231,7 +231,9 @@ def tarp_gas_bag(col):
         cylinder(col, "TarpFold_BarbRidge", M("galvanised"), 0.016, 0.007, at=(rx + out, y, z), rotate=(0, 90, 0), segments=10)
 
 
-SPONGE = (0.055, 0.0375, 0.03)  # the pad's half length, half width and height
+# The pad's half length, half width and height: with its loose strands, a little bigger than the
+# game's own Sponge as it lies on the ground (0.142 x 0.095 x 0.054 m), as a scrubber's packing.
+SPONGE = (0.062, 0.048, 0.05)
 
 
 def _pad_loop(half_length, half_height, corner, t):
@@ -261,54 +263,68 @@ def iron_sponge(col, spent=False):
     """A pad of iron sponge, a gas scrubber's packing: wood shavings rusted together with iron
     filings, pressed into a scrub pad like a steel wool one, coarse wiry strands wound round it
     lengthwise and a few across, some curling loose at its ends; orange-brown with rust, or
-    `spent`, black with iron sulphide but for a few dull specks of sulphur."""
+    `spent`, black with iron sulphide, its strands a dull blue-grey sheen, flecked with yellow
+    sulphur and crusted with it along a few strands."""
     rx, ry, height = SPONGE
     body, wire = (M("ironsulphide"), M("sulphidewire")) if spent else (M("rustchips"), M("rustwire"))
-    box(col, "Sponge_Pad", body, (2 * rx, 2 * ry, height), bevel=0.008)
+    box(col, "Sponge_Pad", body, (2 * rx, 2 * ry, height), bevel=0.009)
     rng = random.Random(71)
-    radius, mid = 0.0023, height / 2
+    radius, mid = 0.0026, height / 2
     # Wound lengthwise round the pad, side by side across it, each strand kinked from side to side.
-    strands = 15
+    strands = 17
+    lengthwise = []
     for i in range(strands):
         y0 = -ry + 0.003 + (2 * ry - 0.006) * i / (strands - 1)
-        waves, phase, sway = rng.randint(3, 6), rng.uniform(0, 2 * math.pi), rng.uniform(0.003, 0.005)
+        waves, phase, sway = rng.randint(3, 6), rng.uniform(0, 2 * math.pi), rng.uniform(0.0035, 0.0055)
         points = []
         for k in range(48):
             t = k / 48
-            u, v = _pad_loop(rx + 0.001, mid + 0.001, 0.009, t)
+            u, v = _pad_loop(rx + 0.001, mid + 0.001, 0.01, t)
             y = max(-ry, min(ry, y0 + sway * math.sin(2 * math.pi * waves * t + phase)))
-            points.append((u, y, mid + v + rng.uniform(-0.0008, 0.0008)))
+            points.append((u, y, mid + v + rng.uniform(-0.0009, 0.0009)))
         tube(col, "Sponge_Wire", wire if i % 2 else body, points + points[:1], radius, 5)
+        lengthwise.append(points)
     # Round its sides, a few strands winding level round the pad between its top and bottom.
-    for i, z0 in enumerate((0.25, 0.5, 0.75)):
+    for i, z0 in enumerate((0.2, 0.4, 0.6, 0.8)):
         waves, phase = rng.randint(5, 8), rng.uniform(0, 2 * math.pi)
         points = []
         for k in range(64):
             t = k / 64
-            x, y = _pad_loop(rx + 0.001, ry + 0.001, 0.009, t)
-            points.append((x, y, height * z0 + 0.003 * math.sin(2 * math.pi * waves * t + phase)))
+            x, y = _pad_loop(rx + 0.001, ry + 0.001, 0.01, t)
+            points.append((x, y, height * z0 + 0.0035 * math.sin(2 * math.pi * waves * t + phase)))
         tube(col, "Sponge_Wire", body if i % 2 else wire, points + points[:1], radius, 5)
     # A few wound across it on the slant, either way, kinked and tangled over the lengthwise ones.
-    for x0, slant in ((-0.03, 0.025), (-0.005, -0.03), (0.02, 0.028), (0.04, -0.022)):
+    for x0, slant in ((-0.034, 0.028), (-0.006, -0.034), (0.022, 0.032), (0.045, -0.025)):
         phase = rng.uniform(0, 2 * math.pi)
         points = []
         for k in range(40):
             t = k / 40
-            v, w = _pad_loop(ry + 0.003, mid + 0.003, 0.01, t)
-            points.append((x0 + slant * v / ry + 0.004 * math.sin(2 * math.pi * 3 * t + phase), v, mid + w))
+            v, w = _pad_loop(ry + 0.003, mid + 0.003, 0.011, t)
+            points.append((x0 + slant * v / ry + 0.0045 * math.sin(2 * math.pi * 3 * t + phase), v, mid + w))
         tube(col, "Sponge_Wire", wire, points + points[:1], radius * 0.8, 5)
     # Loose strands curling out of its ends.
     for end in (-1, 1):
         for k in range(3):
             y, rise = rng.uniform(-0.7, 0.7) * ry, rng.uniform(0.3, 0.8) * height
-            reach = rng.uniform(0.012, 0.02)
-            curl = [(end * (rx - 0.004), y, rise), (end * (rx + reach * 0.6), y + 0.004, rise + 0.006),
-                    (end * (rx + reach), y + 0.01, rise), (end * (rx + reach * 0.5), y + 0.012, rise - 0.006)]
+            reach = rng.uniform(0.013, 0.022)
+            curl = [(end * (rx - 0.004), y, rise), (end * (rx + reach * 0.6), y + 0.0045, rise + 0.007),
+                    (end * (rx + reach), y + 0.011, rise), (end * (rx + reach * 0.5), y + 0.013, rise - 0.007)]
             tube(col, "Sponge_Curl", wire, spline(curl, 4), radius * 0.8, 5)
-    if spent:
-        for _ in range(4):
-            mound(col, "Sponge_Sulphur", M("sulphur"), (0.005, 0.004, 0.003),
-                  at=(rng.uniform(-0.7, 0.7) * rx, rng.uniform(-0.6, 0.6) * ry, height + radius), segments=8, rings=2)
+    if not spent:
+        return
+    # Sulphur the gas left: specks over its top, more on the side the gas came in at, and yellow
+    # crusted along the top of a few lengthwise strands.
+    for _ in range(14):
+        mound(col, "Sponge_Sulphur", M("sulphur"), (rng.uniform(0.004, 0.0065), rng.uniform(0.0035, 0.005), 0.003),
+              at=(rng.uniform(-0.85, 0.85) * rx, rng.uniform(-0.8, 0.8) * ry, height + radius * 0.5),
+              rotate=(0, 0, rng.uniform(0, 180)), segments=8, rings=2)
+    for _ in range(6):
+        mound(col, "Sponge_Sulphur", M("sulphur"), (rng.uniform(0.004, 0.006), rng.uniform(0.003, 0.0045), 0.0025),
+              at=(rng.uniform(-0.8, 0.8) * rx, -ry - radius * 0.5, rng.uniform(0.2, 0.8) * height),
+              rotate=(90, 0, rng.uniform(0, 180)), segments=8, rings=2)
+    for i, start in ((3, 4), (8, 8), (12, 2), (15, 6)):
+        run = lengthwise[i][start:start + rng.randint(4, 7)]
+        tube(col, "Sponge_SulphurCrust", M("sulphur"), [(x, y, z + radius * 0.25) for x, y, z in run], radius * 1.12, 5)
 
 
 def _tarp_bag(col, fill, torn, centre=TARP_AT, barb=None):

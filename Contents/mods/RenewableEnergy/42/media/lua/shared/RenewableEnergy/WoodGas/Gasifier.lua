@@ -51,8 +51,8 @@ Gasifier.BELLOWS = { "Base.Bellows", "Base.LargeBellows" }
 Gasifier.ASH_PER_ITEM = 25
 Gasifier.WOOD_ASH = "RenewableEnergy.WoodAsh"
 Gasifier.TARRY = "RenewableEnergy.TarryPacking"
--- Hay and straw, which pack the filter.
-Gasifier.HAY = { "Base.HayTuft", "Base.Straw2" }
+-- Hay, which packs the filter and insulates a digester.
+Gasifier.HAY = "Base.HayTuft"
 
 -- The filter's condensate, wood vinegar: litres per kg burned, what the filter's drain holds, and
 -- how much faster tar fills the packing while it is full.
@@ -74,8 +74,7 @@ function Gasifier.takesCondensate(item, lit)
 end
 
 local PACKING = {
-    [Gasifier.HAY[1]] = true,
-    [Gasifier.HAY[2]] = true,
+    [Gasifier.HAY] = true,
     ["Base.Splinters"] = true,
     ["Base.GrassTuft"] = true,
 }

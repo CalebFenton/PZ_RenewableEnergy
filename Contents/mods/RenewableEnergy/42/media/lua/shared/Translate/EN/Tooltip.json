@@ -134,7 +134,7 @@
     "Tooltip_RenewableEnergy_PrimitiveGasifier": "Burns wood to make gas for a generator beside it with a Gas Conversion Kit. Small, tarry and needs cleaning often.",
     "Tooltip_RenewableEnergy_Gasifier": "Burns wood to make gas for a generator beside it with a Gas Conversion Kit. A full hopper runs it nearly as long as a tank of gasoline.",
     "Tooltip_RenewableEnergy_AdvancedGasifier": "Burns wood or, best, charcoal to make gas for a generator beside it with a Gas Conversion Kit. Little tar and little cleaning.",
-    "Tooltip_RenewableEnergy_TarryPacking": "Burn it in a gasifier's hopper.",
+    "Tooltip_RenewableEnergy_TarryPacking": "Hay, grass or splinters from a gasifier's filter, soaked through with tar. Burn it in a gasifier's hopper.",
     "Tooltip_RenewableEnergy_NoWood": "There's no wood in the hopper.",
     "Tooltip_RenewableEnergy_LittleAsh": "There's too little ash to clean out.",
     "Tooltip_RenewableEnergy_NoGasifier": "The gasifier is gone.",

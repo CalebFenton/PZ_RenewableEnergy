@@ -270,14 +270,15 @@ PALETTE = {
     "leather": lambda: material("RE_Leather", "#6e4a2c", roughness=0.7, grime=0.2, scale=14),
     # Iron sponge: wood shavings crusted orange-brown with rust, flecked with filed iron, its wiry
     # strands a brighter rust where they stand proud; spent, it is blackened by iron sulphide, its
-    # strands a dull charcoal sheen, with a few dull specks of sulphur.
+    # strands a dull blue-grey sheen as used steel wool's, flecked and crusted with yellow sulphur.
     "rustchips": lambda: material("RE_RustChips", "#8a5634", roughness=0.95, grime=0.35, scale=25,
                                   speckle=("#5e3a22", 0.45)),
     "rustwire": lambda: material("RE_RustWire", "#b0683a", roughness=0.8, grime=0.25, scale=25, speckle=("#7a4426", 0.4)),
-    "ironsulphide": lambda: material("RE_IronSulphide", "#262524", roughness=0.85, grime=0.15, scale=25,
-                                     speckle=("#121212", 0.4)),
-    "sulphidewire": lambda: material("RE_SulphideWire", "#45423e", roughness=0.6, grime=0.2, scale=25),
-    "sulphur": lambda: material("RE_Sulphur", "#b3a65a", roughness=0.9, grime=0.15),
+    "ironsulphide": lambda: material("RE_IronSulphide", "#262626", roughness=0.8, grime=0.15, scale=25,
+                                     speckle=("#363b44", 0.4)),
+    "sulphidewire": lambda: material("RE_SulphideWire", "#4b525c", roughness=0.4, metallic=0.35, grime=0.2, scale=25,
+                                     speckle=("#2c2f34", 0.45)),
+    "sulphur": lambda: material("RE_Sulphur", "#d0bb4c", roughness=0.85, grime=0.15),
 }
 
 

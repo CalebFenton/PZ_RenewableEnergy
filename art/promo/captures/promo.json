@@ -310,10 +310,10 @@
     {
       "name": "model_RenewableEnergy_BatteryBankMetal",
       "box": [
-        106,
-        106,
+        105,
+        105,
         316,
-        406
+        407
       ]
     },
     {
@@ -580,10 +580,10 @@
     {
       "name": "model_RenewableEnergy_IronSponge",
       "box": [
-        18,
-        18,
-        70,
-        44
+        21,
+        21,
+        80,
+        57
       ]
     },
     {
@@ -769,10 +769,10 @@
     {
       "name": "model_RenewableEnergy_SpentIronSponge",
       "box": [
-        18,
-        18,
-        70,
-        44
+        21,
+        21,
+        80,
+        57
       ]
     },
     {
@@ -796,10 +796,10 @@
     {
       "name": "model_RenewableEnergy_TarryPacking",
       "box": [
-        24,
-        24,
-        92,
-        65
+        38,
+        38,
+        148,
+        94
       ]
     },
     {
@@ -814,10 +814,10 @@
     {
       "name": "model_RenewableEnergy_WoodAsh",
       "box": [
-        19,
-        19,
-        61,
-        74
+        26,
+        26,
+        101,
+        66
       ]
     },
     {
@@ -7880,12 +7880,6 @@
               "fullType": "Base.HayTuft",
               "icon": "icon_Base_HayTuft",
               "name": "Hay"
-            },
-            {
-              "count": 10,
-              "fullType": "Base.Straw2",
-              "icon": "icon_Base_Straw2",
-              "name": "Straw"
             }
           ],
           "keep": false,
@@ -9529,7 +9523,6 @@
       "icon_Base_SteelScrap",
       "icon_Base_StoneBlock",
       "icon_Base_Strainer",
-      "icon_Base_Straw2",
       "icon_Base_Tarp",
       "icon_Base_Thread",
       "icon_Base_Tongs",

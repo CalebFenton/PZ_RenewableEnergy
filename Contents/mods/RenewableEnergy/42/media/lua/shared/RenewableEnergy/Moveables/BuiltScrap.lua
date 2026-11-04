@@ -40,11 +40,10 @@ local ENTITIES = {
     alternator = "Base.RenewableEnergy_TurbineWood",
 }
 
--- What a build uses up for good: glued and taped joins, the straw that rots in the walls, garbage
+-- What a build uses up for good: glued and taped joins, the hay that rots in the walls, garbage
 -- bags. An input that can be any of these gives nothing back.
 local SPENT = {
-    ["Base.Glue"] = true, ["Base.DuctTape"] = true, ["Base.HayTuft"] = true, ["Base.Straw2"] = true,
-    ["Base.Garbagebag"] = true,
+    ["Base.Glue"] = true, ["Base.DuctTape"] = true, ["Base.HayTuft"] = true, ["Base.Garbagebag"] = true,
 }
 
 -- What makes a wind charger go, which comes off whole rather than as scrap.
