@@ -152,6 +152,7 @@
     "Tooltip_RenewableEnergy_NotPadlocked": "The battery box isn't padlocked.",
     "Tooltip_RenewableEnergy_TreadmillMotor": "Powers a Scoop Rotor or Treadmill Wind Charger.",
     "Tooltip_RenewableEnergy_ScoopRotor": "Weak and slow, but it turns in any wind and never needs the brake. Uses 1 bank input, like a panel; no charge controller needed.",
+    "Tooltip_RenewableEnergy_TimberScoopRotor": "The Scoop Rotor Wind Charger between two poles instead of on a welded pole: the same power, built with Carpentry. It turns in any wind and never needs the brake. Uses 1 bank input, like a panel; no charge controller needed.",
     "Tooltip_RenewableEnergy_TreadmillNotConnected": "Connect it to a bank first, or the running goes nowhere.",
     "Tooltip_RenewableEnergy_TreadmillNoPower": "There's no power for its motor. Connect it to a battery bank, and running on it makes power instead.",
     "Tooltip_RenewableEnergy_RunOnTreadmill": "Half an hour of running. Connected to a battery bank, it charges the bank; otherwise the treadmill runs off the power like any appliance.",

@@ -301,6 +301,7 @@ local SOURCE_NAMES = {
     rackwood = "IGUI_RenewableEnergy_MountRackWood",
     rackmetal = "IGUI_RenewableEnergy_MountRackMetal",
     scoop = "IGUI_RenewableEnergy_WindScoop",
+    timberScoop = "IGUI_RenewableEnergy_WindTimberScoop",
     propeller = "IGUI_RenewableEnergy_WindTreadmill",
     carAlternator = "IGUI_RenewableEnergy_WindCarAlternator",
     timberPropeller = "IGUI_RenewableEnergy_WindTimberTreadmill",

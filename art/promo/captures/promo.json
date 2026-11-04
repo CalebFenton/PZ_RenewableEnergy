@@ -310,10 +310,10 @@
     {
       "name": "model_RenewableEnergy_BatteryBankMetal",
       "box": [
-        106,
-        106,
+        105,
+        105,
         316,
-        406
+        407
       ]
     },
     {
@@ -598,10 +598,10 @@
     {
       "name": "model_RenewableEnergy_L16Battery",
       "box": [
-        60,
-        60,
-        210,
-        231
+        59,
+        59,
+        209,
+        229
       ]
     },
     {
@@ -852,7 +852,7 @@
       "box": [
         43,
         43,
-        119,
+        120,
         166
       ]
     }
@@ -7339,6 +7339,233 @@
     },
     {
       "build": {
+        "icon": "icon_build_RenewableEnergy_TimberScoopRotor",
+        "name": "Scoop Rotor Wind Charger on a Wooden Frame"
+      },
+      "id": "RenewableEnergy_TimberScoopRotor",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Hammer",
+              "icon": "icon_Base_Hammer",
+              "name": "Claw Hammer"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Saw",
+              "icon": "icon_Base_Saw",
+              "name": "Hacksaw"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.HandDrill",
+              "icon": "icon_Base_HandDrill",
+              "name": "Hand Drill"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.MetalDrum",
+              "icon": "icon_Base_MetalDrum",
+              "name": "Metal Drum"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.TreadmillMotor",
+              "icon": "icon_RenewableEnergy_TreadmillMotor",
+              "name": "Treadmill Motor"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.MetalPipe",
+              "icon": "icon_Base_MetalPipe",
+              "name": "Iron Pipe"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 2,
+          "items": [
+            {
+              "count": 2,
+              "fullType": "Base.Log",
+              "icon": "icon_Base_Log",
+              "name": "Log"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 4,
+          "items": [
+            {
+              "count": 4,
+              "fullType": "Base.Plank",
+              "icon": "icon_Base_Plank",
+              "name": "Plank"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 10,
+          "items": [
+            {
+              "count": 10,
+              "fullType": "Base.Nails",
+              "icon": "icon_Base_Nails",
+              "name": "Nails"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 2,
+          "items": [
+            {
+              "count": 2,
+              "fullType": "Base.Rope",
+              "icon": "icon_Base_Rope",
+              "name": "Rope"
+            },
+            {
+              "count": 2,
+              "fullType": "Base.SheetRope",
+              "icon": "icon_Base_SheetRope",
+              "name": "Sheet Rope"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 4,
+          "items": [
+            {
+              "count": 4,
+              "fullType": "Base.Screws",
+              "icon": "icon_Base_Screws",
+              "name": "Screws"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 2,
+          "items": [
+            {
+              "count": 2,
+              "fullType": "Base.ElectricWire",
+              "icon": "icon_Base_ElectricWire",
+              "name": "Electrical Wire"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.ElectronicsScrap",
+              "icon": "icon_Base_ElectronicsScrap",
+              "name": "Scrap Electronics"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        }
+      ],
+      "learn": {
+        "auto": [],
+        "autoAll": [
+          {
+            "level": 3,
+            "name": "Carpentry"
+          },
+          {
+            "level": 3,
+            "name": "Electrical"
+          }
+        ],
+        "magazines": [
+          "Magazine: Homestead Power #4 - Breaking Wind"
+        ],
+        "needed": true,
+        "research": []
+      },
+      "name": "Scoop Rotor Wind Charger on a Wooden Frame",
+      "outputs": [],
+      "skills": [
+        {
+          "level": 2,
+          "name": "Carpentry"
+        },
+        {
+          "level": 2,
+          "name": "Electrical"
+        }
+      ]
+    },
+    {
+      "build": {
         "icon": "icon_build_RenewableEnergy_TurbineWood",
         "name": "Homemade Wind Turbine"
       },
@@ -9384,6 +9611,7 @@
       "icon_build_RenewableEnergy_ScoopRotor",
       "icon_build_RenewableEnergy_TimberCarAlternatorWood",
       "icon_build_RenewableEnergy_TimberPropellerWood",
+      "icon_build_RenewableEnergy_TimberScoopRotor",
       "icon_build_RenewableEnergy_TurbineWood"
     ],
     "menu": [

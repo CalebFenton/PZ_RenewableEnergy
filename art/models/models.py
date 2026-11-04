@@ -352,8 +352,8 @@ def build_sprite_model(stage, name, spec):
     the game turns it about. Each skin builds its own parts, a mesh and texture of its own: skins
     differ in shape as well as colour, as the blade sets and their broken ones do. No light is
     painted in, or a model the game turns would turn its lit side with it. Each spin step's mesh is
-    the skin's mesh with the rotor's parts (named with wind.ROTOR) turned about the hub's axis, along
-    Y at the spec's "hub" height."""
+    the skin's mesh with the rotor's parts (named with wind.ROTOR) turned about the hub's axis: along
+    Y at the spec's "hub" height, or upright through the origin for an "axis" of "Z"."""
     size = SPRITE_MODEL_TEXTURE_SIZE
     for texture, options, meshes in wind.sprite_model_names(name)[0]:
         low, colour, solid = build_baked(stage, lambda col: spec["model"](col, **options), texture, size, to_ground=False)
@@ -363,7 +363,8 @@ def build_sprite_model(stage, name, spec):
             def turn(bm):
                 layer = bm.faces.layers.int["part"]
                 turning = {v for face in bm.faces if rotor[face[layer]] for v in face.verts}
-                bmesh.ops.rotate(bm, verts=list(turning), cent=(0, 0, spec["hub"]), matrix=Matrix.Rotation(math.radians(spin), 3, "Y"))
+                bmesh.ops.rotate(bm, verts=list(turning), cent=(0, 0, spec["hub"]),
+                                 matrix=Matrix.Rotation(math.radians(spin), 3, spec.get("axis", "Y")))
             piece = kit.edited_copy(low, turn if spin else None)
             export(piece, mesh, os.path.join(MESH_DIR, PREFIX + mesh + ".fbx"))
             print("sprite model %s: %d faces" % (mesh, len(piece.data.polygons)))

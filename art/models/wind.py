@@ -34,28 +34,101 @@ def _scoop(col, name, centre, start, height, z):
             box(col, name + "_Hoop", M("drummetal"), (chord + 0.004, 0.006, 0.022), at=(x, y, z + rise - 0.011), rotate=(0, 0, a + 90))
 
 
+def _scoop_rotor(col, name, foot, plate_mat, plate):
+    """The two drum halves in an S between round end plates of `plate_mat`, `plate` thick, from
+    `foot` up. Returns its top."""
+    radius, height = DRUM
+    offset = radius - SCOOP_OVERLAP / 2
+    reach = offset + radius + 0.01
+    cylinder(col, name + "PlateLow", M(plate_mat), reach, plate, at=(0, 0, foot), segments=32)
+    _scoop(col, name + "Half", (offset, 0), 180, height, foot + plate)
+    _scoop(col, name + "Half", (-offset, 0), 0, height, foot + plate)
+    top = foot + plate + height
+    cylinder(col, name + "PlateTop", M(plate_mat), reach, plate, at=(0, 0, top), segments=32)
+    return top + plate
+
+
 def scoop_rotor(col):
     """A homestead Savonius wind charger: the two halves of a 55 gallon drum cut lengthwise, set in
     an S with their inner edges overlapping, between steel plates on a shaft, on a steel pole set in
     a concrete footing, the treadmill motor it turns in a round housing at the pole's foot, its cable
     buried, since anything off the shaft's axis would swing round as the rotor spins."""
-    radius, height = DRUM
-    offset = radius - SCOOP_OVERLAP / 2
-    reach = offset + radius + 0.01
     cylinder(col, "Scoop_Footing", M("concrete"), 0.2, 0.06, segments=24)
     cylinder(col, "Scoop_Housing", M("darkgrey"), 0.12, 0.24, at=(0, 0, 0.06), segments=20)
     cylinder(col, "Scoop_HousingCap", M("weld"), 0.13, 0.025, at=(0, 0, 0.3), segments=20)
     cylinder(col, "Scoop_Pole", M("galvanised"), 0.045, SCOOP_POLE - 0.325, at=(0, 0, 0.325), segments=14)
     cylinder(col, "Scoop_Bearing", M("weld"), 0.07, 0.05, at=(0, 0, SCOOP_POLE - 0.05), segments=14)
-    plate = 0.008
-    cylinder(col, "Scoop_PlateLow", M("rustysteel"), reach, plate, at=(0, 0, SCOOP_POLE), segments=32)
-    foot = SCOOP_POLE + plate
-    _scoop(col, "Scoop_Half", (offset, 0), 180, height, foot)
-    _scoop(col, "Scoop_Half", (-offset, 0), 0, height, foot)
-    top = foot + height
-    cylinder(col, "Scoop_PlateTop", M("rustysteel"), reach, plate, at=(0, 0, top), segments=32)
-    cylinder(col, "Scoop_Shaft", M("galvanised"), 0.025, 0.09, at=(0, 0, top + plate), segments=12)
-    cylinder(col, "Scoop_ShaftCap", M("weld"), 0.035, 0.03, at=(0, 0, top + plate + 0.06), segments=12)
+    top = _scoop_rotor(col, "Scoop_", SCOOP_POLE, "rustysteel", 0.008)
+    cylinder(col, "Scoop_Shaft", M("galvanised"), 0.025, 0.09, at=(0, 0, top), segments=12)
+    cylinder(col, "Scoop_ShaftCap", M("weld"), 0.035, 0.03, at=(0, 0, top + 0.06), segments=12)
+
+
+# The wooden-frame scoop rotor, after Kozlowski's battery-charging rotor (VITA, "Vertical Axis Wind
+# Machines From Oil Drums", 1977): two rough poles dug in either side, a beam across them low and
+# high carrying the shaft's bearings, guyed to stakes, the motor belted off the shaft on the low beam.
+FRAME_POLE_X = 0.66  # the poles' distance out from the shaft, clear of the rotor's sweep
+FRAME_POLE = (0.065, 2.15)  # a pole's radius and height
+FRAME_LOW, FRAME_HIGH = 0.4, 1.92  # the bottoms of the low and high beams
+FRAME_BEAM = (0.14, 0.035)  # a beam board's depth and thickness, one each side of the poles
+FRAME_ROTOR = 0.95  # the rotor's foot
+FRAME_MOTOR_X = 0.36
+FRAME_BELT = 0.83  # the belt's height
+FRAME_STAKE = (0.95, 0.85)  # a guy stake's distance out along X and Y
+
+
+def _frame_beam(col, name, z, deck):
+    """A board each side of the poles across them from `z` up, and a board across the pair on top
+    from x = deck[0] to deck[1]. Returns the deck's top."""
+    depth, thick = FRAME_BEAM
+    reach = FRAME_POLE_X + 0.12
+    for side, wood in ((-1, "boards"), (1, "boardsdark")):
+        y = side * (FRAME_POLE[0] + thick / 2)
+        box(col, name + "_Beam", M(wood), (2 * reach, thick, depth), at=(0, y, z), bevel=0.004)
+        for x in (-FRAME_POLE_X, FRAME_POLE_X):
+            cylinder(col, name + "_Bolt", M("galvanised"), 0.012, 0.008, at=(x, side * (FRAME_POLE[0] + thick), z + depth / 2),
+                     rotate=(-90 * side, 0, 0), segments=6)
+    top = z + depth
+    width = 2 * (FRAME_POLE[0] + thick)
+    box(col, name + "_Deck", M("boards"), (deck[1] - deck[0], width, 0.03), at=((deck[0] + deck[1]) / 2, 0, top), bevel=0.004)
+    box(col, name + "_BearingBlock", M("boardsdark"), (0.12, 0.12, 0.04), at=(0, 0, top + 0.03), bevel=0.004)
+    cylinder(col, name + "_Bearing", M("weld"), 0.045, 0.03, at=(0, 0, top + 0.07), segments=14)
+    return top + 0.03
+
+
+def timber_scoop_rotor(col, guys=True):
+    """The scoop rotor on a wooden frame: the welded one's drum-half rotor between plywood discs on
+    a pipe shaft, standing between two poles dug into the ground, its bearings on the beams across
+    them, the poles guyed with rope to stakes (but for `guys` False, as the build icon frames the
+    frame), and the treadmill motor standing on the low beam, belted to a pulley on the shaft. Only
+    the rotor turns (ROTOR, about the shaft)."""
+    radius, height = FRAME_POLE
+    for x in (-FRAME_POLE_X, FRAME_POLE_X):
+        mound(col, "TScoop_Earth", M("earth"), (0.16, 0.16, 0.05), at=(x, 0, 0), lumps=0.3, seed=int(x > 0))
+        cylinder(col, "TScoop_Pole", M("bark"), radius, height, at=(x, 0, 0), segments=10)
+        cylinder(col, "TScoop_PoleEnd", M("logend"), radius - 0.004, 0.006, at=(x, 0, height), segments=10)
+        for sy in ((-1, 1) if guys else ()):
+            stake = (x / FRAME_POLE_X * FRAME_STAKE[0], sy * FRAME_STAKE[1])
+            tube(col, "TScoop_Guy", M("rope"), [(x, sy * radius, height - 0.12), (*stake, 0.1)], 0.007, 5)
+            box(col, "TScoop_Stake", M("boardsdark"), (0.04, 0.04, 0.14), at=(*stake, 0), bevel=0.004)
+    deck = _frame_beam(col, "TScoop_Low", FRAME_LOW, (-0.14, FRAME_MOTOR_X + 0.12))
+    _frame_beam(col, "TScoop_High", FRAME_HIGH, (-0.14, 0.14))
+    cylinder(col, "TScoop_Shaft", M("galvanised"), 0.025, FRAME_HIGH + FRAME_BEAM[0] - deck, at=(0, 0, deck), segments=12)
+    # The motor stands on its end on the low beam, its pulley up, in the plane of the shaft's.
+    for z, h in ((deck, 0.015), (deck + 0.23, 0.015)):
+        cylinder(col, "TScoop_MotorBell", M("aluminium"), 0.067, h, at=(FRAME_MOTOR_X, 0, z), segments=18)
+    cylinder(col, "TScoop_Motor", M("black"), 0.065, 0.215, at=(FRAME_MOTOR_X, 0, deck + 0.015), segments=18)
+    small, big = 0.035, 0.15
+    cylinder(col, "TScoop_MotorPulley", M("aluminium"), small, 0.03, at=(FRAME_MOTOR_X, 0, FRAME_BELT - 0.015), segments=14)
+    cylinder(col, "TScoop_Pulley", M("rawsteel"), big, 0.03, at=(0, 0, FRAME_BELT - 0.015), segments=28)
+    # The belt's two straight runs, tangent to both pulleys.
+    turn = math.acos((big - small) / FRAME_MOTOR_X)
+    for side in (-1, 1):
+        c, s = math.cos(turn), side * math.sin(turn)
+        beam(col, "TScoop_Belt", M("leather"), (big * c, big * s, FRAME_BELT), (FRAME_MOTOR_X + small * c, small * s, FRAME_BELT),
+             (0.004, 0.025))
+    _down_cable(col, "TScoop_Cable", [(FRAME_MOTOR_X + 0.05, 0.04, deck + 0.1), (FRAME_MOTOR_X + 0.05, 0.1, deck + 0.02),
+                                      (FRAME_POLE_X - 0.08, 0.12, FRAME_LOW), (FRAME_POLE_X - 0.02, 0.1, 0.0)], 0)
+    _scoop_rotor(col, ROTOR + "Scoop", FRAME_ROTOR, "plywood", 0.018)
 
 
 def treadmill_motor(col):
@@ -212,9 +285,9 @@ def _tail(col, name, start, length, vane, z, timber=False):
         tube(col, name + "_Boom", M("galvanised"), [(0, start[1], z), end], 0.02, 8)
         box(col, name + "_Vane", M("drummetal"), (0.004, vane[0], vane[1]), at=at)
         return
-    beam(col, name + "_Boom", M("planks"), (0, start[1], z), end, (0.025, 0.05), bevel=0.003)
-    for k, wood in enumerate(("planks", "planksdark")):
-        box(col, name + "_Vane", M(wood), (0.018, vane[0], vane[1] / 2), at=(0.022, at[1], at[2] + k * vane[1] / 2), bevel=0.003)
+    beam(col, name + "_Boom", M("boards"), (0, start[1], z), end, (0.025, 0.05), bevel=0.003)
+    for k, wood in enumerate(("boards", "boardsdark")):
+        box(col, name + "_Vane", M(wood), (0.018, vane[0], vane[1] / 2 - 0.006), at=(0.022, at[1], at[2] + k * vane[1] / 2), bevel=0.004)
 
 
 def _pipe_mast(col, name, top, stub=None):
@@ -256,12 +329,12 @@ def _timber_mast(col, name, top, stub=None):
     for leg in range(3):
         if low < apex:
             tube(col, name + "_Leg", M("bark"), [on_leg(leg, max(low, 0.0)), on_leg(leg, apex)], TIMBER_LOG, 10)
-    for k in range(3):
-        z = apex - 0.06 - 0.04 * k
+    for k in range(4):
+        z = apex - 0.05 - 0.032 * k
         if z >= low:
-            ring(col, name + "_Lashing", M("rope"), (0, 0), on_leg(0, z)[1] + TIMBER_LOG + 0.01, z, 0.012)
-    for side, wood in ((-1, "planks"), (1, "planksdark")):
-        box(col, name + "_HeadBoard", M(wood), (0.4, 0.15, 0.025), at=(0, side * 0.076, apex), bevel=0.003)
+            ring(col, name + "_Lashing", M("rope"), (0, 0), on_leg(0, z)[1] + TIMBER_LOG + 0.012, z, 0.016)
+    for side, wood in ((-1, "boards"), (1, "boardsdark")):
+        box(col, name + "_HeadBoard", M(wood), (0.4, 0.15, 0.025), at=(0, side * 0.076, apex), bevel=0.004)
         for x in (-0.15, 0.15):
             cylinder(col, name + "_Nail", M("nail"), 0.008, 0.004, at=(x, side * 0.076, apex + 0.025), segments=6)
     cylinder(col, name + "_Pivot", M("metalpipe"), 0.04, TIMBER_PIVOT, at=(0, 0, apex), segments=14)
@@ -293,7 +366,7 @@ def propeller_charger(col, blades="wood", stub=None, broken=False, timber=False)
     top = hub - 0.12
     down = (_timber_mast if timber else _pipe_mast)(col, "Prop", top, stub)
     if timber:
-        box(col, "Prop_MotorBoard", M("planks"), (0.14, 0.4, 0.025), at=(0, -0.06, hub - 0.09), bevel=0.003)
+        box(col, "Prop_MotorBoard", M("boards"), (0.14, 0.4, 0.025), at=(0, -0.06, hub - 0.09), bevel=0.004)
     else:
         box(col, "Prop_MotorPlate", M("rawsteel"), (0.1, 0.36, 0.01), at=(0, -0.08, hub - 0.075))
     cylinder(col, "Prop_Motor", M("black"), 0.065, 0.3, at=(0, 0.06, hub), rotate=(90, 0, 0), segments=18)
@@ -396,8 +469,8 @@ def car_alternator_charger(col, blades="wood", stub=None, broken=False, timber=F
     down = (_timber_mast if timber else _pipe_mast)(col, "CarAlt", top, stub)
     # The plate stops short of the blades' sweep in front.
     if timber:
-        for k, wood in enumerate(("planks", "planksdark", "planks")):
-            box(col, "CarAlt_Deck", M(wood), (0.135, 0.56, 0.025), at=(0.1 + 0.14 * (k - 1), 0.01, deck - 0.025), bevel=0.003)
+        for k, wood in enumerate(("boards", "boardsdark", "boards")):
+            box(col, "CarAlt_Deck", M(wood), (0.135, 0.56, 0.025), at=(0.1 + 0.14 * (k - 1), 0.01, deck - 0.025), bevel=0.004)
     else:
         box(col, "CarAlt_HeadPlate", M("rawsteel"), (0.42, 0.56, 0.01), at=(0.1, 0.01, deck - 0.01))
     for y in (-0.22, 0.02):
@@ -556,13 +629,17 @@ FACING_YAWS = {"N": 0, "E": -90, "S": 180, "W": 90}
 # that; "spins" the rotor's angles in degrees about the hub at height "hub", a mesh each, named by
 # their index last. A sprite model's name is the model's, the skin's, the yaw's and the spin's, so
 # the scoop rotor, the same after half a turn and spun by turning it whole, is ScoopRotor and an
-# index. Every blade machine takes every blade set, a skin each: each set's blades are shaped
-# their own way (_blade), and baked onto another set's shape they would leave its edges uncoloured.
-# A machine whose rotor spins has a broken skin of each skin too, its blades as a storm leaves
-# them and still: one mesh, named "Broken" where the spin's index goes (PropellerWoodNBroken).
+# index; the one on a wooden frame, whose frame must stay put, spins only its rotor, about the
+# upright shaft ("axis"), and is TimberScoop and an index. Every blade machine takes every blade
+# set, a skin each: each set's blades are shaped their own way (_blade), and baked onto another
+# set's shape they would leave its edges uncoloured. A blade machine has a broken skin of each skin
+# too, its blades as a storm leaves them and still: one mesh, named "Broken" where the spin's index
+# goes (PropellerWoodNBroken).
 BLADE_SKINS = {"Wood": {"blades": "wood"}, "Pipe": {"blades": "pipe"}, "Steel": {"blades": "steel"}}
+SCOOP_SPINS = tuple(SCOOP_SPIN[0] * step for step in range(SCOOP_SPIN[1]))
 SPRITE_MODELS = {
-    "ScoopRotor": {"model": scoop_rotor, "yaws": {str(step): SCOOP_SPIN[0] * step for step in range(SCOOP_SPIN[1])}},
+    "ScoopRotor": {"model": scoop_rotor, "yaws": {str(step): spin for step, spin in enumerate(SCOOP_SPINS)}},
+    "TimberScoop": {"model": timber_scoop_rotor, "yaws": {"": FACING_YAWS["S"]}, "spins": SCOOP_SPINS, "hub": 0, "axis": "Z"},
     "Propeller": {"model": propeller_charger, "skins": BLADE_SKINS, "yaws": FACING_YAWS, "spins": ROTOR_SPINS, "hub": PROPELLER_HUB},
     "CarAlternator": {"model": car_alternator_charger, "skins": BLADE_SKINS, "yaws": FACING_YAWS, "spins": ROTOR_SPINS,
                       "hub": PROPELLER_HUB},
@@ -584,7 +661,7 @@ def sprite_model_names(name):
     for skin, options in (spec.get("skins") or {"": {}}).items():
         base = name + skin
         looks = [(base, options, list(zip(steps, spins)))]
-        if len(spins) > 1:
+        if "skins" in spec:
             looks.append((base + "Broken", {**options, "broken": True}, [("Broken", 0)]))
         for texture, look, shown in looks:
             skins.append((texture, look, [(base + step, spin) for step, spin in shown]))

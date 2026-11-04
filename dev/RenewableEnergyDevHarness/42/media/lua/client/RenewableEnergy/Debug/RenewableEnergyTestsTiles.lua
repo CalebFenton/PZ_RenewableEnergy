@@ -273,10 +273,10 @@ end
 
 local CHARGER = Sprites.windCharger.propeller.wood.S
 
-local function charger(broken)
+local function charger(broken, sprite)
     return function(self)
         local square = T.square(self, {}, "a free outdoor square for a wind charger")
-        return square and T.placeTile(self, square, CHARGER, { [Wind.BROKEN_KEY] = broken })
+        return square and T.placeTile(self, square, sprite or CHARGER, { [Wind.BROKEN_KEY] = broken })
     end
 end
 
@@ -285,8 +285,9 @@ end
 -- brick dome the bricks of its walls, all of them; a barrel digester the barrel it was built from
 -- and its scrubber's materials, but never the glue, tape or garbage bags a build uses up, and its
 -- tarp bag, spent sponge and compressor whatever the roll; a wind charger its metal and wiring,
--- and its motor and blades whole whatever the roll, broken blades broken. The counts are the build
--- recipes', so that a piece coming back once for an input of many shows.
+-- or the wood of a wooden frame, and its motor and blades whole whatever the roll, broken blades
+-- broken. The counts are the build recipes', so that a piece coming back once for an input of many
+-- shows.
 dismantleTest("renewable_energy_tiles_built_in_place_scraps_to_recipe", {
     { label = "a dome rolling just under its odds", place = dome, sprite = Sprites.digester.dome, perk = Perks.Masonry,
         level = 5, roll = BuiltScrap.odds(5) - T.UNDER,
@@ -318,6 +319,12 @@ dismantleTest("renewable_energy_tiles_built_in_place_scraps_to_recipe", {
         gives = {
             ["RenewableEnergy.WoodenBlades"] = 1, ["RenewableEnergy.TreadmillMotor"] = 1, ["Base.SheetMetal"] = 0,
             ["Base.MetalBar"] = 0,
+        } },
+    { label = "a scoop rotor on a wooden frame rolling just under its odds", place = charger(nil, Sprites.windTimberScoop),
+        sprite = Sprites.windTimberScoop, perk = Perks.Woodwork, level = 2, roll = BuiltScrap.odds(2) - T.UNDER,
+        gives = {
+            ["Base.Log"] = 2, ["Base.Plank"] = 4, ["Base.Nails"] = 10, ["Base.Rope"] = 2, ["Base.Screws"] = 4,
+            ["Base.MetalDrum"] = 1, ["RenewableEnergy.TreadmillMotor"] = 1, ["Base.MetalBar"] = 0,
         } },
 })
 

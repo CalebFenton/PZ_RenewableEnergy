@@ -55,6 +55,12 @@ module Base
             DisplayName = RenewableEnergy_ScoopRotor,
             Icon = RenewableEnergy_Build_ScoopRotor,
         }
+        entity ES_RenewableEnergy_TimberScoopRotor
+        {
+            LuaWindowClass = ISEntityWindow,
+            DisplayName = RenewableEnergy_TimberScoopRotor,
+            Icon = RenewableEnergy_Build_TimberScoop,
+        }
         entity ES_RenewableEnergy_PropellerWood
         {
             LuaWindowClass = ISEntityWindow,
@@ -459,6 +465,59 @@ module Base
                 item 1 [Base.MetalDrum],
                 item 1 [RenewableEnergy.TreadmillMotor],
                 item 2 [Base.MetalBar;Base.IronBar;Base.SteelBar],
+                item 2 [Base.ElectricWire],
+                item 1 [Base.ElectronicsScrap],
+            }
+        }
+    }
+
+    /* The scoop rotor on a wooden frame, built with hand tools as Kozlowski's battery-charging rotor
+       was (VITA, 1977): the same drum and motor between two poles dug in, the shaft's bearings on
+       a beam across them low and high, guyed with rope. Its skills are the welded one's, Woodwork
+       for Welding. */
+    entity RenewableEnergy_TimberScoopRotor
+    {
+        component UiConfig
+        {
+            xuiSkin = default,
+            entityStyle = ES_RenewableEnergy_TimberScoopRotor,
+            uiEnabled = false,
+        }
+        component SpriteConfig
+        {
+            OnCreate = RenewableEnergy.Wind.OnCreate,
+            face S
+            {
+                layer
+                {
+                    row = renewable_energy_01_469,
+                }
+            }
+        }
+        component CraftRecipe
+        {
+            timedAction = BuildWoodenStructureMedium,
+            time = 300,
+            category = Carpentry,
+            Tags = Carpentry,
+            NeedToBeLearn = true,
+            AutoLearnAll = Woodwork:3;Electricity:3,
+            SkillRequired = Woodwork:2;Electricity:2,
+            xpAward = Woodwork:20;Electricity:15,
+            Tooltip = Tooltip_RenewableEnergy_TimberScoopRotor,
+            inputs
+            {
+                item 1 tags[base:hammer] mode:keep flags[Prop1;MayDegradeLight],
+                item 1 tags[base:saw] mode:keep flags[MayDegradeLight],
+                item 1 tags[base:drillwood] mode:keep flags[MayDegradeLight],
+                item 1 [Base.MetalDrum],
+                item 1 [RenewableEnergy.TreadmillMotor],
+                item 1 [Base.MetalPipe],
+                item 2 [Base.Log],
+                item 4 [Base.Plank],
+                item 10 [Base.Nails],
+                item 2 [Base.Rope;Base.SheetRope],
+                item 4 [Base.Screws],
                 item 2 [Base.ElectricWire],
                 item 1 [Base.ElectronicsScrap],
             }

@@ -21,7 +21,8 @@ from tile_numbers import (BARREL_DIGESTERS, BARREL_HOLDERS, BATTERY_LOOKS, CRACK
                           GENERATOR_PIPE, GENERATOR_PIPE_FIRST, HEATER, HEATER_LIT, HOLDER_FILLS, HOMEMADE_MODULES,
                           INSULATED_DIGESTER, METER_LEVELS, MOUNTS, RACK_SLOTS, SCOOP_ROTOR, SCRUBBERS, SOLAR_CELL_CHARGER,
                           SOLAR_CRATE, SOLAR_FAILSAFE, SOLAR_FLAT, SOUR_FOAM, SPENT_SCRUBBERS, STORAGE_CAPACITY,
-                          STORAGE_TILES, TURNED_HEATER_FIRST, TURNED_STORAGE_FIRST, TURNED_STORAGE_OVERLAYS, WIND_TILES)
+                          STORAGE_TILES, TIMBER_SCOOP, TURNED_HEATER_FIRST, TURNED_STORAGE_FIRST, TURNED_STORAGE_OVERLAYS,
+                          WIND_TILES)
 
 
 def _turned(at, facing):
@@ -215,8 +216,10 @@ for offset, side in enumerate(DIRECTIONS):
                 layer(woodgas.generator_gas_pipe, side=side, body=body, facing=facing)]
 
 # The scoop rotor wind charger as a tile: what the object is and how the build menu shows it. In
-# play the game draws its sprite model (wind.SPRITE_MODELS) instead, and spins that.
+# play the game draws its sprite model (wind.SPRITE_MODELS) instead, and spins that. The one on a
+# wooden frame, guyed out past its square, shrunk to fit as the blade machines are.
 TILES[SCOOP_ROTOR] = [layer(wind.scoop_rotor)]
+TILES[TIMBER_SCOOP] = [layer(wind.timber_scoop_rotor, scale=0.65)]
 
 # The blade machines, each facing's tile its sprite model's first spin step. They stand taller than
 # a tile's sprite can draw, so the tiles show them shrunk to fit, whole; in play the game draws
@@ -244,6 +247,7 @@ BUILD_ICONS = {
     "Gasifier": [layer(woodgas.gasifier, tier="standard")],
     "AdvancedGasifier": [layer(woodgas.gasifier, tier="advanced")],
     "ScoopRotor": [layer(wind.scoop_rotor)],
+    "TimberScoop": [layer(wind.timber_scoop_rotor, guys=False)],
     "Propeller": [layer(wind.propeller_charger, turn=BUILD_ICON_TURN, stub=BUILD_ICON_MAST)],
     "CarAlternator": [layer(wind.car_alternator_charger, turn=BUILD_ICON_TURN, stub=BUILD_ICON_MAST)],
     "TimberPropeller": [layer(wind.timber_propeller_charger, turn=BUILD_ICON_TURN, stub=BUILD_ICON_MAST)],

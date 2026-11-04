@@ -266,6 +266,7 @@ return {
         W = "renewable_energy_01_259",
     },
     windScoop = "renewable_energy_01_264",
+    windTimberScoop = "renewable_energy_01_469",
     windCharger = {
         propeller = {
             wood = {
@@ -370,6 +371,7 @@ return {
     },
     windModels = {
         scoop = { name = "RenewableEnergy.ScoopRotor", steps = 6, stepsPerTurn = 12 },
+        timberScoop = { name = "RenewableEnergy.TimberScoop", steps = 6, stepsPerTurn = 12 },
         propeller = {
             name = "RenewableEnergy.Propeller",
             byMaterial = true,

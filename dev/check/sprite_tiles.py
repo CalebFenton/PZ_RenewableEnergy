@@ -32,6 +32,7 @@ ENTITY_TILES = {
     "RenewableEnergy_Gasifier": ("gasifier", "standard"),
     "RenewableEnergy_AdvancedGasifier": ("gasifier", "advanced"),
     "RenewableEnergy_ScoopRotor": ("windScoop",),
+    "RenewableEnergy_TimberScoopRotor": ("windTimberScoop",),
     "RenewableEnergy_PropellerWood": ("windCharger", "propeller", "wood"),
     "RenewableEnergy_PropellerPipe": ("windCharger", "propeller", "pipe"),
     "RenewableEnergy_PropellerSteel": ("windCharger", "propeller", "steel"),

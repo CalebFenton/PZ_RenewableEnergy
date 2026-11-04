@@ -37,8 +37,8 @@ from tile_numbers import (BARREL_DIGESTERS, BARREL_HOLDERS, BATTERY_LOOKS, CRACK
                           GENERATOR_KIT_FIRST, GENERATOR_PIPE, GENERATOR_PIPE_FIRST, GENERATOR_TILESET, HEATER,
                           HEATER_LIT, HOLDER_FILLS, HOMEMADE_MODULES, INSULATED_DIGESTER, METER_LEVELS, MOUNTS, RACK_SLOTS,
                           ROTOR_SPIN, SCOOP_ROTOR, SCOOP_SPIN, SCRUBBERS, SOLAR_CELL_CHARGER, SOLAR_CRATE, SOLAR_FAILSAFE,
-                          SOLAR_FLAT, SOUR_FOAM, SPENT_SCRUBBERS, STORAGE_CAPACITY, STORAGE_TILES, TURNED_HEATER_FIRST,
-                          TURNED_STORAGE_FIRST, TURNED_STORAGE_OVERLAYS, WIND_TILES)
+                          SOLAR_FLAT, SOUR_FOAM, SPENT_SCRUBBERS, STORAGE_CAPACITY, STORAGE_TILES, TIMBER_SCOOP,
+                          TURNED_HEATER_FIRST, TURNED_STORAGE_FIRST, TURNED_STORAGE_OVERLAYS, WIND_TILES)
 
 MEDIA = os.path.join(HERE, "..", "Contents", "mods", "RenewableEnergy", "common", "media")
 # Each tileset's name and rows, tilefile.COLUMNS tiles to a row; the file numbers them from 1 in
@@ -128,6 +128,7 @@ TILES = {
     GASIFIERS["standard"]: built_in_place("Gasifier", "Gasifier", 20, "MetalPlates", "MetalPipe"),
     GASIFIERS["advanced"]: built_in_place("Advanced Gasifier", "Gasifier", 30, "MetalPlates", "MetalBars"),
     SCOOP_ROTOR: wind_charger("Scoop Rotor Wind Charger", "MetalPlates", "MetalPipe"),
+    TIMBER_SCOOP: wind_charger("Scoop Rotor Wind Charger on a Wooden Frame", "Wood", "MetalPlates"),
 }
 for material, first_wall, first_rack, _ in MOUNTS:
     for offset, facing in enumerate("SE"):
@@ -228,7 +229,8 @@ def sprite_tiles():
                 kits[generator] = _name(GENERATOR_KIT_FIRST + fitting)
                 pipes[generator] = _by(GENERATOR_PIPE_FIRST + len(DIRECTIONS) * fitting, DIRECTIONS)
 
-    chargers, models = {}, {"scoop": _wind_model("ScoopRotor", SCOOP_SPIN, False)}
+    chargers, models = {}, {"scoop": _wind_model("ScoopRotor", SCOOP_SPIN, False),
+                            "timberScoop": _wind_model("TimberScoop", SCOOP_SPIN, False)}
     for first, model, blades in WIND_TILES:
         chargers.setdefault(_field(model), {})[blades] = _by(first, DIRECTIONS)
         models.setdefault(_field(model), _wind_model(model, ROTOR_SPIN, True))
@@ -281,6 +283,7 @@ def sprite_tiles():
         "gasifierLit": {tier: _name(number + len(GASIFIERS)) for tier, number in GASIFIERS.items()},
         "gasifierPipe": _by(GASIFIER_PIPE, DIRECTIONS),
         "windScoop": _name(SCOOP_ROTOR),
+        "windTimberScoop": _name(TIMBER_SCOOP),
         "windCharger": chargers,
         "windModels": models,
         "snow": {"flat": _name(FLAT_SNOW), "rack": {material: _by(snow, FACINGS) for material, _, _, snow in MOUNTS}},

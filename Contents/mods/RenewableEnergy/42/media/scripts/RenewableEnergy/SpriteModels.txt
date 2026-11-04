@@ -49,6 +49,54 @@ module RenewableEnergy
         rotate = 0.0 150 0.0,
         scale = 0.6667,
     }
+    spriteModel TimberScoop0
+    {
+        modelScript = RenewableEnergy.TimberScoop0,
+        texture = WorldItems/RenewableEnergy_TimberScoop,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberScoop1
+    {
+        modelScript = RenewableEnergy.TimberScoop1,
+        texture = WorldItems/RenewableEnergy_TimberScoop,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberScoop2
+    {
+        modelScript = RenewableEnergy.TimberScoop2,
+        texture = WorldItems/RenewableEnergy_TimberScoop,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberScoop3
+    {
+        modelScript = RenewableEnergy.TimberScoop3,
+        texture = WorldItems/RenewableEnergy_TimberScoop,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberScoop4
+    {
+        modelScript = RenewableEnergy.TimberScoop4,
+        texture = WorldItems/RenewableEnergy_TimberScoop,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberScoop5
+    {
+        modelScript = RenewableEnergy.TimberScoop5,
+        texture = WorldItems/RenewableEnergy_TimberScoop,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
     spriteModel PropellerWoodN0
     {
         modelScript = RenewableEnergy.PropellerWood0,

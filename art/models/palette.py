@@ -1,5 +1,64 @@
 """The shared materials every builder paints its parts with, made on first use: M("name")."""
-from art.shading import material
+from art.shading import hex_rgb, material
+
+
+def _node(nodes, kind, **inputs):
+    node = nodes.new(kind)
+    for key, value in inputs.items():
+        node.inputs[key].default_value = value
+    return node
+
+
+def rough_wood(name, colour, across, stretch, dark, light, knots=None, **options):
+    """Wood as coarse as the game draws its own at a tile's scale, where a sawn grain's fine lines
+    average away to flat brown: `material`'s surface streaked along each part's longest side
+    (kit's "grain" coordinates) in figures `across` metres wide and `stretch` times as long, the
+    lows darkened to `dark` × its colour and the highs lit to `light` ×, as the furrows and ridges
+    of a log's bark or the streaks down the game's crate boards; with `knots`, a dark knot a few
+    centimetres across wherever finer noise rises above that level."""
+    mat = material(name, colour, **options)
+    if mat.get("rough_wood"):
+        return mat
+    mat["rough_wood"] = True
+    nodes, links = mat.node_tree.nodes, mat.node_tree.links
+    bsdf = nodes["Principled BSDF"]
+    base = bsdf.inputs["Base Color"].links[0].from_socket
+    grain = nodes.new("ShaderNodeAttribute")
+    grain.attribute_name = "grain"
+    along = _node(nodes, "ShaderNodeVectorMath")
+    along.operation = "MULTIPLY"
+    along.inputs[1].default_value = (1 / stretch, 1, 1)
+    links.new(grain.outputs["Vector"], along.inputs[0])
+    noise = _node(nodes, "ShaderNodeTexNoise", Scale=1 / across, Detail=3.0)
+    links.new(along.outputs[0], noise.inputs["Vector"])
+    ramp = nodes.new("ShaderNodeValToRGB")
+    elements = ramp.color_ramp.elements
+    elements[0].position, elements[0].color = 0.42, (dark, dark, dark, 1)
+    elements[1].position, elements[1].color = 0.60, (light, light, light, 1)
+    for at in (0.47, 0.54):
+        elements.new(at).color = (1, 1, 1, 1)
+    links.new(noise.outputs["Fac"], ramp.inputs["Fac"])
+    shaded = _node(nodes, "ShaderNodeMix", Factor=1.0)
+    shaded.data_type, shaded.blend_type = "RGBA", "MULTIPLY"
+    links.new(base, shaded.inputs[6])
+    links.new(ramp.outputs["Color"], shaded.inputs[7])
+    out = shaded.outputs[2]
+    if knots is not None:
+        spots = _node(nodes, "ShaderNodeTexNoise", Scale=25.0, Detail=1.0)
+        links.new(grain.outputs["Vector"], spots.inputs["Vector"])
+        rise = _node(nodes, "ShaderNodeMath")
+        rise.operation, rise.use_clamp = "MULTIPLY_ADD", True
+        links.new(spots.outputs["Fac"], rise.inputs[0])
+        rise.inputs[1].default_value, rise.inputs[2].default_value = 25.0, -25.0 * knots
+        eye = _node(nodes, "ShaderNodeMix")
+        eye.data_type = "RGBA"
+        links.new(rise.outputs[0], eye.inputs["Factor"])
+        links.new(out, eye.inputs[6])
+        eye.inputs[7].default_value = (*(c * dark * 0.7 for c in hex_rgb(colour)), 1.0)
+        out = eye.outputs[2]
+    links.new(out, bsdf.inputs["Base Color"])
+    return mat
+
 
 # The earth banked round the brick dome (biogas.DOME) is grassed over this far out from the dome's
 # centre, and thins into the ground over this, in metres.
@@ -99,10 +158,17 @@ PALETTE = {
     "jaracid": lambda: material("RE_JarAcid", "#6b877d", roughness=0.12, grime=0.08, scale=20, streaks=("#a9c4ba", 0.6)),
     # Pale tan twine.
     "twine": lambda: material("RE_Twine", "#c8b07a", roughness=0.9, grime=0.15, scale=40),
-    # A log's bark, dark and furrowed, and the manila rope that lashes logs together.
-    "bark": lambda: material("RE_Bark", "#5a4331", roughness=0.95, grime=0.35, scale=14, grain="weathered",
-                             speckle=("#3b2c20", 0.5)),
-    "rope": lambda: material("RE_Rope", "#a88c5c", roughness=0.9, grime=0.25, scale=40, grain="fine"),
+    # A log's bark as the game draws its log walls and palisades: mid brown, furrowed along the log
+    # in dark grooves between paler ridges, a knot here and there; a sawn log's pale end; and the
+    # pale manila rope its palisades are lashed with.
+    "bark": lambda: rough_wood("RE_Bark", "#84603f", 0.05, 8.0, 0.4, 1.75, knots=0.72, roughness=0.95, grime=0.3, scale=14),
+    "logend": lambda: material("RE_LogEnd", "#c39b6a", roughness=0.9, grime=0.3, scale=20, speckle=("#8f6a44", 0.5)),
+    "rope": lambda: rough_wood("RE_Rope", "#cdb07a", 0.006, 3.0, 0.7, 1.15, roughness=0.9, grime=0.2, scale=40),
+    # Rough-sawn boards nailed up outdoors, as the game's crates and tables: red-brown, streaked
+    # along the board coarsely enough to show at a tile's scale, two shades so neighbours read apart.
+    "boards": lambda: rough_wood("RE_Boards", "#8a5a3a", 0.03, 12.0, 0.6, 1.3, knots=0.74, roughness=0.85, grime=0.3, scale=10),
+    "boardsdark": lambda: rough_wood("RE_BoardsDark", "#6e4630", 0.03, 12.0, 0.6, 1.3, knots=0.74, roughness=0.85, grime=0.3,
+                                     scale=10),
     "sand": lambda: material("RE_Sand", "#c9b48a", roughness=0.95, grime=0.2, scale=60, speckle=("#a48f64", 0.4)),
     "sulphate": lambda: material("RE_Sulphate", "#dcd9cb", roughness=0.95, grime=0.15, scale=60),
     # A plate's paste is dull grey lead in a grid of brighter cast lead. Worn out, it is black

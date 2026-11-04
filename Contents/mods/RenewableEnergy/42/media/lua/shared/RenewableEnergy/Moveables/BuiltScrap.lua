@@ -32,6 +32,7 @@ local ENTITIES = {
         advanced = "Base.RenewableEnergy_AdvancedGasifier",
     },
     scoop = "Base.RenewableEnergy_ScoopRotor",
+    timberScoop = "Base.RenewableEnergy_TimberScoopRotor",
     propeller = "Base.RenewableEnergy_PropellerWood",
     carAlternator = "Base.RenewableEnergy_CarAlternatorWood",
     timberPropeller = "Base.RenewableEnergy_TimberPropellerWood",

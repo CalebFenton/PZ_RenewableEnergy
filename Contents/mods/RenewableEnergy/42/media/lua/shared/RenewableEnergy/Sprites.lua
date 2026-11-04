@@ -47,7 +47,8 @@ local ModuleRepair = require "RenewableEnergy/PowerBank/ModuleRepair"
 -- metal gas pipe to a generator on the next square, by the generator's direction from it; the two
 -- halves meet at the squares' shared edge.
 --
--- windScoop and windCharger: the scoop rotor's tile, and each bladed kind's per blade material and
+-- windScoop, windTimberScoop and windCharger: the scoop rotor's tile, on its welded pole and on a
+-- wooden frame, and each bladed kind's per blade material and
 -- rotor facing (propeller the treadmill wind charger, alternator the homebuilt wind turbine, as
 -- Wind.SPEC.turbines). In play the game draws each as a sprite model instead: windModels gives each
 -- kind's (scripts SpriteModels.txt), the name before the step number, suffixed with blade material
@@ -115,6 +116,7 @@ local KINDS = {
     [Sprites.gardenLight.off] = { "gardenLight" },
     [Sprites.gardenLight.lit] = { "gardenLight" },
     [Sprites.windScoop] = { "scoop" },
+    [Sprites.windTimberScoop] = { "timberScoop" },
     [Sprites.digester.insulated] = { "digester", "insulated" },
     [Sprites.digester.dome] = { "digester", "dome" },
 }
@@ -183,7 +185,7 @@ end
 
 --- What a placed tile is.
 ---@param spriteName string?
----@return string? kind "flat", "wall", "rack", "failsafe", "cellCharger", "crate", "gardenLight", "scoop", "propeller", "carAlternator", "timberPropeller", "timberCarAlternator", "alternator", "treadmill", "digester", "gasifier", "gasHeater", or a bank's Sprites field such as "batteryRackWood"; nil for any other sprite
+---@return string? kind "flat", "wall", "rack", "failsafe", "cellCharger", "crate", "gardenLight", "scoop", "timberScoop", "propeller", "carAlternator", "timberPropeller", "timberCarAlternator", "alternator", "treadmill", "digester", "gasifier", "gasHeater", or a bank's Sprites field such as "batteryRackWood"; nil for any other sprite
 ---@return string? facing "S", "E", "N" or "W" for walls, racks, banks, gas heaters, bladed wind chargers and treadmills; a digester's or gasifier's tier
 ---@return string? variant the material: "wood" or "metal" for walls and racks, the blades' "wood", "pipe" or "steel" for bladed wind chargers, the item type of a barrel digester's barrel, such as "MetalDrum"; a treadmill tile's end, "console" or "rear"; a gas heater's "off" or "lit"
 function Sprites.kindOf(spriteName)

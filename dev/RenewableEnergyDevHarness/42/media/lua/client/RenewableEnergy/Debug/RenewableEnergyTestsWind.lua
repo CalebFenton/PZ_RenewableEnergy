@@ -310,6 +310,7 @@ test("renewable_energy_wind_power_curve_rule", {
 -- SpriteModels.txt must define under that name.
 local DRAWN = {
     scoop = Sprites.windScoop,
+    timberScoop = Sprites.windTimberScoop,
     propellerPipeE = Sprites.windCharger.propeller.pipe.E,
     propellerWoodN = Sprites.windCharger.propeller.wood.N,
     propellerSteelS = Sprites.windCharger.propeller.steel.S,

@@ -130,8 +130,8 @@ RECIPE_SECTIONS = [
                "RenewableEnergy_WeldMetalDrum", "RenewableEnergy_MakeVinegarMildewSpray",
                "RenewableEnergy_MakeVinegarAphidSpray"]),
     (WIND,
-     ["RenewableEnergy_ScoopRotor", "RenewableEnergy_PropellerWood", "RenewableEnergy_TimberPropellerWood",
-      "RenewableEnergy_CarAlternatorWood", "RenewableEnergy_TimberCarAlternatorWood",
+     ["RenewableEnergy_ScoopRotor", "RenewableEnergy_TimberScoopRotor", "RenewableEnergy_PropellerWood",
+      "RenewableEnergy_TimberPropellerWood", "RenewableEnergy_CarAlternatorWood", "RenewableEnergy_TimberCarAlternatorWood",
       "RenewableEnergy_TurbineWood", "RenewableEnergy_CarveWoodenBlades", "RenewableEnergy_CutPipeBlades",
       "RenewableEnergy_ForgeSteelBlades", "RenewableEnergy_MakeHomemadeAlternator"]),
 ]
@@ -182,9 +182,10 @@ GALLERY_RECIPES = [
      [(BIOGAS, slice(0, 4))]),
     ("recipes-gas-kit", "Recipes: the gas kit, the heater, propane", [(BIOGAS, slice(4, None))]),
     ("recipes-woodgas", "Build menu: gasifiers. Recipes: drums and sprays", [(WOODGAS, slice(None))]),
-    ("recipes-wind-treadmill", "Build menu: scoop rotor, treadmill chargers", [(WIND, slice(0, 3))]),
-    ("recipes-wind-car-alternator", "Build menu: car alternator chargers", [(WIND, slice(3, 5))]),
-    ("recipes-wind-turbine-parts", "Build menu: turbine. Recipes: blades, alternator", [(WIND, slice(5, None))]),
+    ("recipes-wind-scoops", "Build menu: scoop rotors, welded and wooden", [(WIND, slice(0, 2))]),
+    ("recipes-wind-treadmill", "Build menu: treadmill chargers", [(WIND, slice(2, 4))]),
+    ("recipes-wind-car-alternator", "Build menu: car alternator chargers", [(WIND, slice(4, 6))]),
+    ("recipes-wind-turbine-parts", "Build menu: turbine. Recipes: blades, alternator", [(WIND, slice(6, None))]),
 ]
 
 

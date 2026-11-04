@@ -197,6 +197,7 @@
     "IGUI_RenewableEnergy_WindToday": "Wind today",
     "IGUI_RenewableEnergy_WindOutput": "%1, %2 km/h",
     "IGUI_RenewableEnergy_WindScoop": "Scoop rotor wind charger",
+    "IGUI_RenewableEnergy_WindTimberScoop": "Scoop rotor wind charger on a wooden frame",
     "IGUI_RenewableEnergy_ReasonBraked": "braked",
     "IGUI_RenewableEnergy_ReasonCalm": "too little wind",
     "IGUI_RenewableEnergy_ReasonSheltered": "sheltered",

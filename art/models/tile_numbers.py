@@ -117,6 +117,7 @@ GASIFIERS = {"primitive": 250, "standard": 251, "advanced": 252}
 GASIFIER_PIPE, GENERATOR_PIPE = 256, 260
 
 SCOOP_ROTOR = 264
+TIMBER_SCOOP = 469  # the scoop rotor on a wooden frame
 # The blade machines: each one's first tile, of one per facing in DIRECTIONS' order, the sprite
 # model it is (wind.SPRITE_MODELS) and its blades.
 WIND_TILES = ((265, "Propeller", "wood"), (269, "Propeller", "pipe"), (273, "Alternator", "steel"),

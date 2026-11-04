@@ -433,6 +433,42 @@ module RenewableEnergy
         texture = WorldItems/RenewableEnergy_ScoopRotor,
         scale = 1,
     }
+    model TimberScoop0
+    {
+        mesh = WorldItems/RenewableEnergy_TimberScoop0,
+        texture = WorldItems/RenewableEnergy_TimberScoop,
+        scale = 1,
+    }
+    model TimberScoop1
+    {
+        mesh = WorldItems/RenewableEnergy_TimberScoop1,
+        texture = WorldItems/RenewableEnergy_TimberScoop,
+        scale = 1,
+    }
+    model TimberScoop2
+    {
+        mesh = WorldItems/RenewableEnergy_TimberScoop2,
+        texture = WorldItems/RenewableEnergy_TimberScoop,
+        scale = 1,
+    }
+    model TimberScoop3
+    {
+        mesh = WorldItems/RenewableEnergy_TimberScoop3,
+        texture = WorldItems/RenewableEnergy_TimberScoop,
+        scale = 1,
+    }
+    model TimberScoop4
+    {
+        mesh = WorldItems/RenewableEnergy_TimberScoop4,
+        texture = WorldItems/RenewableEnergy_TimberScoop,
+        scale = 1,
+    }
+    model TimberScoop5
+    {
+        mesh = WorldItems/RenewableEnergy_TimberScoop5,
+        texture = WorldItems/RenewableEnergy_TimberScoop,
+        scale = 1,
+    }
     model PropellerWood0
     {
         mesh = WorldItems/RenewableEnergy_PropellerWood0,

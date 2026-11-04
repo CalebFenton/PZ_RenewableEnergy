@@ -389,7 +389,7 @@ The figures here are at the default **Wind Multiplier** of 2, which scales them 
 | Car Alternator Wind Charger | Car Alternator | 800 W at 40 km/h | 3 | Yes |
 | Homemade Wind Turbine | Homemade Alternator | 1600 W at 40 km/h | 3 | Yes, but turns aside in a gale |
 
-- **Scoop rotor**: two half-drum scoops on a short pole. It never needs the brake and never breaks, but it makes little. It's the one charger that needs no controller.
+- **Scoop rotor**: two half-drum scoops on a short pole. It never needs the brake and never breaks, but it makes little. It's the one charger that needs no controller. On the **Carpentry** page it also stands between two poles dug into the ground, guyed with rope: hammer, saw and hand drill, 2 logs, 4 planks, 10 nails, 2 rope, 4 screws, the drum and the motor, at Woodwork 2 and Electricity 2, for the same power.
 - **Treadmill wind charger**: three blades high on a steel mast. It's the first charger that makes real power.
 - **Car alternator wind charger**: the same mast belted to a car's alternator. It makes a third more in any wind for the same inputs, a straight upgrade.
 - **On a timber mast**: either of those two on three lashed logs. It makes exactly what the welded one does, at the same height, and its blades break and wear the same; dismantled, it gives back wood rather than metal.
@@ -644,7 +644,7 @@ Tow it home and it keeps charging its batteries on the way, or strip it for part
   - Battery work, inverters, the controller, the failsafe and makeshift modules come from Electricity; reconditioning from Mechanics too, and making the plate mold, casting plates and reducing dross from Blacksmith too. Reglazing takes Electricity and Glassmaking together.
   - The barrel digester comes from Farming or Mechanics, the insulated digester from Woodwork and Farming together, the dome from Masonry and Farming together. The Gas Conversion Kit comes from Mechanics, the Gas Heater from Metalworking and Mechanics together.
   - The primitive gasifier comes from Mechanics, the bigger two from Metalworking and Mechanics together, and the advanced one takes Blacksmith as well.
-  - Wind chargers take Metalworking and Electricity together, or Woodwork and Electricity on a timber mast, and the car alternator wind charger Mechanics too; the homemade alternator takes Electricity and Mechanics. Wooden and plastic pipe blades come from Carving, steel ones from Blacksmith.
+  - Wind chargers take Metalworking and Electricity together, or Woodwork and Electricity on a timber mast or wooden frame, and the car alternator wind charger Mechanics too; the homemade alternator takes Electricity and Mechanics. Wooden and plastic pipe blades come from Carving, steel ones from Blacksmith.
 - **Research.** Researching a found module teaches the panel mounts and sealing, and a makeshift one teaches sealing. A plug-in inverter teaches battery boxes and the Makeshift Plug-in Inverter, a power inverter racks and the Makeshift Power Inverter, and an inverter/charger cabinets and the failsafe.
 
 ### What a recipe needs around it
