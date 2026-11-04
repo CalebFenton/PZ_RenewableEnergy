@@ -158,16 +158,17 @@ PALETTE = {
     "jaracid": lambda: material("RE_JarAcid", "#6b877d", roughness=0.12, grime=0.08, scale=20, streaks=("#a9c4ba", 0.6)),
     # Pale tan twine.
     "twine": lambda: material("RE_Twine", "#c8b07a", roughness=0.9, grime=0.15, scale=40),
-    # A log's bark as the game draws its log walls and palisades: mid brown, furrowed along the log
-    # in dark grooves between paler ridges, a knot here and there; a sawn log's pale end; and the
-    # pale manila rope its palisades are lashed with.
-    "bark": lambda: rough_wood("RE_Bark", "#84603f", 0.05, 8.0, 0.4, 1.75, knots=0.72, roughness=0.95, grime=0.3, scale=14),
+    # A log's bark as the game draws its log walls and palisades and its Log model: warm mid brown,
+    # run through with fine dark streaks along the log and paler ridges between them, a knot here
+    # and there; a sawn log's pale end; and the pale manila rope its palisades are lashed with.
+    "bark": lambda: rough_wood("RE_Bark", "#96673b", 0.02, 16.0, 0.4, 1.45, knots=0.8, roughness=0.95, grime=0.2, scale=14),
     "logend": lambda: material("RE_LogEnd", "#c39b6a", roughness=0.9, grime=0.3, scale=20, speckle=("#8f6a44", 0.5)),
     "rope": lambda: rough_wood("RE_Rope", "#cdb07a", 0.006, 3.0, 0.7, 1.15, roughness=0.9, grime=0.2, scale=40),
-    # Rough-sawn boards nailed up outdoors, as the game's crates and tables: red-brown, streaked
-    # along the board coarsely enough to show at a tile's scale, two shades so neighbours read apart.
-    "boards": lambda: rough_wood("RE_Boards", "#8a5a3a", 0.03, 12.0, 0.6, 1.3, knots=0.74, roughness=0.85, grime=0.3, scale=10),
-    "boardsdark": lambda: rough_wood("RE_BoardsDark", "#6e4630", 0.03, 12.0, 0.6, 1.3, knots=0.74, roughness=0.85, grime=0.3,
+    # Rough-sawn boards nailed up outdoors, as the game's crates and planks: warm brown, finely
+    # streaked along the board as the game draws its own at a tile's scale, two shades so neighbours
+    # read apart.
+    "boards": lambda: rough_wood("RE_Boards", "#a0703f", 0.02, 14.0, 0.5, 1.35, knots=0.76, roughness=0.85, grime=0.25, scale=10),
+    "boardsdark": lambda: rough_wood("RE_BoardsDark", "#875a32", 0.02, 14.0, 0.5, 1.35, knots=0.76, roughness=0.85, grime=0.25,
                                      scale=10),
     "sand": lambda: material("RE_Sand", "#c9b48a", roughness=0.95, grime=0.2, scale=60, speckle=("#a48f64", 0.4)),
     "sulphate": lambda: material("RE_Sulphate", "#dcd9cb", roughness=0.95, grime=0.15, scale=60),
@@ -201,6 +202,8 @@ PALETTE = {
     # canvas, tan rubber, a yellow funnel and grey pipe, a light grey, which the game draws
     # darker on a model.
     "tarp": lambda: material("RE_Tarp", "#c09347", roughness=0.85, grime=0.3, scale=14),
+    # The tarp's sewn hem, a shade darker where it's doubled over and stitched.
+    "tarphem": lambda: material("RE_TarpHem", "#97702f", roughness=0.85, grime=0.3, scale=14),
     "rubberhose": lambda: material("RE_RubberHose", "#8c7a50", roughness=0.7, grime=0.25),
     "funnel": lambda: material("RE_Funnel", "#c9b234", roughness=0.45, grime=0.15),
     "pvc": lambda: material("RE_Pvc", "#a4a6a8", roughness=0.45, grime=0.2),
@@ -265,13 +268,16 @@ PALETTE = {
     # The flat belt a car alternator wind charger's rotor drives its alternator with, cut from
     # leather the brown of the game's own leather belt (Belt2).
     "leather": lambda: material("RE_Leather", "#6e4a2c", roughness=0.7, grime=0.2, scale=14),
-    # Iron sponge: wood shavings crusted orange-brown with rust, flecked with filed iron; spent, it
-    # is blackened by iron sulphide with a few specks of yellow sulphur.
+    # Iron sponge: wood shavings crusted orange-brown with rust, flecked with filed iron, its wiry
+    # strands a brighter rust where they stand proud; spent, it is blackened by iron sulphide, its
+    # strands a dull charcoal sheen, with a few dull specks of sulphur.
     "rustchips": lambda: material("RE_RustChips", "#8a5634", roughness=0.95, grime=0.35, scale=25,
                                   speckle=("#5e3a22", 0.45)),
+    "rustwire": lambda: material("RE_RustWire", "#b0683a", roughness=0.8, grime=0.25, scale=25, speckle=("#7a4426", 0.4)),
     "ironsulphide": lambda: material("RE_IronSulphide", "#262524", roughness=0.85, grime=0.15, scale=25,
                                      speckle=("#121212", 0.4)),
-    "sulphur": lambda: material("RE_Sulphur", "#d6c34a", roughness=0.9, grime=0.1),
+    "sulphidewire": lambda: material("RE_SulphideWire", "#45423e", roughness=0.6, grime=0.2, scale=25),
+    "sulphur": lambda: material("RE_Sulphur", "#b3a65a", roughness=0.9, grime=0.15),
 }
 
 

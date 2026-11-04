@@ -2,7 +2,9 @@
 import math
 import random
 
-from art.kit import around, beam, box, cylinder, mound, ring, tube
+from mathutils import Vector
+
+from art.kit import around, box, cylinder, mound, ring, spline, tube
 from biogas import generator_fit
 from palette import M
 from parts import DRUM, arch, drum, drum_patch
@@ -256,61 +258,74 @@ def generator_gas_pipe(col, side, body=None, facing="S"):
     _pipe(col, "GenPipe", route)
 
 
+# The tarry packing's oakum rope: a ply's radius, its distance off the rope's centre line, and the
+# length of one turn of the twist.
+OAKUM = (0.013, 0.011, 0.065)
+
+
 def tarry_packing(col):
-    """A wad of straw out of a gasifier's filter, soaked black-brown with tar, a glossy smear of tar
-    run out under it, patches of the straw showing through where it soaked less, and loose strands
-    matted along it, some soaked dark and some still pale."""
-    rx, ry, height = 0.1, 0.08, 0.045
-    mound(col, "Tarry_Smear", M("tar"), (rx * 1.2, ry * 1.15, 0.006), lumps=0.12, seed=62, segments=20, rings=3)
-    mound(col, "Tarry_Wad", M("tar"), (rx, ry, height), lumps=0.25, seed=60, segments=16, rings=5)
+    """A hank of oakum out of a gasifier's filter: hemp fibre twisted loosely into a rope of three
+    plies and bent round on itself, gummed glossy black-brown with tar where the gas ran through
+    it, one ply browner where it soaked less, its ends frayed out into loose fibres, some soaked
+    dark and some still pale."""
+    ply, lay, pitch = OAKUM
+    z = ply + lay
+    path = spline([(-0.075, -0.05, z), (-0.07, 0.015, z), (-0.03, 0.05, z), (0.03, 0.048, z), (0.068, 0.005, z),
+                   (0.05, -0.04, z), (0.005, -0.055, z)], 8)
+    along, frames = 0.0, []
+    for i, point in enumerate(path):
+        if i:
+            along += (point - path[i - 1]).length
+        ahead = (path[min(i + 1, len(path) - 1)] - path[max(i - 1, 0)]).normalized()
+        frames.append((point, along, Vector((-ahead.y, ahead.x, 0)).normalized()))
+    for k, name in enumerate(("tar", "tar", "tarstraw")):
+        points = []
+        for point, s, side in frames:
+            turn = 2 * math.pi * (s / pitch + k / 3)
+            points.append(point + (side * math.cos(turn) + Vector((0, 0, 1)) * math.sin(turn)) * lay)
+        tube(col, "Tarry_Ply", M(name), points, ply, 8)
     rng = random.Random(61)
-    for i in range(4):
-        spread = rng.uniform(0.2, 0.6)
-        u, v = around((0, 0), 40 + i * 95, spread)
-        mound(col, "Tarry_Patch", M("tarstraw"), (rng.uniform(0.012, 0.018), rng.uniform(0.008, 0.012), 0.008),
-              at=(u * rx, v * ry, height * math.sqrt(1 - spread * spread) * 1.05), rotate=(0, 0, rng.uniform(0, 180)),
-              lumps=0.1, seed=63 + i, segments=10, rings=3)
-    for k in range(12):
-        angle, reach = rng.uniform(0, 360), rng.uniform(0.5, 0.85)
-        ux, uy = around((0, 0), angle, 1)
-        z = height * math.sqrt(1 - reach * reach) + 0.003
-        start = (ux * rx * reach, uy * ry * reach, z)
-        # Strands lie along the wad, matted into it: straight out of its edge, a ring of them
-        # reads as legs.
-        tx, ty = around((0, 0), angle + rng.choice((90, -90)) + rng.uniform(-35, 35), 1)
-        length = rng.uniform(0.03, 0.05)
-        end = (start[0] + tx * length, start[1] + ty * length, max(0.004, z + rng.uniform(-0.02, 0.005)))
-        # Thicker than a decal (models.DECAL_THICKNESS), so the ground model keeps them standing out.
-        beam(col, "Tarry_Strand", M("straw" if k % 3 == 0 else "tarstraw"), start, end, (0.006, 0.003))
+    # Each end frayed into a brush of fibres fanning out along the rope and drooping to the ground.
+    for end, before in ((path[0], path[1]), (path[-1], path[-2])):
+        out = (end - before).normalized()
+        side = Vector((-out.y, out.x, 0))
+        for k in range(6):
+            spread, length = rng.uniform(-0.9, 0.9), rng.uniform(0.03, 0.05)
+            start = end + side * spread * lay + Vector((0, 0, rng.uniform(-0.6, 0.6) * lay))
+            tip = start + (out + side * spread * 0.8) * length
+            tip.z = max(0.004, start.z - rng.uniform(0.008, 0.02))
+            fibre = M("straw" if k % 3 == 0 else "tarstraw" if k % 3 == 1 else "tar")
+            tube(col, "Tarry_Fibre", fibre, spline([start, (start + tip) / 2 + Vector((0, 0, 0.004)), tip], 3), 0.003, 5)
 
 
 def wood_ash(col):
-    """A shovelful of wood ash out of a stove: a soft pale grey heap slumped into a darker skirt
-    of fines round its foot, flecked white where the ash burnt clean, with bits of charcoal in it
-    and a couple of charred twig ends poking out."""
-    rx, ry, height = 0.12, 0.1, 0.075
-    mound(col, "Ash_Skirt", M("ashdark"), (rx * 1.3, ry * 1.3, 0.02), lumps=0.08, seed=52, segments=24, rings=4)
-    mound(col, "Ash_Heap", M("ash"), (rx, ry, height), lumps=0.08, seed=50, segments=20, rings=6)
+    """Wood ash out of a stove, kept in an old can painted black: its rolled rim and two ribs
+    catching the light, heaped above the rim with soft pale grey ash flecked white where it burnt
+    clean, with bits of charcoal in it."""
+    radius, height = 0.055, 0.085
+    cylinder(col, "Ash_Can", M("roundbin"), radius, height, segments=24)
+    ring(col, "Ash_CanRim", M("roundbin"), (0, 0), radius, height, 0.003)
+    for z in (0.025, 0.06):
+        ring(col, "Ash_CanRib", M("roundbin"), (0, 0), radius, z, 0.0018)
+    heap = 0.045
+    # Sunk into the can, below its lid's plane, which would otherwise meet the heap's base and shade black.
+    base = height - 0.01
+    mound(col, "Ash_Heap", M("ash"), (radius - 0.002, radius - 0.002, heap + 0.01), at=(0, 0, base), lumps=0.06, seed=50,
+          segments=20, rings=6)
     rng = random.Random(51)
 
     def on_heap(spread):
-        # Clear of the heap's lumps, which raise its surface by up to a twelfth.
-        return height * math.sqrt(1 - spread * spread) * 1.06
-    # Spread evenly over the heap, on a golden-angle spiral, so no side of it is bare.
-    for i in range(12):
-        spread = 0.75 * math.sqrt((i + 0.5) / 12)
-        u, v = around((0, 0), i * 137.5, spread)
-        size = (rng.uniform(0.012, 0.022), rng.uniform(0.008, 0.014), 0.01)
-        box(col, "Ash_Charcoal", M("charcoal"), size, at=(u * rx, v * ry, on_heap(spread) - 0.004),
+        # Clear of the heap's lumps, which raise its surface by up to a sixteenth.
+        return base + (heap + 0.01) * math.sqrt(1 - spread * spread) * 1.04
+    # Spread over the heap on a golden-angle spiral, so no side of it is bare.
+    for i in range(5):
+        spread = 0.7 * math.sqrt((i + 0.5) / 5)
+        u, v = around((0, 0), i * 137.5, spread * (radius - 0.002))
+        size = (rng.uniform(0.008, 0.013), rng.uniform(0.006, 0.009), 0.007)
+        box(col, "Ash_Charcoal", M("charcoal"), size, at=(u, v, on_heap(spread) - 0.004),
             rotate=(rng.uniform(-20, 20), rng.uniform(-20, 20), rng.uniform(0, 180)))
-    for i in range(9):
-        spread = 0.8 * math.sqrt((i + 0.3) / 9)
-        u, v = around((0, 0), 60 + i * 137.5, spread)
-        mound(col, "Ash_Fleck", M("ashwhite"), (rng.uniform(0.008, 0.014), rng.uniform(0.006, 0.01), 0.004),
-              at=(u * rx, v * ry, on_heap(spread) - 0.003), rotate=(0, 0, rng.uniform(0, 180)), segments=8, rings=2)
-    for angle, spread, length in ((30, 0.55, 0.07), (200, 0.45, 0.06)):
-        u, v = around((0, 0), angle, spread)
-        start = (u * rx, v * ry, on_heap(spread) - 0.012)
-        out = around((0, 0), angle, 1)
-        beam(col, "Ash_Twig", M("charcoal"), start, (start[0] + out[0] * length, start[1] + out[1] * length, start[2] + 0.025),
-             (0.009, 0.009))
+    for i in range(6):
+        spread = 0.8 * math.sqrt((i + 0.3) / 6)
+        u, v = around((0, 0), 60 + i * 137.5, spread * (radius - 0.002))
+        mound(col, "Ash_Fleck", M("ashwhite"), (rng.uniform(0.005, 0.009), rng.uniform(0.004, 0.007), 0.003),
+              at=(u, v, on_heap(spread) - 0.002), rotate=(0, 0, rng.uniform(0, 180)), segments=8, rings=2)

@@ -297,13 +297,15 @@ def homemade_module(col, name="Homemade", size=HOMEMADE, back=0.012, leads=True)
     width, depth, height = size
     strip = 0.032
     rng = random.Random(42)
-    parts = [box(col, name + "_Back", M("plywood"), (width, depth, back), bevel=0.002)]
+    inner_w, inner_d = width - 2 * strip, depth - 2 * strip
+    # The back fits inside the frame: running under it, its edges would lie in the frame's outer
+    # faces, and the renderer draws two solids' shared faces black.
+    parts = [box(col, name + "_Back", M("plywood"), (inner_w, inner_d, back), bevel=0.002)]
     for sign in (-1, 1):
         parts.append(box(col, name + "_FrameLong", M("pine"), (width, strip, height), at=(0, sign * (depth - strip) / 2, 0),
                          bevel=0.004))
-        parts.append(box(col, name + "_FrameShort", M("pinedark"), (strip, depth - 2 * strip, height),
+        parts.append(box(col, name + "_FrameShort", M("pinedark"), (strip, inner_d, height),
                          at=(sign * (width - strip) / 2, 0, 0), bevel=0.004))
-    inner_w, inner_d = width - 2 * strip, depth - 2 * strip
     columns, rows = 6, 2
     pitch_x, pitch_y = inner_w / columns, inner_d / rows
     for row in range(rows):

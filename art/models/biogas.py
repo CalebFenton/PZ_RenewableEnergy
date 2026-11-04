@@ -2,7 +2,7 @@
 import math
 import random
 
-from art.kit import FACING_TURN, around, bank, beam, box, cylinder, group, lathe, mound, prism, ring, tube
+from art.kit import FACING_TURN, around, bank, beam, box, cylinder, group, lathe, mound, prism, ring, spline, tube
 from palette import BANK_FADE, M
 from parts import BOARD, DRUM, FEED_BUNG, GAS_BUNG, drum
 
@@ -197,42 +197,118 @@ TARP_SQUARENESS = (1.5, 2.2, 3.0)
 TARP_SWELL = (1.0, 1.0, 1.06)
 
 
+FOLDED_TARP = (0.15, 0.1, 0.022)  # the folded bag's half length and half width, and one fold's thickness
+
+
 def tarp_gas_bag(col):
-    """The tarp gas holder as a loose item: the slack pillow, its hose barb out of the front corner."""
-    rx, ry = TARP
-    _tarp_bag(col, 1, False, centre=(0, 0), barb=(-rx - 0.06, -ry - 0.06, 0.03))
+    """The tarp gas holder as a loose item, let down and folded: three folds of the game's tarp
+    stacked a little askew, each smaller than the one under it so their edges step up, the hem seam
+    showing round the top one with grommets along its front, tied across with black cord, its hose
+    barb standing out of one end."""
+    rx, ry, fold = FOLDED_TARP
+    shifts = ((0.0, 0.0, 0.0), (0.006, 0.004, -2.0), (-0.004, -0.003, 2.5))
+    for k, (dx, dy, turn) in enumerate(shifts):
+        # Each fold sunk a millimetre into the one below, or their faces would meet and shade black.
+        box(col, "TarpFold_Fold", M("tarp"), (2 * rx - 0.024 * k, 2 * ry - 0.016 * k, fold), at=(dx, dy, k * (fold - 0.001)),
+            rotate=(0, 0, turn), bevel=0.008)
+    top = 3 * fold - 0.002
+    hx, hy = rx - 0.048 - 0.012, ry - 0.032 - 0.012
+    for sign in (-1, 1):
+        box(col, "TarpFold_Hem", M("tarphem"), (2 * hx, 0.008, 0.0012), at=(0, sign * hy, top))
+        box(col, "TarpFold_Hem", M("tarphem"), (0.008, 2 * hy, 0.0012), at=(sign * hx, 0, top))
+    for x in (-0.07, 0.0, 0.07):
+        cylinder(col, "TarpFold_Grommet", M("lead"), 0.011, 0.004, at=(x, -hy + 0.016, top - 0.002), segments=10)
+    # The cord round the folds, drawn in tight over the top and down both sides, knotted on top.
+    x = 0.035
+    tube(col, "TarpFold_Cord", M("black"), [(x, -ry - 0.002, 0.006), (x, -ry + 0.006, top - 0.006), (x, -ry + 0.02, top + 0.002),
+                                            (x, ry - 0.02, top + 0.002), (x, ry - 0.006, top - 0.006), (x, ry + 0.002, 0.006)],
+         0.0045, 6)
+    mound(col, "TarpFold_Knot", M("black"), (0.013, 0.011, 0.01), at=(x, 0.012, top), segments=10, rings=3)
+    # The hose barb out of the bottom fold's end, its two ridges catching the light.
+    z, y = 0.016, -0.03
+    tube(col, "TarpFold_Barb", M("galvanised"), [(rx - 0.02, y, z), (rx + 0.065, y, z)], 0.012, 8)
+    for out in (0.025, 0.05):
+        cylinder(col, "TarpFold_BarbRidge", M("galvanised"), 0.016, 0.007, at=(rx + out, y, z), rotate=(0, 90, 0), segments=10)
+
+
+SPONGE = (0.055, 0.0375, 0.03)  # the pad's half length, half width and height
+
+
+def _pad_loop(half_length, half_height, corner, t):
+    """The point a fraction `t` of the way round a rounded rectangle `half_length` by `half_height`
+    about its centre, its corners rounded to `corner`, (along, up): leftward along the top, then
+    down, along the bottom and up, round a corner after each side."""
+    a, b = half_length - corner, half_height - corner
+    centres = ((-a, b), (-a, -b), (a, -b), (a, b))
+    normals = ((0, 1), (-1, 0), (0, -1), (1, 0))
+    sides = (2 * a, 2 * b, 2 * a, 2 * b)
+    arc = math.pi / 2 * corner
+    s = (t % 1) * (sum(sides) + 4 * arc)
+    for k in range(4):
+        if s <= sides[k]:
+            (cx, cy), (nx, ny) = centres[k - 1], normals[k]
+            # Each side runs a quarter turn anticlockwise of its outward normal.
+            return (cx + corner * nx - ny * s, cy + corner * ny + nx * s)
+        s -= sides[k]
+        if s <= arc:
+            angle = math.pi / 2 * (k + 1) + s / corner
+            return (centres[k][0] + corner * math.cos(angle), centres[k][1] + corner * math.sin(angle))
+        s -= arc
+    return (a, b + corner)
 
 
 def iron_sponge(col, spent=False):
-    """A handful of iron sponge, a gas scrubber's packing: a loose wad of wood chips and curled
-    shavings rusted together with filed iron scrap, crusted orange-brown with darker iron flecks;
-    or `spent`, the same wad blackened with iron sulphide and a few faint specks of sulphur."""
-    body = M("ironsulphide" if spent else "rustchips")
-    fleck = M("sulphur" if spent else "charcoal")
-    rx, ry, height = 0.08, 0.07, 0.045
-    mound(col, "Sponge_Wad", body, (rx, ry, height), lumps=0.3, seed=70, segments=16, rings=5)
+    """A pad of iron sponge, a gas scrubber's packing: wood shavings rusted together with iron
+    filings, pressed into a scrub pad like a steel wool one, coarse wiry strands wound round it
+    lengthwise and a few across, some curling loose at its ends; orange-brown with rust, or
+    `spent`, black with iron sulphide but for a few dull specks of sulphur."""
+    rx, ry, height = SPONGE
+    body, wire = (M("ironsulphide"), M("sulphidewire")) if spent else (M("rustchips"), M("rustwire"))
+    box(col, "Sponge_Pad", body, (2 * rx, 2 * ry, height), bevel=0.008)
     rng = random.Random(71)
-    for i in range(14):
-        angle, reach = rng.uniform(0, 360), rng.uniform(0.3, 0.95)
-        ux, uy = around((0, 0), angle, 1)
-        z = height * math.sqrt(1 - reach * reach) + 0.002
-        at = (ux * rx * reach, uy * ry * reach, z)
-        if i % 2:
-            # A wood chip lying on the wad, tipped up at a slant.
-            box(col, "Sponge_Chip", body, (rng.uniform(0.025, 0.04), rng.uniform(0.012, 0.018), 0.005), at=at,
-                rotate=(rng.uniform(-30, 30), rng.uniform(-30, 30), rng.uniform(0, 180)))
-        else:
-            # A curled shaving lying along the wad's edge: sticking out of it, a ring of them
-            # reads as quills.
-            length = rng.uniform(0.03, 0.05)
-            tx, ty = around((0, 0), angle + rng.choice((90, -90)) + rng.uniform(-30, 30), 1)
-            end = (at[0] + tx * length, at[1] + ty * length, max(0.004, z + rng.uniform(-0.02, 0.01)))
-            beam(col, "Sponge_Shaving", body, at, end, (0.008, 0.003))
-    for _ in range(6):
-        spread = rng.uniform(0.1, 0.7)
-        u, v = around((0, 0), rng.uniform(0, 360), spread)
-        mound(col, "Sponge_Fleck", fleck, (0.006, 0.005, 0.004),
-              at=(u * rx, v * ry, height * math.sqrt(1 - spread * spread)), segments=8, rings=2)
+    radius, mid = 0.0023, height / 2
+    # Wound lengthwise round the pad, side by side across it, each strand kinked from side to side.
+    strands = 15
+    for i in range(strands):
+        y0 = -ry + 0.003 + (2 * ry - 0.006) * i / (strands - 1)
+        waves, phase, sway = rng.randint(3, 6), rng.uniform(0, 2 * math.pi), rng.uniform(0.003, 0.005)
+        points = []
+        for k in range(48):
+            t = k / 48
+            u, v = _pad_loop(rx + 0.001, mid + 0.001, 0.009, t)
+            y = max(-ry, min(ry, y0 + sway * math.sin(2 * math.pi * waves * t + phase)))
+            points.append((u, y, mid + v + rng.uniform(-0.0008, 0.0008)))
+        tube(col, "Sponge_Wire", wire if i % 2 else body, points + points[:1], radius, 5)
+    # Round its sides, a few strands winding level round the pad between its top and bottom.
+    for i, z0 in enumerate((0.25, 0.5, 0.75)):
+        waves, phase = rng.randint(5, 8), rng.uniform(0, 2 * math.pi)
+        points = []
+        for k in range(64):
+            t = k / 64
+            x, y = _pad_loop(rx + 0.001, ry + 0.001, 0.009, t)
+            points.append((x, y, height * z0 + 0.003 * math.sin(2 * math.pi * waves * t + phase)))
+        tube(col, "Sponge_Wire", body if i % 2 else wire, points + points[:1], radius, 5)
+    # A few wound across it on the slant, either way, kinked and tangled over the lengthwise ones.
+    for x0, slant in ((-0.03, 0.025), (-0.005, -0.03), (0.02, 0.028), (0.04, -0.022)):
+        phase = rng.uniform(0, 2 * math.pi)
+        points = []
+        for k in range(40):
+            t = k / 40
+            v, w = _pad_loop(ry + 0.003, mid + 0.003, 0.01, t)
+            points.append((x0 + slant * v / ry + 0.004 * math.sin(2 * math.pi * 3 * t + phase), v, mid + w))
+        tube(col, "Sponge_Wire", wire, points + points[:1], radius * 0.8, 5)
+    # Loose strands curling out of its ends.
+    for end in (-1, 1):
+        for k in range(3):
+            y, rise = rng.uniform(-0.7, 0.7) * ry, rng.uniform(0.3, 0.8) * height
+            reach = rng.uniform(0.012, 0.02)
+            curl = [(end * (rx - 0.004), y, rise), (end * (rx + reach * 0.6), y + 0.004, rise + 0.006),
+                    (end * (rx + reach), y + 0.01, rise), (end * (rx + reach * 0.5), y + 0.012, rise - 0.006)]
+            tube(col, "Sponge_Curl", wire, spline(curl, 4), radius * 0.8, 5)
+    if spent:
+        for _ in range(4):
+            mound(col, "Sponge_Sulphur", M("sulphur"), (0.005, 0.004, 0.003),
+                  at=(rng.uniform(-0.7, 0.7) * rx, rng.uniform(-0.6, 0.6) * ry, height + radius), segments=8, rings=2)
 
 
 def _tarp_bag(col, fill, torn, centre=TARP_AT, barb=None):

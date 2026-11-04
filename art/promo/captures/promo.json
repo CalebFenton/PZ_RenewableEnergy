@@ -310,10 +310,10 @@
     {
       "name": "model_RenewableEnergy_BatteryBankMetal",
       "box": [
-        105,
-        105,
+        106,
+        106,
         316,
-        407
+        406
       ]
     },
     {
@@ -529,7 +529,7 @@
         106,
         106,
         406,
-        181
+        179
       ]
     },
     {
@@ -580,10 +580,10 @@
     {
       "name": "model_RenewableEnergy_IronSponge",
       "box": [
-        23,
-        23,
-        89,
-        58
+        18,
+        18,
+        70,
+        44
       ]
     },
     {
@@ -598,10 +598,10 @@
     {
       "name": "model_RenewableEnergy_L16Battery",
       "box": [
-        59,
-        59,
-        209,
-        229
+        60,
+        60,
+        210,
+        231
       ]
     },
     {
@@ -769,10 +769,10 @@
     {
       "name": "model_RenewableEnergy_SpentIronSponge",
       "box": [
-        23,
-        23,
-        89,
-        58
+        18,
+        18,
+        70,
+        44
       ]
     },
     {
@@ -787,19 +787,19 @@
     {
       "name": "model_RenewableEnergy_TarpGasBag",
       "box": [
-        69,
-        69,
-        265,
-        164
+        46,
+        46,
+        178,
+        98
       ]
     },
     {
       "name": "model_RenewableEnergy_TarryPacking",
       "box": [
-        32,
-        32,
-        124,
-        74
+        24,
+        24,
+        92,
+        65
       ]
     },
     {
@@ -814,10 +814,10 @@
     {
       "name": "model_RenewableEnergy_WoodAsh",
       "box": [
-        41,
-        41,
-        158,
-        100
+        19,
+        19,
+        61,
+        74
       ]
     },
     {
