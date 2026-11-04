@@ -20,35 +20,68 @@ local FRIDGE = "appliances_refrigeration_01_0"
 
 -- Charging and loads ---------------------------------------------------------------------------
 
--- An hour of full sun on a connected panel charges the bank by what the panel makes, and the
--- charge, the status and the tile's battery overlays reach this client's copies.
+-- Hours of full sun on a connected panel charge the bank by the panel's rating at the system
+-- efficiency over those hours, and the charge, the status and the tile's battery overlays reach
+-- this client's copies. Sun past what the batteries hold leaves them exactly full.
+local SUNNY_HOURS = 2.5
 test("renewable_energy_bank_panel_charges_bank", {
     run = function(self)
-        local bank = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY }, { charge = 0.2 })
+        -- Two batteries, so that the sunny hours fit at the default Sunlight Multiplier.
+        local bank = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY, T.CAR_BATTERY }, { charge = 0.2 })
         self.panel = bank and T.panel(self, Sprites.flat, { near = bank, connect = true })
         if not self.panel then return end
         self.bank = bank
         T.watch(self, bank)
-        T.readRecord(self, bank, "before")
-        T.bankPass(self, bank, Sun.FULL_SUN)
+        T.batch(function()
+            T.readRecord(self, bank, "before")
+            T.bankPass(self, bank, Sun.FULL_SUN, { hours = SUNNY_HOURS, label = "sunny" })
+        end)
         T.waitForStatus(self, bank, function(status)
             return math.abs(T.copyUses(bank, T.CAR_BATTERY) - bank.state.charge) < 0.001
                 and status.solarW == bank.state.status.solarW
                 and table.concat(T.overlaysOf(bank.object), ",") == table.concat(bank.state.overlays, ",")
         end, "this client's copies of the charged battery, the status and the overlays")
+        T.bankPass(self, bank, Sun.FULL_SUN, { hours = 12, label = "overfilled" })
     end,
     validate = function(self)
         if not T.expectConnected(self.panel) then return end
         -- The run's last wait already failed the test if this client's copies differ from the server's.
-        local after = self.bank.state
+        local before, after, full = self.reads.before, self.reads.sunny, self.reads.overfilled
         local status = after.status
-        -- How watts follow the sun is renewable_energy_solar_sun_watts_multiplier_snow_roof's.
-        expect(status.solarW > 0, "a connected panel in full sun makes nothing")
-        expectNear("Wh gained in an hour", after.storedWh - self.reads.before.storedWh, status.solarW, 0.5)
+        if not expect(before.storedWh + T.flatPanelW() * SUNNY_HOURS < before.nominalWh,
+            "the sunny hours would fill the bank, so its gain can't show") then return end
+        expectNear("a flat panel's watts in full sun", status.solarW, T.flatPanelW(), 1e-9)
+        expectNear("Wh gained in " .. SUNNY_HOURS .. " hours", after.storedWh - before.storedWh, T.flatPanelW() * SUNNY_HOURS, 0.01)
         expectEqual("percent of full sun", status.sources[1] and status.sources[1].fullSunPct, 100)
         local battery = stateItem(after, T.CAR_BATTERY)
         expectNear("the battery's charge", battery and battery.uses, after.charge, 0.001)
         expect(table.concat(after.overlays, ",") ~= "", "the charged bank's tile shows no batteries")
+        battery = stateItem(full, T.CAR_BATTERY)
+        expectEqual("the bank's charge after more sun than it holds", full.charge, 1)
+        expectEqual("the battery's charge after more sun than it holds", battery and battery.uses, 1)
+    end,
+})
+
+-- What the last pass found, the sun and each source's watts, is still in the status once the world
+-- is saved and loaded again, which keeps only a bank's saved fields: a window opened before the
+-- next pass shows it rather than night and nothing coming in.
+test("renewable_energy_bank_status_kept_through_save", {
+    run = function(self)
+        local bank = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY }, { charge = 0.2 })
+        self.panel = bank and T.panel(self, Sprites.flat, { near = bank, connect = true })
+        if not self.panel then return end
+        T.batch(function()
+            T.bankPass(self, bank, Sun.FULL_SUN, { hours = 0.1 })
+            T.reloadRecord(self, bank, "saved", { bank = { name = "PZHarness.readRecord", args = T.at(bank, { kind = "bank" }) } })
+        end)
+    end,
+    validate = function(self)
+        if not T.expectConnected(self.panel) then return end
+        local before, after = self.reads.saved.before.bank.status, self.reads.saved.after.bank.status
+        expectNear("a flat panel's watts in full sun before the save", before.solarW, T.flatPanelW(), 1e-9)
+        expectEqual("the panel's watts after the save", after.solarW, before.solarW)
+        expectEqual("the sun's elevation after the save", after.sunElevation, before.sunElevation)
+        expectEqual("the sun on a flat panel after the save", after.irradiance, before.irradiance)
     end,
 })
 
@@ -75,9 +108,12 @@ test("renewable_energy_bank_powers_at_night", {
     validate = function(self)
         local on, after, without, with = self.reads.on, self.bank.state, self.reads.without.status, self.reads.with.status
         expect(on.activated and on.powered, "switching on a charged bank with an inverter did not power its square")
-        expect(without.drawW > 0, "a bank that is on with nothing switched on draws nothing for its inverter")
-        expect(with.drawW - without.drawW > T.fridgeW(), string.format(
-            "a fridge drawing %.1f W adds %.1f W to the draw, no inverter losses", T.fridgeW(), with.drawW - without.drawW))
+        -- One inverter carries the load at its efficiency and idles on top.
+        local inverter = Specs.inverters[T.INVERTER_CHARGER]
+        expectNear("the draw for what the house has on", without.drawW, without.loadW / inverter.efficiency + inverter.idle, 1e-6)
+        -- Vanilla bills appliances in single-precision fuel.
+        expectNear("the load a fridge adds", with.loadW - without.loadW, T.fridgeW(), 0.001)
+        expectNear("the draw a fridge adds", with.drawW - without.drawW, T.fridgeW() / inverter.efficiency, 0.001)
         expectNear("Wh used in an hour", self.reads.with.storedWh - after.storedWh, after.status.drawW, 0.5)
         local charging = after.status.charging
         expect(charging.watts < 0 and charging.hours ~= nil, "the status doesn't say the bank is draining")
@@ -97,6 +133,7 @@ test("renewable_energy_bank_stands_by_on_the_grid", {
         self.bank = bank
         T.step(function() T.need(self, bank.square:hasGridPower(), "grid power on the bank's square") end)
         T.switchOn(self, bank)
+        T.bankPass(self, bank, 0, { hours = 0.1, label = "noFridge" })
         T.step(function() T.placeTile(self, fridge, T.MINI_FRIDGE) end)
         T.bankPass(self, bank, 0, { hours = 12, label = "onGrid" })
         T.step(function() T.setGrid(self, false) end)
@@ -107,8 +144,7 @@ test("renewable_energy_bank_stands_by_on_the_grid", {
         expectEqual("the state of a switched-on bank on the grid", onGrid.status.state, "grid")
         expect(not onGrid.activated, "the bank ran its own generator while the grid powered its square")
         expectEqual("the bank's draw on the grid", onGrid.drawW, 0)
-        expect(onGrid.status.loadW >= T.fridgeW(), string.format(
-            "on the grid the bank measures a load of %.1f W with a fridge on", onGrid.status.loadW))
+        expectNear("the load a fridge adds on the grid", onGrid.status.loadW - self.reads.noFridge.status.loadW, T.fridgeW(), 0.001)
         expectEqual("the load the bank measured on the grid, against the one it carries after", onGrid.status.loadW,
             offGrid.status.loadW)
         expectEqual("the bank's deepest drop after a night on the grid", onGrid.cycleDepth, 0)
@@ -297,6 +333,64 @@ test("renewable_energy_bank_overload_cuts_and_returns", {
         expectEqual("inverter condition after the overload", T.stateCondition(cut, T.INVERTER_CHARGER),
             100 - math.floor(wear.perOverload.inverter + 2 * wear.perHour.inverter))
         expect(back.activated and not back.overloaded, "the power didn't come back once the load fit")
+    end,
+})
+
+-- A load of exactly the inverters' rating runs; a watt more cuts the power. Catches a bank cut
+-- while running at its rating.
+test("renewable_energy_bank_load_at_the_limit_runs", {
+    run = function(self)
+        T.setGrid(self, false)
+        local bank = T.bank(self, "batteryRackWood", { T.L16, T.L16, T.INVERTER_CHARGER })
+        if not bank then return end
+        T.switchOn(self, bank)
+        local limitW = Specs.inverters[T.INVERTER_CHARGER].watts
+        T.batch(function()
+            T.onRecord(self, bank, "applyLoad", { appliances = { { name = "fridgeFreezer", watts = limitW } } }, "atLimit")
+            T.onRecord(self, bank, "applyLoad", { appliances = { { name = "fridgeFreezer", watts = limitW + 1 } } }, "overLimit")
+        end)
+    end,
+    validate = function(self)
+        local atLimit, overLimit = self.reads.atLimit, self.reads.overLimit
+        expect(atLimit.activated and not atLimit.overloaded, "a load of exactly the inverter's rating cut the bank")
+        expect(overLimit.overloaded and not overLimit.activated, "a load a watt over the inverter's rating didn't cut the bank")
+    end,
+})
+
+-- A bank that ran empty stays off until it holds a whole pass of its draw: a charge a little short
+-- of the inverter's draw over the pass leaves it empty, a little more brings it back. Catches a
+-- bank that comes back at any charge and stops and starts every pass.
+test("renewable_energy_bank_empty_bank_resumes_with_a_pass_of_draw", {
+    run = function(self)
+        T.setGrid(self, false)
+        local bank = T.bank(self, "batteryRackWood", { T.CAR_BATTERY, T.INVERTER_CHARGER }, { charge = 0.01 })
+        if not bank then return end
+        T.batch(function()
+            T.job(self, "bank", BankJobs.TURN_ON, bank, nil, "switch")
+            T.bankPass(self, bank, 0, { label = "emptied" })
+        end)
+        T.step(function()
+            local emptied = self.reads.emptied
+            local inverter = Specs.inverters[T.INVERTER_CHARGER]
+            -- An hour's draw (the passes' default) for the load the bank measured.
+            local passWh = emptied.status.loadW / inverter.efficiency + inverter.idle
+            T.batch(function()
+                T.setCharge(self, bank, (passWh - 0.5) / emptied.nominalWh)
+                T.bankPass(self, bank, 0, { label = "short" })
+                T.setCharge(self, bank, (passWh + 0.5) / emptied.nominalWh)
+                T.bankPass(self, bank, 0, { label = "enough" })
+            end)
+        end)
+    end,
+    validate = function(self)
+        if not T.expectOk(self.reads.switch, "switching the bank on") then return end
+        local emptied, short, enough = self.reads.emptied, self.reads.short, self.reads.enough
+        if not expectEqual("the state of the bank its pass emptied", emptied.status.state, "empty") then return end
+        expectEqual("the load the bank measured after it emptied", enough.status.loadW, emptied.status.loadW)
+        expectEqual("the state of the empty bank holding a little less than a pass of draw", short.status.state, "empty")
+        expect(not short.activated, "the empty bank holding a little less than a pass of draw powers its squares")
+        expectEqual("the state of the empty bank holding a little more than a pass of draw", enough.status.state, "on")
+        expect(enough.activated, "the empty bank holding a little more than a pass of draw doesn't power its squares")
     end,
 })
 

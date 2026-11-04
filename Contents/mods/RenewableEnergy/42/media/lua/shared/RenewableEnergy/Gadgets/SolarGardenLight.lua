@@ -7,7 +7,7 @@
 -- lit tile it sees a lamp of its own, in its bulb's colour (this file). A server tells its clients
 -- when a light's lamp changes, so they draw it at once.
 
-local Places = require "RenewableEnergy/Places"
+local Lamppost = require "RenewableEnergy/Lamppost"
 local Sprites = require "RenewableEnergy/Sprites"
 local Jobs = require "cf_commonlib/Jobs"
 local PlaceTracker = require "cf_commonlib/PlaceTracker"
@@ -145,37 +145,21 @@ end
 local function removeLamp(key)
     local lamp = lamps[key]
     if lamp then
-        -- By object, as vanilla's lamps do: the cell drops it on its next lighting pass. By place
-        -- it would clear its light at once, which the native lighting refuses.
-        getCell():removeLamppost(lamp.source)
+        Lamppost.clear(lamp)
         lamps[key] = nil
     end
 end
 
 -- Gives the place x, y, z a lamp in the colour of `bulb`, or none if `bulb` is nil.
 local function drawLamp(x, y, z, bulb)
-    local key = Places.key(x, y, z)
+    local key = Squares.placeKey(x, y, z)
     if not bulb then
         removeLamp(key)
         return
     end
-    local lamp = lamps[key]
-    -- The cell drops the lamps of a chunk that unloads, so a lamp is looked for again.
-    if lamp and getCell():getLightSourceAt(x, y, z) == lamp.source then
-        if lamp.bulb ~= bulb then
-            -- Another bulb went in while the light stayed lit. The lamp takes its colour, as a
-            -- vanilla lamp does when its bulb changes (IsoLightSwitch.setPrimaryR), and the next
-            -- lighting pass hands it to the native lighting.
-            local r, g, b = lampColor(bulb)
-            lamp.source:setR(r)
-            lamp.source:setG(g)
-            lamp.source:setB(b)
-            lamp.bulb = bulb
-        end
-        return
-    end
+    lamps[key] = lamps[key] or {}
     local r, g, b = lampColor(bulb)
-    lamps[key] = { source = getCell():addLamppost(x, y, z, r, g, b, SolarGardenLight.SPEC.radius), bulb = bulb }
+    Lamppost.show(lamps[key], x, y, z, r, g, b, SolarGardenLight.SPEC.radius)
 end
 
 --- Gives a lit light a lamp in its bulb's colour and takes an unlit one's away. Not on a
@@ -196,7 +180,7 @@ local lights = PlaceTracker.new({
     matches = SolarGardenLight.isLight,
     onFound = SolarGardenLight.syncLamp,
     onLost = function(x, y, z)
-        removeLamp(Places.key(x, y, z))
+        removeLamp(Squares.placeKey(x, y, z))
     end,
 })
 

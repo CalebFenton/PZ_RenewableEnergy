@@ -94,12 +94,12 @@ test("renewable_energy_bank_window_shows_grid_power", {
         local function gridRow(key)
             return T.rowLabelled((StatusRows.rows(self.reads[key].status, self.at)), label)
         end
-        local bare, charging, status = gridRow("bare"), gridRow("charging"), self.reads.charging.status
+        local bare, charging = gridRow("bare"), gridRow("charging")
         expectEqual("the grid row of a bank without an inverter or a charger", bare and bare.value,
             getText("IGUI_RenewableEnergy_GridNoCharger"))
-        expect(status.chargerW > 0, "a bank's chargers on the grid make nothing")
+        -- Room for more than an hour of it: the charger fills at its rating.
         expectEqual("the grid row of a bank charging from the grid", charging and charging.value,
-            getText("IGUI_RenewableEnergy_GridCharging", Format.watts(status.chargerW)))
+            getText("IGUI_RenewableEnergy_GridCharging", Format.watts(Specs.chargerWatts)))
         expect(gridRow("off") == nil, "the grid row stays once the grid is off")
     end,
 })
@@ -179,11 +179,9 @@ test("renewable_energy_bank_window_reflects_status", {
         local rackName = getText("IGUI_RenewableEnergy_MountRackMetal")
         local group = T.rowLabelled(right, getText("IGUI_RenewableEnergy_Count", rackName, self.panelCount))
         if not expect(group ~= nil, "no row of " .. self.panelCount .. " metal racks") then return end
-        local watts = 0
-        for _, source in ipairs(status.sources) do
-            watts = watts + source.watts
-        end
-        expect(watts > 0, "the panels within the slots make nothing")
+        -- The racks within the slots make their modules' rating at the system efficiency in full sun.
+        local inSlots = math.floor(Specs.freeSlots / Specs.mounts.rack.slots)
+        local watts = T.fullSunW(inSlots * Specs.mounts.rack.modules * Specs.modules[T.FACTORY_MODULE].watts)
         expectEqual("the metal racks' watts", group.value, Format.watts(watts))
         expectEqual("the sources the metal racks' row highlights", #group.sources, self.panelCount)
         local sourceRows = {}

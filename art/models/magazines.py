@@ -22,9 +22,18 @@ def magazine(col, issue):
     box(col, "Mag%d_Cover" % issue, M(cover), (width, depth, 0.001), at=(0, 0, height - 0.001))
     top = height + 0.0003
     flat = (0, 0, 0)
-    text(col, "Mag%d_Title" % issue, title, "HOMESTEAD", 0.03, at=(0, 0.09, top), rotate=flat)
-    text(col, "Mag%d_Title2" % issue, title, "POWER", 0.036, at=(0, 0.052, top), rotate=flat)
-    text(col, "Mag%d_Issue" % issue, M("red"), "#%d" % issue, 0.03, at=(0.075, 0.105, top), rotate=flat)
+    # The title set left, clear of the issue number, which is dark in a white roundel in the top
+    # right corner on every cover, so it reads even on a 32 px icon.
+    left = -width / 2 + 0.012
+    text(col, "Mag%d_Title" % issue, title, "HOMESTEAD", 0.019, at=(left, 0.098, top), rotate=flat, align="LEFT")
+    text(col, "Mag%d_Title2" % issue, title, "POWER", 0.032, at=(left, 0.058, top), rotate=flat, align="LEFT")
+    badge = (width / 2 - 0.046, depth / 2 - 0.046)
+    cylinder(col, "Mag%d_Badge" % issue, M("white"), 0.042, 0.0004, at=(*badge, height), segments=24)
+    # The numeral printed four times a hair apart: the font's strokes alone come out thinner than
+    # a pixel on the icon.
+    for dx, dy in ((-0.002, 0), (0.002, 0), (0, -0.002), (0, 0.002)):
+        text(col, "Mag%d_Issue" % issue, M("ink"), "%d" % issue, 0.07, at=(badge[0] + dx, badge[1] - 0.025 + dy, top + 0.0002),
+             rotate=flat)
     box(col, "Mag%d_Picture" % issue, M("sky"), (0.17, 0.13, 0.0004), at=(0, -0.04, height))
     if issue == 1:
         cylinder(col, "Mag1_Sun", M("sun"), 0.025, 0.0006, at=(-0.045, -0.0, height + 0.0002), segments=16)

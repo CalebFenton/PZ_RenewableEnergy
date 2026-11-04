@@ -189,7 +189,7 @@ test("renewable_energy_solar_seal_module_in_place", {
             modules = { { type = T.FACTORY_MODULE, condition = 100 }, cracked } })
         if not self.panel then return end
         local bank = self.bank
-        T.setRecipeSkills(self, ModuleRepair.sealRecipe())
+        T.setRecipeSkills(self, getScriptManager():getCraftRecipe(ModuleRepair.SEAL_RECIPE))
         T.give(self, "inputs", { { type = "Base.Screwdriver" }, { type = "Base.Epoxy" }, { type = "Base.Glue" } })
         T.step(function()
             self.items.inputs[1]:setFavorite(true, true)
@@ -247,7 +247,7 @@ test("renewable_energy_solar_reglaze_module_in_place", {
             modules = { { type = T.FACTORY_MODULE, condition = 100 }, cracked } })
         if not self.panel then return end
         local bank = self.bank
-        T.setRecipeSkills(self, ModuleRepair.reglazeRecipe())
+        T.setRecipeSkills(self, getScriptManager():getCraftRecipe(ModuleRepair.REGLAZE_RECIPE))
         T.knowRecipes(self, { ModuleRepair.REGLAZE_RECIPE })
         T.give(self, "inputs", { { type = "Base.Screwdriver" }, { type = "Base.GlassPanel" }, { type = "Base.Epoxy" },
             { type = "Base.ElectricWire" } })
@@ -307,7 +307,7 @@ test("renewable_energy_solar_seal_respects_protected_inputs", {
     run = function(self)
         local panel = T.panel(self, Sprites.flat, { modules = T.factoryModules(20) })
         if not panel then return end
-        T.setRecipeSkills(self, ModuleRepair.sealRecipe())
+        T.setRecipeSkills(self, getScriptManager():getCraftRecipe(ModuleRepair.SEAL_RECIPE))
         T.give(self, "inputs", { { type = "Base.Screwdriver" }, { type = "Base.Epoxy" } })
         T.step(function()
             local tool, epoxy = self.items.inputs[1], self.items.inputs[2]
@@ -339,7 +339,7 @@ test("renewable_energy_solar_seal_each_module_in_place", {
         self.panel = self.bank and T.panel(self, Sprites.rack.wood.S, { near = self.bank, connect = true,
             modules = T.factoryModules(self.conditions[1], self.conditions[2]) })
         if not self.panel then return end
-        T.setRecipeSkills(self, ModuleRepair.sealRecipe())
+        T.setRecipeSkills(self, getScriptManager():getCraftRecipe(ModuleRepair.SEAL_RECIPE))
         T.give(self, "inputs", { { type = "Base.Screwdriver" }, { type = "Base.Epoxy" }, { type = "Base.Glue" } })
         -- The options before each seal, and after the last.
         self.offers = {}

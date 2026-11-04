@@ -1,7 +1,6 @@
 -- A battery bank's right-click menu. Each job's option is cf_commonlib's JobOptions', greyed out by
 -- BankJobs, which the action and the authority ask, so the menu refuses exactly what they would.
--- Parts enter and leave a bank only through Wire In and Unwire (see
--- RenewableEnergy/PowerBank/WiredPartsGuard.lua).
+-- Parts enter and leave a bank only through Wire In and Unwire (WiredPartsGuard).
 
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local BankJobs = require "RenewableEnergy/PowerBank/BankJobs"

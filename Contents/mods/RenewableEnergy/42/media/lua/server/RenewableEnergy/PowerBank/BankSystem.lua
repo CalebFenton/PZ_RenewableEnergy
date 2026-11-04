@@ -249,7 +249,7 @@ local function loadBank(isoObject)
     BankSystem.instance:loadIsoObject(isoObject)
 end
 
-Tiles.onLoad(PowerBank.bankSprites(), loadBank, { first = true })
+Tiles.onLoad(PowerBank.feature.sprites, loadBank, { first = true })
 
 -- A panel's chunk loaded: its overlays are saved with it, but older saves may lack its homemade
 -- modules or cracks.

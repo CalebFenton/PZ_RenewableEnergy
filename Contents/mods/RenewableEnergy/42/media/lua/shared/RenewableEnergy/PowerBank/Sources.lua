@@ -8,6 +8,7 @@ local Sprites = require "RenewableEnergy/Sprites"
 local Wind = require "RenewableEnergy/Wind"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local Treadmill = require "RenewableEnergy/PowerBank/Treadmill"
+local GeneratorReach = require "cf_commonlib/GeneratorReach"
 local Squares = require "cf_commonlib/Squares"
 
 local Sources = {}
@@ -118,16 +119,14 @@ end
 --- (Sources.connectRefusal) and no bank has yet: one wired to another bank moves over only by its
 --- own Connect to that bank.
 function Sources.sourcesInReach(bankPosition)
-    local reach = PowerBank.sourceReach()
     local found = {}
-    for z = bankPosition.z - reach.levels, bankPosition.z + reach.levels do
-        Squares.eachAround(bankPosition.x, bankPosition.y, z, reach.tiles, function(square)
-            local source = Sources.findOn(square)
-            if source and not PowerBank.connectedBank(source) and not Sources.connectRefusal(source, bankPosition) then
-                table.insert(found, source)
-            end
-        end)
-    end
+    -- In reach by the walk, and on no bank, so of connectRefusal only the square is left to ask.
+    GeneratorReach.eachSquare(bankPosition.x, bankPosition.y, bankPosition.z, function(square)
+        local source = Sources.findOn(square)
+        if source and Sources.squareOk(square, Sources.kindOf(source)) and not PowerBank.connectedBank(source) then
+            table.insert(found, source)
+        end
+    end)
     return found
 end
 

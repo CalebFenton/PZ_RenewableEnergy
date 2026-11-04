@@ -23,11 +23,20 @@ The crafting window lists every recipe, and tooltips and **Status** windows give
 
 There are two ways to keep the lights on, and most homesteads end up using both.
 
-**A battery bank.** Panels, wind chargers and treadmills charge the bank's batteries, and its inverter turns that charge into power for the house. Underneath, a bank is a generator that burns no fuel and makes no noise: it powers whatever a generator in its spot would, with the same reach and floors.
+**A battery bank.** Panels, wind chargers and treadmills charge the bank's batteries, and its inverter turns that charge into power for the house. A bank burns no fuel and makes no noise, and it powers whatever a generator in its spot would, with the same reach and floors.
 
 **A generator on gas.** A Gas Conversion Kit lets a vanilla generator run on gas from a manure digester or a wood gasifier instead of gasoline. It's still loud, and it still draws the dead, but it keeps going once the gas stations run dry.
 
-They work together: a charger wired into the bank fills it from a running generator, and a **Solar Failsafe** starts the generator when the batteries run low. You get quiet power most days, and the generator's roar only when the weather fails you.
+They work together: a vanilla Car Battery Charger wired into the bank fills it from a running generator, and a **Solar Failsafe** starts the generator when the batteries run low. You get quiet power most days, and the generator's roar only when the weather fails you.
+
+### The words used here
+
+- **Bank**: a battery box, rack or cabinet placed in a room, with everything wired into it.
+- **Inverter**: the part that turns the batteries' charge into power for the house. It sets how much you can switch on at once, and a bank needs one to turn on.
+- **Source**: anything that charges a bank: a solar panel, a wind charger or a treadmill.
+- **Input**: a bank's slot for a source. A bank has 2, each **Charge Controller** wired in adds 7, and a bladed wind charger takes 3 (see [Inputs](#inputs)).
+- **Charger**: a Car Battery Charger, or the charger built into an Inverter/Charger, wired into a bank. It fills the batteries from the grid or a running generator.
+- **Reach**: the area a generator in the bank's spot would power, 20 squares and 3 floors by default. A bank powers everything in it and takes sources from it.
 
 ### What things draw
 
@@ -49,7 +58,11 @@ The inverter also loses a share of what passes through it, a tenth for a found o
 
 ## Your first setup
 
-You need a **Wooden Battery Box** (Homestead Power #1, or Woodwork), two car batteries, a **Plug-in Inverter** from an auto parts store or a car's glove box (or a **Makeshift Plug-in Inverter** you build, see [Inverters](#inverters)), and a solar module or two.
+You need a **Wooden Battery Box**, two car batteries, a **Plug-in Inverter** from an auto parts store or a car's glove box (or a **Makeshift Plug-in Inverter** you build, see [Inverters](#inverters)), and a solar module or two.
+
+**Homestead Power #1** teaches the box and the panel. Without it, you learn the box at Woodwork, Metalworking or Electricity 5, and the panel at Electricity 4. Either way, making the wooden box takes Woodwork 3 (the **Metal Battery Box** takes Metalworking 3 instead), and the panel Electricity 2. Every car has a battery. Good solar modules are rare outside electronics and camping stores, but cracked ones are common on garage and shed shelves, and they still make power (see [Where to look](#where-to-look)).
+
+**No skills yet?** Farm storerooms, barns and sheds the first time anyone sees them can hold a battery box or rack already in place and connected, with a few worn batteries, sometimes an inverter, and now and then a panel beside it (see [Places already set up](#places-already-set-up)). An arrow board trailer gives you two panels and a box of deep cycles (see [The arrow board trailer](#the-arrow-board-trailer)).
 
 1. Place the box inside a building, in a room. Outdoors, it does nothing.
 2. Right-click it and **Wire In** the batteries and the inverter. That takes a screwdriver, some Electric Wire and enough light to see by.
@@ -96,6 +109,11 @@ The Inverter/Charger also has a 1000 W charger built in (see [Chargers and gener
 
 Taking apart a radio or a TV often gives an Amplifier, and a Speaker always does. Dismantling a microwave gives its transformer 20% of the time at Electricity 0, 10% more for each level, and every time from Electricity 8.
 
+**Controllers and the failsafe.** Homestead Power #2 teaches both; without it, you learn the controller at Electricity 8 and the failsafe at Electricity 6.
+
+- **Charge Controller**: an Amplifier, six Scrap Electronics, two lengths of wire, a small sheet of metal and four screws, with a screwdriver and pliers, at Electricity 5.
+- **Solar Failsafe**: a Remote Controller (Long-Range), two Scrap Electronics and two lengths of wire, with a screwdriver and pliers, at Electricity 3.
+
 ### Sources
 
 A usual climb:
@@ -106,11 +124,11 @@ A usual climb:
 - A **car alternator wind charger**, then a **homemade wind turbine** on high, open ground.
 - A generator on biogas or wood gas as the backup, started by a **Solar Failsafe**.
 
-### Batteries
+### Better batteries
 
 Car batteries come first, then **Deep Cycle Batteries**, which hold twice as much and last far longer, then **L-16s**, found mostly where the phone and power companies kept them. You can make a **Jar Battery** from scratch when you can't find anything better. See [Batteries](#batteries).
 
-### Gas
+### Gas backups
 
 | Line | Small | Medium | Large |
 |---|---|---|---|
@@ -167,9 +185,13 @@ Inputs go in the order you connected the sources. Sources past the last input st
 
 ### Reach
 
-**Connect Sources in Reach** picks up every source not yet connected to a bank that a generator in the bank's place would power: within 20 squares and 3 floors of the bank, or whatever the **Generator Tile Range** and **Generator Vertical Power Range** sandbox options say. To move a source from one bank to another, right-click the source and pick **Connect to** the other bank. Sources too large for its free inputs are skipped; each queued connection still needs room when its turn arrives. A bank takes sources only once it's connected itself (**Connect Bank**). Panels and wind chargers must stand outdoors; a treadmill can be under a roof. Move a source and it drops off its bank, so connect it again, and so does one left out of reach when those options shrink.
+**Connect Sources in Reach** picks up every source in the bank's reach that isn't yet connected to a bank: within 20 squares and 3 floors of the bank, or whatever the **Generator Tile Range** and **Generator Vertical Power Range** sandbox options say.
 
-Roofing over a panel or wind charger also drops its connection at the next bank update. Move it back outdoors and connect it again.
+- **The bank must be connected first** (**Connect Bank**).
+- **Panels and wind chargers must stand outdoors**, under open sky. A treadmill can be under a roof.
+- **Inputs.** Sources too large for the bank's free inputs are skipped, and each queued connection still needs room when its turn arrives.
+- **Moving a source to another bank**: right-click the source and pick **Connect to** the other bank.
+- **What drops a connection**: moving the source, roofing over a panel or wind charger (at the next bank update), or leaving it out of reach when those sandbox options shrink. Put it right and connect it again.
 
 ### Chargers and generators
 
@@ -220,9 +242,13 @@ Once a game day, each battery wears by that day's deepest drop from its peak. We
 Batteries never last forever, but you can bring them back a few times before they need rebuilding:
 
 1. **Service Battery**: Electricity 1, water, and a rag, baking soda or wood ash. A small boost, and it keeps its charge.
-2. **Recondition Battery** (learned from Homestead Power #2): water and baking soda or wood ash bring it straight up to its ceiling, but leave it empty.
+2. **Recondition Battery** (Homestead Power #2, or learned at Electricity or Mechanics 5): Electricity 3, water and baking soda or wood ash bring it straight up to its ceiling, but leave it empty.
 3. **The ceiling**: each service or recondition lowers how far the next one can bring it back. After a handful, it needs a rebuild.
-4. **Rebuild**: **Strip** the battery (gloves, and containers to catch the acid) for its case, worn plates and acid. Recast the plates at a furnace in a fired clay mold. A third of the lead skims off as **Lead Dross**, so three worn sets make two, and a lead pipe can stand in for one set. Then rebuild with acid and water. The battery comes back like new, empty, with its repair count cleared.
+4. **Rebuild.** Homestead Power #2 teaches every step; without it, you learn them at Electricity 6.
+   1. **Strip** the battery (Electricity 4, gloves, and containers to catch the acid) for its case, worn plates and acid.
+   2. Make the mold once: **Make Wooden Battery Plate Pattern** (Woodwork 2, a hammer, a saw, a plank and nails), **Press Battery Plate Mold** from clay and the pattern at a hand press, then **Fire Battery Plate Mold** in a kiln. The pattern and the mold are kept.
+   3. **Recast Battery Plates** (Blacksmith 3) at a furnace with the mold and charcoal. A third of the lead skims off as **Lead Dross**, so three worn sets make two, and a lead pipe can stand in for one set. **Cast Battery Plates from Lead Pipe** makes a set from three lead pipes.
+   4. **Rebuild** the battery (Electricity 5, a screwdriver, and a wrench for an L-16) from its case, new plates, acid and water. It comes back like new, empty, with its repair count cleared.
 5. **Reduce Lead Dross** (Blacksmith 5) at the furnace with charcoal and the mold: each dross makes one set of plates, so no lead is ever lost, only charcoal.
 
 Acid can't be made, and it needn't be: stripping a battery gives back exactly the acid rebuilding it takes. More comes from auto parts stores and garages, or from batteries you strip. A rebuild keeps the battery's kind: a deep cycle or L-16 can only be rebuilt from its own case.
@@ -235,7 +261,7 @@ A bank found in a room comes stocked, connected and switched off. Its batteries 
 
 ### Jar battery
 
-Six glass jars, one set of plates (three lead pipes cast a set), acid and water. It's small and short-lived, but everything except the acid can be made.
+Six glass jars, one set of plates (three lead pipes cast a set), acid and water, at Electricity 4. It's small and short-lived, but everything except the acid can be made.
 
 ### In a car
 
@@ -286,8 +312,8 @@ The glass shows how worn a module is: whole down to 85 condition, a few fine cra
 
 Sealing is the cheap fix, reglazing the good one.
 
-- **Seal Cracked Module** takes a screwdriver and 1 use of epoxy, glue or wood glue. Seal a loose module in the crafting window, or one still on a placed panel from the panel's menu. Each seal adds 20 condition, up to 55, less 10 for each earlier seal, for either kind of module; the glass still looks cracked. Once a module is at its ceiling, the panel's menu greys its seal out: reglaze it instead.
-- **Reglaze Module** puts on a new pane of glass, with a screwdriver, a glass pane or car window, 1 use of epoxy, glue or wood glue, and electric wire. Reglaze a loose module in the crafting window, or one still on a placed panel or on the arrow board trailer from its menu. Any damaged module can be reglazed, cracked or not. It comes back as new, looks whole, and its seal count clears.
+- **Seal Cracked Module** (Electricity 2) takes a screwdriver and 1 use of epoxy, glue or wood glue. Seal a loose module in the crafting window, or one still on a placed panel from the panel's menu. Each seal adds 20 condition, up to 55, less 10 for each earlier seal, for either kind of module; the glass still looks cracked. Once a module is at its ceiling, the panel's menu greys its seal out: reglaze it instead.
+- **Reglaze Module** (Electricity 3) puts on a new pane of glass, with a screwdriver, a glass pane or car window, 1 use of epoxy, glue or wood glue, and electric wire. Reglaze a loose module in the crafting window, or one still on a placed panel or on the arrow board trailer from its menu. Any damaged module can be reglazed, cracked or not. It comes back as new, looks whole, and its seal count clears.
 
 **Unmount** always gives back the same modules at the same condition, plus some of the frame.
 
@@ -295,7 +321,7 @@ Sealing and reglazing in place follow the crafting window's item protections: fa
 
 ### Makeshift modules
 
-A **Makeshift Solar Module** is 16 solar cells under glass, rated 96 W. Cells come from taking apart calculators, garden lights, solar battery chargers, maintainers, and shattered factory modules (only at 0 condition, for 12 cells). It wears, cracks, seals and reglazes like a factory module.
+A **Makeshift Solar Module** (Electricity 4) is 16 solar cells under glass, rated 96 W. Cells come from taking apart calculators, garden lights, solar battery chargers, maintainers, and shattered factory modules (only at 0 condition, for 12 cells). It wears, cracks, seals and reglazes like a factory module.
 
 ### Glass
 
@@ -384,11 +410,11 @@ From 55 km/h, the homemade turbine's tail swings its head out of the wind ("turn
 
 No sun and no wind? Run for it.
 
-Right-click a treadmill and **Connect to** a bank in reach (Electricity 2, a screwdriver, wire and a Scrap Electronics): that wires its motor to make power instead of using it. **Run on Treadmill** lasts half an hour and banks roughly what a fridge-freezer draws in that time. The energy goes in when the run ends and reaches the batteries over the next half hour; stopping early banks your share of the run.
+Right-click a treadmill and pick a bank in reach under **Connect to a Battery Bank** (Electricity 2, a screwdriver, wire and a Scrap Electronics): that wires its motor to make power instead of using it. **Run on Treadmill** lasts half an hour and banks roughly what a fridge-freezer draws in that time. The energy goes in when the run ends and reaches the batteries over the next half hour; stopping early banks your share of the run.
 
 A run costs a good chunk of endurance and some thirst, and trains Fitness and Sprinting. You stop by yourself when you're nearly spent. If the bank has no free input, the run still tires you, but the energy is lost.
 
-**Disconnect** with the screwdriver wires the motor back and gives the wire back. A treadmill feeding a bank can't be picked up or turned until you disconnect it. A treadmill whose bank is gone or out of reach stays wired: **Connect to** another bank takes no more wire, and **Unwire the Motor** gives the wire back; picking it up gives the wire back too, and it forgets its wiring. Where there's power from the grid, a generator or a bank, an unwired treadmill is plain exercise equipment, and on a bank it draws about what a washer does.
+**Disconnect** with the screwdriver wires the motor back and gives the wire back. A treadmill feeding a bank can't be picked up or turned until you disconnect it. A treadmill whose bank is gone or out of reach stays wired: **Connect to a Battery Bank** again takes no more wire, and **Unwire the Motor** gives the wire back; picking it up gives the wire back too, and it forgets its wiring. Where there's power from the grid, a generator or a bank, an unwired treadmill is plain exercise equipment, and on a bank it draws about what a washer does.
 
 ## Generators on gas
 
@@ -521,7 +547,7 @@ Logs, branches, planks, firewood, twigs, pinecones, charcoal, and anything a cha
 
 **Light Gasifier** takes matches or a lighter. A new gasifier, or one that has been out for a while, is cold and needs bellows as well. A lit gasifier that isn't feeding a running generator still burns about a kilogram of fuel a day; that's the price of keeping it ready.
 
-### Upkeep
+### Gasifier upkeep
 
 - **Ash.** The ash pit fills as it burns, fastest in the primitive gasifier. A full pit halves the gas. **Clean Out Ash** with a shovel, trowel or broom gives **Wood Ash**, which settles a sour digester, goes in a scrubber's water, or stands in for baking soda when you service a battery.
 - **Filter.** The filter holds hay, straw, grass or splinters, which turn into **Tarry Packing** as it burns. Change the packing in time: once no clean packing is left, tar reaches the engine, for half the gas and fast wear. Tarry packing wears the generator faster even before then.
@@ -563,7 +589,12 @@ Tow it home and it keeps charging its batteries on the way, or strip it for part
 
 ### Other ways to learn
 
-- **Skills.** Every recipe is also learned by reaching a skill level, usually above what crafting it needs, so a magazine gets you there sooner. Boxes, racks, cabinets and panels come from Woodwork, Metalworking or Electricity. Battery work, inverters and controllers come from Electricity, digesters from Farming plus a building skill, gasifiers from Mechanics and Metalworking, wind chargers from Metalworking and Electricity, and the car alternator wind charger takes Mechanics too.
+- **Skills.** Every recipe is also learned by reaching a skill level, usually above what crafting it needs, so a magazine gets you there sooner.
+  - Battery boxes, racks and cabinets, wall panels and solar racks come from any one of Woodwork, Metalworking or Electricity; the flat panel from Electricity alone.
+  - Battery work, inverters, the controller, the failsafe and makeshift modules come from Electricity; reconditioning from Mechanics too, and reducing dross from Blacksmith too. Reglazing takes Electricity and Glassmaking together.
+  - The barrel digester comes from Farming or Mechanics, the insulated digester from Woodwork and Farming together, the dome from Masonry and Farming together. The Gas Conversion Kit comes from Mechanics, the Gas Heater from Metalworking and Mechanics together.
+  - The primitive gasifier comes from Mechanics, the bigger two from Metalworking and Mechanics together, and the advanced one takes Blacksmith as well.
+  - Wind chargers take Metalworking and Electricity together, and the car alternator wind charger Mechanics too; the homemade alternator takes Electricity and Mechanics. Wooden and pipe blades come from Carving, steel ones from Blacksmith.
 - **Research.** Researching a found module teaches the panel mounts and sealing, and a makeshift one teaches sealing. A plug-in inverter teaches battery boxes and the Makeshift Plug-in Inverter, a power inverter racks and the Makeshift Power Inverter, and an inverter/charger cabinets and the failsafe.
 
 ### What a recipe needs around it
@@ -589,7 +620,7 @@ Found inverters, the maintainer, the solar battery charger, garden lights, facto
 | night, cloudy, low sun | The sun | Wait, or add wind or a treadmill |
 | snow | Snow on the panel | **Clear Snow**, or use racks and wall panels in winter |
 | cracked | A cracked module | Seal or reglaze it |
-| no free input | The bank ran out of inputs | Wire in a charge controller, or repair a broken one |
+| no free input | The bank ran out of inputs | Wire in a charge controller, repair a broken one, or disconnect a source you need less |
 | too little wind | Below its starting speed | Wait for the wind |
 | sheltered | Trees, buildings or walls around the blades | Move it into the open or up a floor |
 | too close to another charger | Other chargers within three squares, at the same height | Move them four squares apart |
@@ -603,17 +634,20 @@ Found inverters, the maintainer, the solar battery charger, garden lights, facto
 
 - **Turn On is greyed out**: the bank has no working inverter or no battery.
 - **The bank does nothing**: it's outdoors, or not connected (**Connect Bank**).
+- **The bank drains with everything off**: the inverter draws a few watts while the bank is on, and everything switched on in its reach counts, the neighbours' lights and fridges included.
 - **The power keeps cutting out**: more is switched on than the inverters carry, including the neighbours' fridges. Switch something off.
-- **A recipe is greyed out with everything in hand**: you need more light, a table, or the station it names.
+- **Connect Sources in Reach finds nothing**: the bank isn't connected yet (**Connect Bank**), the source is indoors or under a roof, it's out of reach, or it's already connected to another bank (move it with **Connect to**).
+- **A treadmill run banked nothing**: the bank had no free input.
+- **A recipe is greyed out with everything in hand**: your skill is too low, or you need more light, a table, or the station it names.
 - **A digester makes no gas**: it's still starting up, too cold, sour, full of sludge, or its holder is torn. Its **Status** says which.
+- **A generator won't run on gas**: it needs a Gas Conversion Kit, a gas line (from a digester, one Rubber Hose for every 5 squares on the same floor; from a gasifier, right beside it, not diagonally), and its valve on **Run on Gas**. A gasifier must be lit, and a cold one needs bellows to light. When the gas runs out the generator stops and doesn't restart by itself.
 - **A generator on gas keeps stalling**: more than it carries is switched on, or its gasifier needs the ash cleaned or the packing changed.
+- **The Solar Failsafe doesn't start the generator**: it has no gasoline and no lit gasifier, it's worn enough to catch fire, or the failsafe isn't on the generator's square. The bank must drop to the start charge first (20% by default).
 
 ## Moving things and your save
 
-- **Picking up.** Panels keep their modules, and garden lights keep their charge. Anything connected (a bank, a panel, a wind charger or a treadmill) must be disconnected before you can pick it up or turn it, as with a generator, and goes down again unconnected. A bank must also be emptied; a sledgehammer dumps what's in it on the floor. A generator with a gas kit fitted can't be picked up. A digester, gasifier or wind charger goes down again just as it was picked up, gas, feed, fittings, wear and all; nothing changes while you carry it. Its hopper must be empty, and a gasifier must be put out. A gas heater goes out when its digester is picked up, and a gasifier loses its pipe to the generator.
+- **Picking up.** Panels keep their modules, and garden lights keep their charge. Anything connected (a bank, a panel, a wind charger or a treadmill) must be disconnected before you can pick it up or turn it, as with a generator, and goes down again unconnected. A bank must also be emptied; a sledgehammer dumps what's in it on the floor. A generator with a gas kit fitted can't be picked up. A digester, gasifier or wind charger goes down again just as it was picked up, gas, feed, fittings, wear and all; nothing changes while you carry it. Its hopper must be empty, and a gasifier must be put out and its gas line disconnected. A gas heater goes out when its digester is picked up.
 - **Scrapping.** A digester, gasifier or wind charger taken apart with the Moveables tool's Scrap mode gives back what built it: each piece comes back 70% of the time at level 0 of its recipe's first skill, 2% more for each level. Glue, tape, garbage bags, straw, cement and welding fuel are used up for good. A wind charger's motor or alternator and its blades always come off whole, broken blades broken, and a digester's Tarp Gas Bag, compressor and packed Iron Sponge come back as they were.
-- **Banks from an older version.** A box, rack, bank or gas heater from before they could turn works as before but won't turn. One standing in your world turns once you pick it up and place it again. One you were carrying places facing south only: place it, pick it up, and from then on it turns.
-- **Makeshift modules from an older version.** A Makeshift Solar Module used to be rated 160 W with a ceiling of 60% condition; now it is rated 96 W and comes new at 100%. One that was mounted, on the arrow board trailer or damaged before the update keeps its old condition: one that was new then reads 58 of 96 W now and shows light cracks. Reglaze it to bring it back to new. A mount carried since before the update may show the wrong modules as makeshift until you place it and pick it up again.
 - **Adding to a save.** Loot and stocked rooms turn up only in containers and rooms nobody has opened or seen yet. Solar sites, rural finds and garden lights appear anywhere, explored or not.
 - **Removing from a save.** What the mod built into your world goes with it.
 

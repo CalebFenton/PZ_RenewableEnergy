@@ -46,28 +46,6 @@ test("renewable_energy_bank_needs_connecting", {
     end,
 })
 
--- A bank tile a player places becomes a working bank that isn't connected yet, as a generator
--- set down isn't.
-test("renewable_energy_bank_placed_bank_starts_unconnected", {
-    instant = true,
-    run = function(self)
-        local square = T.square(self, { indoors = true }, "a free indoor square for a bank")
-        if not square then return end
-        self.square = square
-        -- Placing a bank tile needs the Electrician tool.
-        T.give(self, "screwdriver", { { type = "Base.Screwdriver" } })
-        T.placeAsPlayer(self, square, "RenewableEnergy.BatteryBoxWood", Sprites.batteryBoxWood.S)
-        T.waitFor(self, function()
-            local bank = PowerBank.findOn(square)
-            return bank ~= nil and PowerBank.summaryOf(bank) ~= nil
-        end, "this client's copy of the placed bank, working")
-    end,
-    validate = function(self)
-        local bank = PowerBank.findOn(self.square)
-        expect(not bank:isConnected(), "a bank the player placed starts connected")
-    end,
-})
-
 -- Vanilla's recipe of the generator magazine.
 local GENERATOR = { "Generator" }
 
@@ -96,22 +74,30 @@ test("renewable_energy_bank_connect_needs_generator_skill", {
     end,
 })
 
--- Connect Bank from the menu connects the bank, Disconnect Bank undoes it, and only a
+-- A bank tile a player places becomes a working bank that isn't connected yet, as a generator set
+-- down isn't. Connect Bank from the menu connects it, Disconnect Bank undoes it, and only a
 -- disconnected bank can be picked up, as with a generator.
 test("renewable_energy_bank_connect_and_disconnect", {
     instant = true,
     run = function(self)
-        -- Outdoors: connecting takes light to see by, which an unlit room lacks.
-        self.bank = T.bank(self, "batteryBoxWood", {}, { connected = false, outdoors = true })
-        if not self.bank then return end
-        -- Picking up a bank tile needs the Electrician tool.
+        local square = T.square(self, { indoors = true }, "a free indoor square for a bank")
+        if not square then return end
+        -- Light to connect by, which an unlit room lacks.
+        T.holdLight(self)
+        -- Placing and picking up a bank tile need the Electrician tool.
         T.give(self, "screwdriver", { { type = "Base.Screwdriver" } })
-        local bank = self.bank
+        T.placeAsPlayer(self, square, "RenewableEnergy.BatteryBoxWood", Sprites.batteryBoxWood.S)
+        local bank = { square = square }
+        T.waitFor(self, function()
+            bank.object = PowerBank.findOn(square)
+            return bank.object ~= nil and PowerBank.summaryOf(bank.object) ~= nil
+        end, "this client's copy of the placed bank, working")
         local function canPickUp()
             local object = bank.object
             return ISMoveableSpriteProps.new(object:getSprite():getName()):canPickUpMoveable(player(), bank.square, object)
         end
         T.step(function()
+            self.placedConnected = bank.object:isConnected()
             if not T.chooseOption(self, "Connect Bank", T.menuOption(BankMenu.addBankOptions, bank.object,
                 getText("ContextMenu_RenewableEnergy_ConnectBank")), bank.square) then
                 return
@@ -129,6 +115,7 @@ test("renewable_energy_bank_connect_and_disconnect", {
         end)
     end,
     validate = function(self)
+        expect(not self.placedConnected, "a bank the player placed starts connected")
         if not T.expectOffered(self, "Connect Bank") then return end
         expect(not self.connectedPickUp, "a connected bank can be picked up")
         if not T.expectOffered(self, "Disconnect Bank") then return end

@@ -108,6 +108,10 @@ local function fill(character, record, row, isoObject, vessel)
     end
     if row.fill.endurancePerM3 then
         character:getStats():remove(CharacterStat.ENDURANCE, m3 * row.fill.endurancePerM3)
+        -- Sent now rather than with the next periodic stats sync, as vanilla's complete()s do.
+        if isServer() then
+            syncPlayerStats(character, SyncPlayerStatsPacket.getBitMaskForStat(CharacterStat.ENDURANCE))
+        end
     end
     return true
 end

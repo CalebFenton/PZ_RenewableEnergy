@@ -11,7 +11,7 @@ local Clock = require "cf_commonlib/Clock"
 local function partStatus(parts, extra)
     local list = {}
     for _, part in ipairs(parts) do
-        local entry = { id = part.id, type = part.type, condition = part.condition, working = Bank.isWorking(part) }
+        local entry = { type = part.type, condition = part.condition, working = Bank.isWorking(part) }
         if extra then
             extra(entry, part)
         end
@@ -65,14 +65,11 @@ function Bank:buildStatus()
     local chargers = partStatus(self.chargers, function(entry)
         entry.charging = entry.working and (now.chargerW or 0) > 0 and chargeSource or nil
     end)
-    local isoObject = self:getIsoObject()
     local status = {
-        kind = self:spec().sprite,
         bankType = self.bankType,
         name = self.name,
         on = self.on,
         state = self:state(),
-        powered = isoObject ~= nil and isoObject:isActivated() or (isoObject == nil and self:shouldPower()),
         hour = Clock.now(),
         sunElevation = now.elevation or 0,
         irradiance = now.irradiance or 0,

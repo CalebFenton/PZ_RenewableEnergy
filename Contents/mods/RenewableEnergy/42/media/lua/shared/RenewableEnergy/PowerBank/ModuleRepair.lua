@@ -67,16 +67,6 @@ end
 ModuleRepair.SEAL = { craft = ModuleRepair.SEAL_RECIPE, except = isModuleInput }
 ModuleRepair.REGLAZE = { craft = ModuleRepair.REGLAZE_RECIPE, except = isModuleInput }
 
---- Seal Cracked Module's CraftRecipe.
-function ModuleRepair.sealRecipe()
-    return getScriptManager():getCraftRecipe(ModuleRepair.SEAL_RECIPE)
-end
-
---- Reglaze Module's CraftRecipe.
-function ModuleRepair.reglazeRecipe()
-    return getScriptManager():getCraftRecipe(ModuleRepair.REGLAZE_RECIPE)
-end
-
 --- The job row (cf_commonlib's Jobs) of mending a module in place with the craft `material`
 --- (ModuleRepair.SEAL or REGLAZE): `allowed(subject, with)` says whether the module the job means
 --- can take it, else `refusal` refuses it; `extra` adds the place's own fields, such as where a

@@ -19,7 +19,7 @@ RenewableEnergy = RenewableEnergy or {}
 RenewableEnergy.Gasifier = Gasifier
 
 Gasifier.SYSTEM_NAME = "renewable_energy_gasifier"
-Gasifier.CONTAINER = "RenewableEnergyGasifier"
+Gasifier.HOPPER = "RenewableEnergyGasifier"
 Gasifier.FILTER = "RenewableEnergyGasifierFilter"
 
 -- filterCapacity: the filter container's capacity. tarKgPerItem: wood burned for each packing item
@@ -122,12 +122,12 @@ function Gasifier.acceptPacking(container, item)
 end
 
 local ACCEPT = {
-    [Gasifier.CONTAINER] = "RenewableEnergy.Gasifier.acceptFuel",
+    [Gasifier.HOPPER] = "RenewableEnergy.Gasifier.acceptFuel",
     [Gasifier.FILTER] = "RenewableEnergy.Gasifier.acceptPacking",
 }
 
 function Gasifier.hopperOf(isoObject)
-    return isoObject:getContainerByType(Gasifier.CONTAINER)
+    return isoObject:getContainerByType(Gasifier.HOPPER)
 end
 
 function Gasifier.filterOf(isoObject)

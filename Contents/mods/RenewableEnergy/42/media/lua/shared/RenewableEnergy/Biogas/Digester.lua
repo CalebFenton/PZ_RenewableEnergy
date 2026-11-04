@@ -205,9 +205,13 @@ function Digester.feedOf(item)
     return { potential = FOOD_POTENTIAL_PER_KG * weight, acid = FOOD_ACID_PER_KG * weight, kg = kg, whole = true }
 end
 
+local function isFeed(item)
+    return Digester.feedOf(item) ~= nil
+end
+
 --- The hopper's AcceptItemFunction: feed and neutralisers only.
 function Digester.acceptItem(container, item)
-    return Digester.feedOf(item) ~= nil
+    return isFeed(item)
 end
 
 --- The feeds waiting in the hopper `container`, in its order: the items, and each one's feed
@@ -261,9 +265,9 @@ function Digester.scrubberOverlay(tier, state)
     return (Digester.scrubLeft(state) > 0 and Sprites.digesterScrubber or Sprites.digesterScrubberSpent)[tier]
 end
 
---- The holder overlay for a holder kind, its fill (0..1) and whether it's torn, or nil for the
---- dome, whose holder is itself.
-function Digester.holderOverlay(holder, fill, torn)
+--- The holder overlay for a holder kind, the gas in it and whether it's torn, or nil for the
+--- dome, whose holder is itself, and for none.
+function Digester.holderOverlay(holder, gas, torn)
     local spec = Digester.HOLDERS[holder]
     if torn then
         return spec.torn
@@ -272,7 +276,7 @@ function Digester.holderOverlay(holder, fill, torn)
     if not levels then
         return nil
     end
-    return levels[math.min(#levels, 1 + math.floor(fill * #levels))]
+    return levels[math.min(#levels, 1 + math.floor(gas / spec.capacity * #levels))]
 end
 
 GlobalObjects.declare(Digester, {
@@ -283,8 +287,8 @@ GlobalObjects.declare(Digester, {
     -- copy of the hopper, and `powered`, whether the digester's square has power for a fitted
     -- compressor, as this side sees it now: power comes and goes between the authority's passes.
     decorate = function(summary, isoObject)
-        local _, feeds = Digester.feedsIn(isoObject:getContainer())
-        summary.hopper = #feeds
+        local container = isoObject:getContainer()
+        summary.hopper = container and container:getCountEval(isFeed) or 0
         summary.powered = isoObject:getSquare():haveElectricity()
     end,
 })

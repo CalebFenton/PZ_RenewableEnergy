@@ -58,3 +58,5 @@ function ISRemoveBurntVehicle:complete()
     end
     return done
 end
+
+return CarAlternator

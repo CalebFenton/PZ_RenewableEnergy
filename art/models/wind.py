@@ -184,17 +184,26 @@ def _tail(col, name, start, length, vane, z):
     box(col, name + "_Vane", M("drummetal"), (0.004, vane[0], vane[1]), at=(0, end[1] + vane[0] / 2 - 0.05, z - vane[1] / 2 + 0.05))
 
 
-def _pipe_mast(col, name, top):
+def _pipe_mast(col, name, top, stub=None):
     """A welded pipe mast on a concrete footing, gusseted to its base plate, with the yaw bearing a
-    wind charger's head turns on from `top` up."""
-    box(col, name + "_Footing", M("concrete"), (0.4, 0.4, 0.08), bevel=0.01)
-    box(col, name + "_BasePlate", M("rawsteel"), (0.26, 0.26, 0.012), at=(0, 0, 0.08))
-    for angle in (45, 135, 225, 315):
-        box(col, name + "_Gusset", M("weld"), (0.1, 0.008, 0.12), at=(*around((0, 0), angle, 0.09), 0.092), rotate=(0, 0, angle))
-    cylinder(col, name + "_Mast", M("galvanised"), 0.045, top - 0.092, at=(0, 0, 0.092), segments=14)
-    for z in (top / 3, 2 * top / 3):
-        ring(col, name + "_MastWeld", M("weld"), (0, 0), 0.046, z, 0.006)
+    wind charger's head turns on from `top` up; or with `stub`, only that many metres of the mast
+    under the bearing, as a build icon frames the head."""
+    foot = 0.092 if stub is None else top - stub
+    if stub is None:
+        box(col, name + "_Footing", M("concrete"), (0.4, 0.4, 0.08), bevel=0.01)
+        box(col, name + "_BasePlate", M("rawsteel"), (0.26, 0.26, 0.012), at=(0, 0, 0.08))
+        for angle in (45, 135, 225, 315):
+            box(col, name + "_Gusset", M("weld"), (0.1, 0.008, 0.12), at=(*around((0, 0), angle, 0.09), foot), rotate=(0, 0, angle))
+    cylinder(col, name + "_Mast", M("galvanised"), 0.045, top - foot, at=(0, 0, foot), segments=14)
+    if stub is None:
+        for z in (top / 3, 2 * top / 3):
+            ring(col, name + "_MastWeld", M("weld"), (0, 0), 0.046, z, 0.006)
     cylinder(col, name + "_YawBearing", M("weld"), 0.065, 0.07, at=(0, 0, top), segments=14)
+
+
+def _down_cable(col, name, points, low):
+    """The cable down the mast through `points`, top first, as far down as `low`."""
+    tube(col, name, M("black"), [p for p in points if p[2] >= low], 0.007, 6)
 
 
 def _spinner(col, y, hub):
@@ -203,21 +212,21 @@ def _spinner(col, y, hub):
     cylinder(col, ROTOR + "Nose", M("rawsteel"), 0.07, 0.05, at=(0, y - 0.05, hub), rotate=(90, 0, 0), radius_top=0.02, segments=16)
 
 
-def propeller_charger(col, blades="wood"):
+def propeller_charger(col, blades="wood", stub=None):
     """The treadmill wind charger: a welded pipe mast on a concrete footing, a yaw bearing on top,
     the treadmill motor as its generator, three blades on its shaft, carved from pine planks
     ("wood"), cut from plastic pipe ("pipe") or forged from sheet steel ("steel"), to the same shape,
-    and a tail vane behind."""
+    and a tail vane behind. `stub` draws only the head on the top of its mast (_pipe_mast)."""
     hub = PROPELLER_HUB
     top = hub - 0.12
-    _pipe_mast(col, "Prop", top)
+    _pipe_mast(col, "Prop", top, stub)
     box(col, "Prop_MotorPlate", M("rawsteel"), (0.1, 0.36, 0.01), at=(0, -0.08, hub - 0.075))
     cylinder(col, "Prop_Motor", M("black"), 0.065, 0.3, at=(0, 0.06, hub), rotate=(90, 0, 0), segments=18)
     for y in (0.075, -0.24):
         cylinder(col, "Prop_MotorBell", M("aluminium"), 0.067, 0.015, at=(0, y, hub), rotate=(90, 0, 0), segments=18)
     _tail(col, "Prop_Tail", (0, 0.06), 0.8, (0.42, 0.32), hub)
-    tube(col, "Prop_Cable", M("black"), [(0.04, 0.04, hub - 0.07), (0.055, 0.0, top), (0.055, 0.0, 0.3), (0.12, 0.08, 0.09),
-                                         (0.2, 0.2, 0.0)], 0.007, 6)
+    _down_cable(col, "Prop_Cable", [(0.04, 0.04, hub - 0.07), (0.055, 0.0, top), (0.055, 0.0, 0.3), (0.12, 0.08, 0.09),
+                                    (0.2, 0.2, 0.0)], 0 if stub is None else top - stub)
     _spinner(col, -0.255, hub)
     _rotor_blades(col, (0, -0.28, hub), blades, PROPELLER_BLADE)
 
@@ -294,16 +303,16 @@ CAR_ALTERNATOR_PULLEY_RADIUS = 0.22  # the rotor's pulley, many times the altern
 CAR_ALTERNATOR_X = 0.2  # the alternator beside the mast, clear of the rotor's pulley
 
 
-def car_alternator_charger(col, blades="wood"):
+def car_alternator_charger(col, blades="wood", stub=None):
     """The car alternator wind charger: the treadmill charger's welded pipe mast with a sheet-metal
     head plate on its yaw bearing, three blades on a short shaft in two pillow-block bearings and
     a large flat pulley behind them, a leather flat belt down to the small pulley of a car's
     alternator bolted to the plate beside the mast, and a sheet-metal tail vane clamped rigid
-    behind."""
+    behind. `stub` draws only the head on the top of its mast (_pipe_mast)."""
     hub = PROPELLER_HUB
     deck = hub - CAR_ALTERNATOR_RAISE
     top = deck - 0.08
-    _pipe_mast(col, "CarAlt", top)
+    _pipe_mast(col, "CarAlt", top, stub)
     # The plate stops short of the blades' sweep in front.
     box(col, "CarAlt_HeadPlate", M("rawsteel"), (0.42, 0.56, 0.01), at=(0.1, 0.01, deck - 0.01))
     for y in (-0.22, 0.02):
@@ -329,8 +338,9 @@ def car_alternator_charger(col, blades="wood"):
     for y in (0.14, 0.24):
         box(col, "CarAlt_TailClamp", M("weld"), (0.06, 0.025, 0.055), at=(0, y, deck), bevel=0.003)
     _tail(col, "CarAlt_Tail", (0, 0.1), 0.85, (0.42, 0.32), deck + 0.03)
-    tube(col, "CarAlt_Cable", M("black"), [(CAR_ALTERNATOR_X + 0.03, 0.06, axis + 0.02), (0.33, 0.07, deck - 0.02), (0.1, 0.03, top - 0.15),
-                                           (0.055, 0.0, top - 0.3), (0.055, 0.0, 0.3), (0.12, 0.08, 0.09), (0.2, 0.2, 0.0)], 0.007, 6)
+    _down_cable(col, "CarAlt_Cable", [(CAR_ALTERNATOR_X + 0.03, 0.06, axis + 0.02), (0.33, 0.07, deck - 0.02), (0.1, 0.03, top - 0.15),
+                                      (0.055, 0.0, top - 0.3), (0.055, 0.0, 0.3), (0.12, 0.08, 0.09), (0.2, 0.2, 0.0)],
+                0 if stub is None else top - stub)
     _spinner(col, -0.28, hub)
     _rotor_blades(col, (0, -0.305, hub), blades, PROPELLER_BLADE)
 
@@ -360,12 +370,14 @@ def _alternator_head(col, rotor):
 ALTERNATOR_HEAD_Y = -0.32  # the hub's face, in front of the mast
 
 
-def alternator_charger(col, blades="steel"):
+def alternator_charger(col, blades="steel", stub=None):
     """The homebuilt wind turbine, the best of the homestead wind chargers: a two-storey braced
     tripod of welded angle iron, kept inside its own square, a homemade alternator on its head,
-    three long blades of any kind _blade makes and a tail vane that folds it out of a storm."""
+    three long blades of any kind _blade makes and a tail vane that folds it out of a storm.
+    `stub` draws only the head and that many metres of the tripod under it, for a build icon."""
     hub = ALTERNATOR_HUB
     top = hub - 0.2
+    low = 0.05 if stub is None else top - stub
     feet = [around((0, 0), angle, 0.42) for angle in (90, 210, 330)]
     heads = [around((0, 0), angle, 0.07) for angle in (90, 210, 330)]
 
@@ -374,22 +386,25 @@ def alternator_charger(col, blades="steel"):
         return (feet[leg][0] + (heads[leg][0] - feet[leg][0]) * t, feet[leg][1] + (heads[leg][1] - feet[leg][1]) * t, z)
 
     for leg in range(3):
-        cylinder(col, "Alt_Footing", M("concrete"), 0.08, 0.05, at=(*feet[leg], 0), segments=12)
-        beam(col, "Alt_Leg", M("rustysteel"), on_leg(leg, 0.05), on_leg(leg, top), (0.045, 0.045))
+        if stub is None:
+            cylinder(col, "Alt_Footing", M("concrete"), 0.08, 0.05, at=(*feet[leg], 0), segments=12)
+        beam(col, "Alt_Leg", M("rustysteel"), on_leg(leg, low), on_leg(leg, top), (0.045, 0.045))
     levels = (0.9, 1.9, 2.8, 3.6)
     for i, z in enumerate(levels):
+        below = levels[i - 1] if i else 0.05
         for leg in range(3):
-            beam(col, "Alt_Brace", M("rustysteel"), on_leg(leg, z), on_leg((leg + 1) % 3, z), (0.03, 0.03))
-            low = levels[i - 1] if i else 0.05
-            beam(col, "Alt_Diagonal", M("rustysteel"), on_leg(leg, low), on_leg((leg + 1) % 3, z), (0.025, 0.025))
+            if z >= low:
+                beam(col, "Alt_Brace", M("rustysteel"), on_leg(leg, z), on_leg((leg + 1) % 3, z), (0.03, 0.03))
+            if below >= low:
+                beam(col, "Alt_Diagonal", M("rustysteel"), on_leg(leg, below), on_leg((leg + 1) % 3, z), (0.025, 0.025))
     cylinder(col, "Alt_TopPlate", M("weld"), 0.12, 0.02, at=(0, 0, top), segments=16)
     cylinder(col, "Alt_YawBearing", M("weld"), 0.06, 0.1, at=(0, 0, top + 0.02), segments=14)
     beam(col, "Alt_Frame", M("rustysteel"), (0, 0.02, top + 0.11), (0, ALTERNATOR_HEAD_Y + 0.3, hub), (0.05, 0.05))
     group(col, "Alt_Head", _alternator_head(col, ROTOR), at=(0, ALTERNATOR_HEAD_Y, hub))
     cylinder(col, "Alt_FurlHinge", M("weld"), 0.025, 0.22, at=(0.06, 0.05, hub - 0.12), segments=10)
     _tail(col, "Alt_Tail", (0, 0.05), 1.05, (0.55, 0.42), hub)
-    tube(col, "Alt_Cable", M("black"), [(0.03, 0.05, hub - 0.1), on_leg(0, top - 0.05), on_leg(0, 0.3), (feet[0][0] + 0.05, feet[0][1], 0.0)],
-         0.007, 6)
+    _down_cable(col, "Alt_Cable", [(0.03, 0.05, hub - 0.1), on_leg(0, top - 0.05), on_leg(0, 0.3), (feet[0][0] + 0.05, feet[0][1], 0.0)],
+                0 if stub is None else low)
     _rotor_blades(col, (0, ALTERNATOR_HEAD_Y - 0.01, hub), blades, ALTERNATOR_BLADE)
 
 
@@ -399,16 +414,21 @@ BLADE_BUNDLES = {"wood": (PROPELLER_BLADE, 2.4 * PROPELLER_BLADE[2]), "pipe": (P
                  "steel": (ALTERNATOR_BLADE, 3.2 * ALTERNATOR_BLADE[2])}
 
 
+# How far the blades of a bundle fan out from their tied roots, in degrees each side: enough that
+# their tips lie apart and a set reads as three blades, not one.
+BUNDLE_FAN = 12
+
+
 def blade_bundle(col, kind):
-    """Three blades of `kind` stacked flat and tied with twine at two places."""
+    """Three blades of `kind` stacked flat, their roots tied together with twine, fanned out."""
     size, spacing = BLADE_BUNDLES[kind]
     length, chord, _ = size
     name = "%sBlades" % kind.title()
-    for i in range(3):
-        # Span along X, chord along Y, flat side up.
-        group(col, name, _blade(col, name, kind, size), at=(-length / 2, 0, spacing * (0.5 + i)), rotate=(90, 0, 90))
-    for x in (-length * 0.2, length * 0.25):
-        box(col, name + "_Twine", M("tape"), (0.012, chord + 0.02, spacing * 3.2), at=(x, chord * 0.1, 0))
+    root = -length / 2
+    for i, turn in enumerate((-BUNDLE_FAN, 0, BUNDLE_FAN)):
+        # Span along X, chord along Y, flat side up, turned about its root.
+        group(col, name, _blade(col, name, kind, size), at=(root, 0, spacing * (0.5 + i)), rotate=(90, 0, 90 + turn))
+    box(col, name + "_Twine", M("tape"), (0.014, chord + 0.03, spacing * 3.2), at=(root + 0.05, 0, 0))
 
 
 def broken_blades(col, kind):
@@ -421,9 +441,13 @@ def broken_blades(col, kind):
               at=(-length * 0.3, chord * 0.4 * (i - 1), spacing * (0.5 + i)), rotate=(90, 0, 90 + turn))
 
 
-def homemade_alternator(col):
-    """The homemade alternator lying on its back, the hub's face up."""
-    group(col, "AltItem", _alternator_head(col, "AltItem_"), at=(0, 0, 0.27), rotate=(-90, 0, 0))
+def homemade_alternator(col, standing=False):
+    """The homemade alternator lying on its back, the hub's face up; or `standing` on its rim, as its
+    icon shows it, the resin stator and its coils in sight between the discs."""
+    if standing:
+        group(col, "AltItem", _alternator_head(col, "AltItem_"), at=(0, 0, 0.237))
+    else:
+        group(col, "AltItem", _alternator_head(col, "AltItem_"), at=(0, 0, 0.27), rotate=(-90, 0, 0))
 
 
 def car_alternator(col):

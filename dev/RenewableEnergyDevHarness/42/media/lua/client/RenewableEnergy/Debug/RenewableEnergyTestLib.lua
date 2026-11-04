@@ -10,7 +10,6 @@ local Capture = require "PZHarness/Capture"
 local Squares = require "cf_commonlib/Squares"
 local BankJobs = require "RenewableEnergy/PowerBank/BankJobs"
 local BankMenu = require "RenewableEnergy/UI/BankMenu"
-local Battery = require "RenewableEnergy/PowerBank/Battery"
 local ClientBankSystem = require "RenewableEnergy/PowerBank/ClientBankSystem"
 local Format = require "RenewableEnergy/UI/Format"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
@@ -247,12 +246,28 @@ function T.bankPart(self, bank, fullType, changes)
 end
 
 --- The condition a new `fullType` battery keeps after one day's discharge `depth` deep at the
---- Battery Wear option the test set: Battery.cycleWear's fraction of its ConditionMax, scaled by
---- the option (Battery.wearAll), in whole points.
+--- Battery Wear option the test set, in whole points, from the design statement rather than the
+--- mod's formula: cycle life falls with the square of the depth, anchored at the type's
+--- Specs.batteries cyclesAt50.
 function T.conditionAfterDischarge(fullType, depth)
-    local battery = instanceItem(fullType)
-    local max = battery:getConditionMax()
-    return max - math.floor(Battery.cycleWear(battery, depth) * Battery.wearScale() * max)
+    local max = instanceItem(fullType):getConditionMax()
+    local wear = (depth / 0.5) ^ 2 / Specs.batteries[fullType].cyclesAt50
+        * (SandboxVars.RenewableEnergy.BatteryWear / 100)
+    return max - math.floor(wear * max)
+end
+
+--- The share of its rating a solar module makes in full sun at Sunlight Multiplier 1: the
+--- design's system efficiency (Sun.lua), written out so that the tests pin it.
+T.SOLAR_EFFICIENCY = 0.8
+
+--- Watts modules rated `ratedW` together make in full sun at the Sunlight Multiplier the world runs.
+function T.fullSunW(ratedW)
+    return ratedW * T.SOLAR_EFFICIENCY * SandboxVars.RenewableEnergy.SunlightMultiplier
+end
+
+--- Watts a flat panel holding the default modules makes in full sun (the panel fixture's default).
+function T.flatPanelW()
+    return T.fullSunW(Specs.mounts.flat.modules * Specs.modules[Specs.factoryModule].watts)
 end
 
 --- The whole status of `bank` as this client last received it, or nil. It comes only while this

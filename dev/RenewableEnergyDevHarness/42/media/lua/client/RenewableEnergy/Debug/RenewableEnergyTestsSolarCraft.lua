@@ -252,6 +252,41 @@ T.conditionCraftsTest("renewable_energy_solar_craft_module_by_condition_and_seal
     { TAKE_APART, "a shattered module comes apart", before = 0, repaired = 0, used = true },
 })
 
+-- A seal on a module in a nearby crate reaches this client with its repair count as well as its
+-- condition: the recipe's OnTest reads the count here, and a stale one offers a seal the server
+-- refuses (InventoryItem.syncItemFields sends the count only for an item a player holds).
+test("renewable_energy_solar_craft_seal_in_a_crate_reaches_clients", {
+    run = function(self)
+        local square = player():getSquare()
+        local at = { x = square:getX() + 1, y = square:getY(), z = square:getZ() }
+        T.server(self, "moduleInCrate", { x = at.x, y = at.y, z = at.z, condition = CAP - ModuleRepair.SEAL_ADDS - 1 })
+        local function copy()
+            local here = getSquare(at.x, at.y, at.z)
+            local objects = here and here:getObjects()
+            for i = 0, (objects and objects:size() or 0) - 1 do
+                local container = objects:get(i):getContainer()
+                local module = container and container:getItemWithID(self.server.moduleInCrate.id)
+                if module then
+                    return module
+                end
+            end
+            return nil
+        end
+        T.waitFor(self, function() return copy() ~= nil end, "this client's copy of the crate's module")
+        T.server(self, "sealModuleInCrate", function()
+            return { x = at.x, y = at.y, z = at.z, id = self.server.moduleInCrate.id }
+        end)
+        T.waitFor(self, function()
+            local module = copy()
+            return module ~= nil and module:getHaveBeenRepaired() == 1 and module:getCondition() == CAP - 1
+        end, "the sealed module's repair count and condition on this client")
+    end,
+    validate = function(self)
+        expectEqual("the server's module, repairs", self.server.sealModuleInCrate.repaired, 1)
+        expectEqual("the server's module, condition", self.server.sealModuleInCrate.condition, CAP - 1)
+    end,
+})
+
 -- Take Out Window Glass's OnTest. Every picked-up tile is the same script item, so only the
 -- window's sprite may pass; the tools it is also asked about aren't its business.
 test("renewable_energy_solar_take_out_window_glass_takes_only_windows", {

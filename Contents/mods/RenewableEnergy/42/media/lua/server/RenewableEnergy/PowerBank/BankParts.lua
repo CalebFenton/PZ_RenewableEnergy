@@ -12,7 +12,7 @@ local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local Bank = require "RenewableEnergy/PowerBank/Bank"
 
 local function partEntry(item)
-    return { id = item:getID(), type = item:getFullType(), condition = item:getCondition() }
+    return { type = item:getFullType(), condition = item:getCondition() }
 end
 
 --- Read what the container holds into the bank's snapshot. Does nothing without one: a

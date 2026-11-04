@@ -12,6 +12,8 @@ require "PZHarness/Rolls"
 local Battery = require "RenewableEnergy/PowerBank/Battery"
 local Distributions = require "RenewableEnergy/Items/Distributions"
 local Finds = require "RenewableEnergy/Items/Finds"
+local ModFixtures = require "RenewableEnergy/Debug/RenewableEnergyFixtures"
+local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local Recipes = require "RenewableEnergy/Recipes"
 local Specs = require "RenewableEnergy/Specs"
 local Wear = require "RenewableEnergy/PowerBank/Wear"
@@ -41,7 +43,7 @@ end
 -- The spawn tables of every stash house, vanilla's and the mod's, registered or not.
 local function stashSpawnTables()
     local tables = {}
-    for description in pairs(Stash.descriptions) do
+    for _, description in ipairs(Stash.descriptions) do
         tables[description.spawnTable] = true
     end
     for _, description in ipairs(StashDescriptions or {}) do
@@ -204,7 +206,7 @@ end)
 -- loot applied twice. Every row other than a stash map's is in each of its lists once, at its
 -- weight × its rarity option, or nowhere at 0; a stash map's is there at its own weight when
 -- `maps` says the Stash Houses option drops maps, else nowhere.
-check("lootOptions", function(expect, expectNear, _, args, defer)
+check("lootOptions", function(expect, expectNear, expectEqual, _, args, defer)
     local options, names = SandboxVars.RenewableEnergy, {}
     for option in pairs(args.rows[1].options) do
         table.insert(names, option)
@@ -233,7 +235,7 @@ check("lootOptions", function(expect, expectNear, _, args, defer)
                     if items then
                         count, weight = countPairs(items, spec.fullType)
                     end
-                    if expect(count == 1, where .. " " .. count .. " times") then
+                    if expectEqual(where .. ", times listed", count, 1) then
                         expectNear(where .. " weight", weight, entry[1] * multiplier)
                     end
                 end
@@ -287,16 +289,21 @@ local HANDOVERS = {
 }
 
 -- Each handover readies, once, the mod's finds in the containers it reaches, a bag's contents
--- included: a battery gets a part charge, an inverter or controller wear at PART_WEAR's mean with
--- every roll middling, marked as its own. Handed over again, as loot respawn refills a container
--- or a room is seen again, it passes over a battery or part that has a charge or condition of its
--- own: a found one, an emptied battery, a crafted controller (its recipe's OnCreate). A part in a
--- bank, one of the mod's own containers, is never worn. Seeing a room leaves an unexplored
--- container to its own fill. `args` is a free outdoor square.
-check("lootFindsReadied", function(expect, expectNear, _, args, defer)
+-- included: a battery gets a part charge, FOUND_CHARGE spread evenly over the roll, an inverter or
+-- controller PART_WEAR's wear at that roll, marked as its own. The roll is off the middle so a
+-- charge range read backwards, or a wear left at the mean, shows; it is past PART_WEAR's dud
+-- chance. Handed over again, as loot respawn refills a container or a room is seen again, it
+-- passes over a battery or part that has a charge or condition of its own: a found one, an
+-- emptied battery, a crafted controller (its recipe's OnCreate). A part in a bank, one of the
+-- mod's own containers, is never worn. Seeing a room leaves an unexplored container to its own
+-- fill. `args` is a free outdoor square.
+check("lootFindsReadied", function(expect, expectNear, expectEqual, _, args, defer)
     local square = PZHarness.squareAt(args)
-    local range, mean = Battery.FOUND_CHARGE, Finds.PART_WEAR.mean
-    PZHarness.Rolls.force(defer, 0.5)
+    local ROLL, range, wear = 0.2, Battery.FOUND_CHARGE, Finds.PART_WEAR
+    local charge = range.min + (range.max - range.min) * ROLL
+    -- Three equal rolls average to ROLL, spreading wear over mean ± halfWidth.
+    local condition = math.floor(wear.mean + wear.halfWidth * (ROLL * 2 - 1) + 0.5)
+    PZHarness.Rolls.force(defer, ROLL)
     for _, handover in ipairs(HANDOVERS) do
         local after = " after " .. handover.what
         local shelf = containerInWorld(square, "metal_shelves", defer)
@@ -316,17 +323,16 @@ check("lootFindsReadied", function(expect, expectNear, _, args, defer)
         local unexplored = handover.seesRoom and containerInWorld(square, "crate", defer):AddItem("RenewableEnergy.DeepCycleBattery")
         handover.handOver(square, { shelf, bank })
         for _, battery in ipairs(batteries) do
-            local charge = Battery.getCharge(battery)
-            expect(Battery.hasCharge(battery) and charge >= range.min and charge <= range.max, string.format(
-                "a found %s holds %s%s, expected %s to %s", battery:getFullType(), charge, after, range.min, range.max))
+            expect(Battery.hasCharge(battery), "a found " .. battery:getFullType() .. " has no charge of its own" .. after)
+            expectNear("a found " .. battery:getFullType() .. "'s charge" .. after, Battery.getCharge(battery), charge)
         end
         for _, part in ipairs(parts) do
-            expect(part:getCondition() == mean and Wear.hasOwnCondition(part), string.format(
+            expect(part:getCondition() == condition and Wear.hasOwnCondition(part), string.format(
                 "a found %s has condition %d, marked %s%s, not %d and marked", part:getFullType(), part:getCondition(),
-                tostring(Wear.hasOwnCondition(part)), after, mean))
+                tostring(Wear.hasOwnCondition(part)), after, condition))
         end
         expectNear("an emptied battery's charge" .. after, Battery.getCharge(emptied), 0)
-        expect(crafted:getCondition() == crafted:getConditionMax(), "a crafted controller has condition " .. crafted:getCondition() .. after)
+        expectEqual("a crafted controller's condition" .. after, crafted:getCondition(), crafted:getConditionMax())
         expect(installed:getCondition() == installed:getConditionMax() and not Wear.hasOwnCondition(installed),
             "an inverter in a bank has condition " .. installed:getCondition() .. after)
         if unexplored then
@@ -338,8 +344,8 @@ check("lootFindsReadied", function(expect, expectNear, _, args, defer)
         Wear.setCondition(parts[1], parts[1]:getConditionMax())
         handover.handOver(square, { shelf, bank })
         expectNear("a found battery's charge after " .. handover.what .. " again", Battery.getCharge(batteries[1]), 1)
-        expect(parts[1]:getCondition() == parts[1]:getConditionMax(),
-            "a found part as good as new has condition " .. parts[1]:getCondition() .. " after " .. handover.what .. " again")
+        expectEqual("the condition of a found part as good as new after " .. handover.what .. " again",
+            parts[1]:getCondition(), parts[1]:getConditionMax())
         -- The next handover's room is the same square.
         local placed = { shelf, bank }
         if unexplored then
@@ -356,13 +362,106 @@ end)
 -- containers out of it without taking the room's loot away.
 local VANILLA_ALL_ROOMS = { sodatruck = true }
 
--- Respawn calls ItemPickerJava.fillContainer(container, nil) on looted containers that aren't
--- IsoThumpables, as a bank is not. That rolls the room's "all" table, then its table for the
--- container's type, and fires OnFillContainer; outside any room, or in a room with no
--- distribution, it uses SuburbsDistributions.all. The stash spawn table fills its crate on purpose,
--- and a stash house is the only place that uses it. `args.sprites` are the Sprites fields of the
--- tiles a player builds, a bank's in every facing.
-check("lootPlayerContainers", function(expect, _, _, args)
+-- How many fills the protection taken off gets to show the room's fallback loot: vanilla rolls it.
+local CONTROL_FILLS = 20
+
+-- What ItemPickerJava.fillContainer(container, nil), loot respawn's refill
+-- (LootRespawn.respawnInContainer), adds to the container: its item count, bags' contents
+-- included. Emptied afterwards.
+local function respawnFill(container)
+    container:removeAllItems()
+    ItemPickerJava.fillContainer(container, nil)
+    local added = 0
+    for _, count in pairs(PZHarness.Loot.countItems(container)) do
+        added = added + count
+    end
+    PZHarness.Loot.forgetItems(container)
+    container:removeAllItems()
+    return added
+end
+
+-- Tile `tile` on the square as a player has it: a bank as BankSystem places one, anything else
+-- with its sprite's containers, as a moved-in tile gets them.
+local function placeTile(square, tile)
+    if PowerBank.bankOfSprite(tile) then
+        return ModFixtures.placeBank(square, tile, {}, 1)
+    end
+    local object = IsoObject.new(square:getCell(), square, tile)
+    object:createContainersFromSpriteProperties()
+    square:AddTileObject(object)
+    return object
+end
+
+-- Runs fn() with the tables the mod gives `containerType` in "all" and in `roomName` taken out
+-- and the loot parsed so, then puts them back and parses again.
+local function unprotected(containerType, roomName, fn)
+    local tables = { SuburbsDistributions.all, roomName and SuburbsDistributions[roomName] }
+    local saved = {}
+    return PZHarness.Loot.restoring(function()
+        for i, t in pairs(tables) do
+            saved[i] = t[containerType]
+            t[containerType] = nil
+        end
+        ItemPickerJava.Parse()
+        return fn()
+    end, function()
+        for i, t in pairs(tables) do
+            t[containerType] = saved[i]
+        end
+        ItemPickerJava.Parse()
+    end)
+end
+
+-- An item of the generic fallback's list (ProceduralDistributions OtherGeneric), to tell the
+-- containers that would take it: a bank takes only its parts (ItemSpawner.spawnItem, isItemAllowed).
+local GENERIC_ITEM = "Base.BluePen"
+
+-- Loot respawn refills a looted container that isn't an IsoThumpable, as a bank (an IsoGenerator)
+-- and a moved tile are not, through ItemPickerJava.fillContainer: the room's table for the
+-- container's type, else its "other" or "all", else SuburbsDistributions.all's; then
+-- OnFillContainer. Each tile of `args.sprites` (Sprites fields, a bank's in every facing) on the
+-- indoor square `args.indoor` and the outdoor one `args.outdoor` gets nothing from it, every mod
+-- roll at 0 so a cracked module would come. With the mod's tables taken out for the first type
+-- that takes generic loot, the same fill hands it loot, so the zero is the tables' doing. Data
+-- checks cover what the two squares' rooms don't: every room's table for every type is empty
+-- (the stash spawn table fills its crate on purpose, and only a stash house uses it), no room's
+-- "all" fills everything, every tile's container type is the mod's own, and none gets cracked
+-- modules.
+check("lootPlayerContainers", function(expect, _, expectEqual, _, args, defer)
+    PZHarness.Rolls.force(defer, 0)
+    local generic = instanceItem(GENERIC_ITEM)
+    PZHarness.Loot.withMeasureOptions(Loot.MEASURE_OPTIONS, function()
+        for _, at in ipairs({ args.indoor, args.outdoor }) do
+            local square = PZHarness.squareAt(at)
+            local roomName = square:getRoom() and square:getRoom():getName()
+            local where = " in " .. tostring(roomName or "no room")
+            local controlled
+            for _, field in ipairs(args.sprites) do
+                local tiles = Sprites[field]
+                for _, tile in pairs(type(tiles) == "table" and tiles or { tiles }) do
+                    local object = placeTile(square, tile)
+                    local container = object:getContainer()
+                    if expect(container ~= nil, tile .. " has no container") then
+                        local added = respawnFill(container)
+                        expectEqual("items loot respawn put in " .. tile .. "'s " .. container:getType() .. where, added, 0)
+                        if not controlled and container:isItemAllowed(generic) then
+                            controlled = container:getType()
+                            local control = 0
+                            unprotected(controlled, roomName, function()
+                                for _ = 1, CONTROL_FILLS do
+                                    control = control + respawnFill(container)
+                                    if control > 0 then break end
+                                end
+                            end)
+                            expect(control > 0, string.format("%d fills of an unprotected %s%s added nothing", CONTROL_FILLS, controlled, where))
+                        end
+                    end
+                    removePlaced(object)
+                end
+            end
+            expect(controlled, "no tile's container takes a " .. GENERIC_ITEM .. where)
+        end
+    end)
     local own = {}
     for _, containerType in ipairs(Distributions.OWN_CONTAINER_TYPES) do
         own[containerType] = true

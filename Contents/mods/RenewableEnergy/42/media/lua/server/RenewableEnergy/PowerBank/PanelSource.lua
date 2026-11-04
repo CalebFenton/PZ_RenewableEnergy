@@ -164,7 +164,10 @@ function PanelSource.connect(player, source, isoObject, facing, material)
     end
     if learned > 0 then
         PanelSource.writeModules(isoObject, modules)
-        addXp(player, Perks.Electricity, Specs.connectXp * learned)
+        -- A site's panels are wired with no one doing it (SourceSite.connectSource).
+        if player then
+            addXp(player, Perks.Electricity, Specs.connectXp * learned)
+        end
     end
     source.facing, source.material, source.snow, source.modules = facing, material, 0, modules
     PanelStorms.toRecord(source, isoObject)

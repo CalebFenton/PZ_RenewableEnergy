@@ -246,7 +246,7 @@ end
 
 -- The uses of epoxy Seal Cracked Module takes.
 local function sealEpoxyUses()
-    local inputs = ModuleRepair.sealRecipe():getInputs()
+    local inputs = getScriptManager():getCraftRecipe(ModuleRepair.SEAL_RECIPE):getInputs()
     local epoxy = getScriptManager():FindItem("Base.Epoxy")
     for i = 0, inputs:size() - 1 do
         local input = inputs:get(i)
@@ -282,7 +282,7 @@ test("renewable_energy_world_arrow_board_seal_mends_a_cracked_panel", {
         if not spawnTrailer(self) then return end
         local trailer = self.trailer
         self.epoxyNeeded = sealEpoxyUses()
-        T.setRecipeSkills(self, ModuleRepair.sealRecipe())
+        T.setRecipeSkills(self, getScriptManager():getCraftRecipe(ModuleRepair.SEAL_RECIPE))
         T.onVehicle(self, trailer, "setTrailer",
             { panels = { [LEFT] = { type = T.FACTORY_MODULE, condition = SEAL_FROM, repaired = SEALED_BEFORE } } })
         waitForPanelsCopy(self, trailer)
@@ -295,7 +295,7 @@ test("renewable_energy_world_arrow_board_seal_mends_a_cracked_panel", {
         T.count(self, "left", { "Base.Screwdriver", "Base.Epoxy" })
         T.readCharacter(self, "after", { perks = { "Electricity" } })
         -- What CraftRecipe.addXP gives this character for the recipe's xpAward.
-        T.xpAward(self, "Electricity", ModuleRepair.sealRecipe():getXPAward(0):getAmount(), "award")
+        T.xpAward(self, "Electricity", getScriptManager():getCraftRecipe(ModuleRepair.SEAL_RECIPE):getXPAward(0):getAmount(), "award")
         waitForPanelsCopy(self, trailer)
         T.step(function() self.after = sealPanelOption(trailer.vehicle) end)
     end,
@@ -343,7 +343,7 @@ test("renewable_energy_world_arrow_board_reglaze_panel_in_place", {
     run = function(self)
         if not spawnTrailer(self) then return end
         local trailer = self.trailer
-        T.setRecipeSkills(self, ModuleRepair.reglazeRecipe())
+        T.setRecipeSkills(self, getScriptManager():getCraftRecipe(ModuleRepair.REGLAZE_RECIPE))
         T.knowRecipes(self, { ModuleRepair.REGLAZE_RECIPE })
         T.onVehicle(self, trailer, "setTrailer",
             { panels = { [LEFT] = { type = T.FACTORY_MODULE, condition = 30, repaired = 2 } } })

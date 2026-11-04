@@ -1,3 +1,6 @@
+-- Wiring a part into a battery bank or a treadmill and unwiring it: what it takes, how long, the
+-- XP taught the first time, and the wire given back.
+
 local Utilities = require "RenewableEnergy/Utilities"
 local Specs = require "RenewableEnergy/Specs"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"

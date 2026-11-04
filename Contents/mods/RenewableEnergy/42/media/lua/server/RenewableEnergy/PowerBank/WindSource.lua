@@ -5,7 +5,7 @@
 if isClient() then return end
 
 local Utilities = require "RenewableEnergy/Utilities"
-local StormChance = require "RenewableEnergy/Chance"
+local StormChance = require "RenewableEnergy/StormChance"
 local Specs = require "RenewableEnergy/Specs"
 local StormNotice = require "RenewableEnergy/StormNotice"
 local Wind = require "RenewableEnergy/Wind"
@@ -70,15 +70,27 @@ local function blocks(x, y, level)
     return hasSolidWall(level == 0 and ground or getSquare(x, y, level)) and 1 or 0
 end
 
+-- The offsets of the ring of squares from 1 to a radius around one, { dx, dy, distance } each, by
+-- radius: worked out once, as the radii are constants.
+local rings = {}
+
 -- Calls fn(dx, dy, distance) for each offset of the ring of squares from 1 to `radius` around one.
 local function eachInRing(radius, fn)
-    for dx = -radius, radius do
-        for dy = -radius, radius do
-            local distance = math.sqrt(dx * dx + dy * dy)
-            if distance >= 1 and distance <= radius then
-                fn(dx, dy, distance)
+    local ring = rings[radius]
+    if not ring then
+        ring = {}
+        for dx = -radius, radius do
+            for dy = -radius, radius do
+                local distance = math.sqrt(dx * dx + dy * dy)
+                if distance >= 1 and distance <= radius then
+                    table.insert(ring, { dx, dy, distance })
+                end
             end
         end
+        rings[radius] = ring
+    end
+    for _, offset in ipairs(ring) do
+        fn(offset[1], offset[2], offset[3])
     end
 end
 

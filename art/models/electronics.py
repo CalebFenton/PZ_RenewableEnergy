@@ -38,16 +38,18 @@ def sticker(col, name, band, size, at, rotate=None):
     return group(col, name + "_At", parts, at=at, rotate=rotate)
 
 
-def plug_in_inverter(col):
-    """A 140 W inverter for a cigarette lighter socket: an aluminium extrusion, one outlet, a cord."""
+def plug_in_inverter(col, cord=True):
+    """A 140 W inverter for a cigarette lighter socket: an aluminium extrusion, one outlet, and a
+    cord, which its icon leaves off so the inverter fills it."""
     box(col, "PlugInv_Body", M("aluminium"), (0.14, 0.075, 0.045), bevel=0.006)
     fins(col, "PlugInv_Rib", M("aluminium"), 0.12, 0.075, 0.045, 7, height=0.003)
     for sign in (-1, 1):
         box(col, "PlugInv_Cap", M("black"), (0.012, 0.079, 0.049), at=(sign * 0.072, 0, -0.002), bevel=0.004)
     outlet(col, "PlugInv_Outlet", (-0.079, 0, 0.003), scale=0.9, turn=-90)
-    tube(col, "PlugInv_Cord", M("black"), [(0.078, 0, 0.02), (0.13, 0.01, 0.01), (0.17, 0.06, 0.005),
-                                           (0.12, 0.1, 0.005), (0.06, 0.09, 0.005)], 0.0035)
-    cylinder(col, "PlugInv_Plug", M("black"), 0.011, 0.05, at=(0.06, 0.09, 0.011), rotate=(0, -90, 0), segments=10)
+    if cord:
+        tube(col, "PlugInv_Cord", M("black"), [(0.078, 0, 0.02), (0.13, 0.01, 0.01), (0.17, 0.06, 0.005),
+                                               (0.12, 0.1, 0.005), (0.06, 0.09, 0.005)], 0.0035)
+        cylinder(col, "PlugInv_Plug", M("black"), 0.011, 0.05, at=(0.06, 0.09, 0.011), rotate=(0, -90, 0), segments=10)
     box(col, "PlugInv_Led", M("ledgreen"), (0.006, 0.003, 0.006), at=(-0.04, -0.039, 0.02))
     sticker(col, "PlugInv_Sticker", "red", (0.045, 0.022), (0.03, -0.0375, 0.012))
 
@@ -107,8 +109,10 @@ def solar_failsafe(col, cable=True):
     """A generator auto-start relay box: grey enclosure, its lid screwed down at the corners, a
     warning label, LED, and a control cable out through a gland in its side."""
     width, depth, height = 0.18, 0.1, 0.14
-    box(col, "Failsafe_Case", M("grey"), (width, depth, height), bevel=0.008)
-    box(col, "Failsafe_Lid", M("darkgrey"), (width + 0.006, depth + 0.006, 0.012), at=(0, 0, height - 0.012), bevel=0.004)
+    lid = 0.012
+    # The lid sits on the case: a top face of each in one plane would render black.
+    box(col, "Failsafe_Case", M("grey"), (width, depth, height - lid), bevel=0.008)
+    box(col, "Failsafe_Lid", M("darkgrey"), (width + 0.006, depth + 0.006, lid), at=(0, 0, height - lid), bevel=0.004)
     box(col, "Failsafe_Label", M("yellow"), (0.12, 0.002, 0.045), at=(0, -depth / 2 - 0.001, 0.05))
     text(col, "Failsafe_Text", M("ink"), "AUTO START", 0.0135, at=(0, -depth / 2 - 0.0025, 0.068))
     box(col, "Failsafe_Led", M("ledgreen"), (0.012, 0.004, 0.012), at=(0.06, -depth / 2 - 0.002, 0.1))

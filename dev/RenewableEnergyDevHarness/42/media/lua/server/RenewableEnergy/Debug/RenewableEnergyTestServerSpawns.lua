@@ -172,7 +172,7 @@ end
 -- the option goes astray; a bank tier with no charge controller slot (Specs.banks
 -- maxControllers 0) never gets one, even from a stock that lists one, while the others get it;
 -- and with the battery and misc options at 0 the bank holds nothing, even on the lowest roll.
-check("bankStockParts", function(expect, _, _, args, defer)
+check("bankStockParts", function(expect, _, expectEqual, _, args, defer)
     for stockName, stock in pairs(WorldSpawns.BANK_STOCK) do
         for _, kind in ipairs(PARTS) do
             local part = stock[kind]
@@ -206,8 +206,8 @@ check("bankStockParts", function(expect, _, _, args, defer)
         WorldSpawns.BANK_STOCK[name] = { sprite = spec.sprite, batteries = stock.batteries,
             controller = { chance = 1, types = { { Specs.controller, 1 } } } }
         local controllers = bankPartsAt(container, name, 0, defer).controller
-        expect(controllers == (spec.maxControllers == 0 and 0 or 1),
-            "a " .. spec.sprite .. " bank listing a certain controller holds " .. controllers)
+        expectEqual("controllers a " .. spec.sprite .. " bank listing a certain controller holds", controllers,
+            spec.maxControllers == 0 and 0 or 1)
     end
     WorldSpawns.BANK_STOCK[name] = nil
     options.LRMBatteries, options.LRMMisc = 0, 0
@@ -215,15 +215,22 @@ check("bankStockParts", function(expect, _, _, args, defer)
     for _, count in pairs(withRolls(defer, 0, PZHarness.Loot.fillOnce, function(c) WorldSpawns.stockBank(c, args.stock) end, container)) do
         held = held + count
     end
-    expect(held == 0, held .. " items in a " .. args.stock .. " bank with the battery and misc options at 0")
+    expectEqual("items in a " .. args.stock .. " bank with the battery and misc options at 0", held, 0)
     restoreOptions()
 end)
 
 -- The rolls a wear profile is checked at, its lowest, a middling one and its highest, and the
--- condition each gives.
+-- condition each gives; then three differing rolls, whose mean (0 + 0.1 + 1) / 3 sits 4/15 of
+-- halfWidth under the mean, unlike any one of them or a pair: a profile reading fewer rolls
+-- shows. A uniform profile's one roll is covered by the first three.
 local function wearCases(wear)
     local range = wearRange(wear)
-    return { { roll = 0, condition = range.min }, { roll = 0.5, condition = wear.mean }, { roll = 1 - UNDER, condition = range.max } }
+    local cases = { { rolls = { 0, 0, 0 }, condition = range.min }, { rolls = { 0.5, 0.5, 0.5 }, condition = wear.mean },
+        { rolls = { 1 - UNDER, 1 - UNDER, 1 - UNDER }, condition = range.max } }
+    if not wear.uniform then
+        table.insert(cases, { rolls = { 0, 0.1, 1 - UNDER }, condition = math.floor(wear.mean - wear.halfWidth * 4 / 15 + 0.5) })
+    end
+    return cases
 end
 
 -- The rolls a dud's condition is checked at, its lowest and its highest, and the condition each gives.
@@ -232,9 +239,10 @@ local function dudCases(dud)
 end
 
 -- Every stock's batteries name a wear profile. Each profile wears a found battery to its mean less
--- its half width at the lowest rolls, its mean at middling ones, and no better than new at the
--- highest, unrepaired; with a dud chance, a roll just under it makes a dud, at the dud's lowest
--- and highest condition by the next roll, with the dud's repairs, and a roll at it doesn't.
+-- its half width at the lowest rolls, its mean at middling ones, no better than new at the
+-- highest, and the mean of three differing ones, unrepaired; with a dud chance, a roll just under
+-- it makes a dud, at the dud's lowest and highest condition by the next roll, with the dud's
+-- repairs, and a roll at it doesn't.
 local function expectBatteryWear(expect, defer)
     local dud = Finds.DUD
     for stockName, stock in pairs(WorldSpawns.BANK_STOCK) do
@@ -252,10 +260,10 @@ local function expectBatteryWear(expect, defer)
         local first = wear.dud and { wear.dud } or {}
         for _, case in ipairs(wearCases(wear)) do
             local rolls = { unpack(first) }
-            for _ = 1, 3 do table.insert(rolls, case.roll) end
+            for _, roll in ipairs(case.rolls) do table.insert(rolls, roll) end
             local got = worn(name, rolls)
             expect(got.condition == case.condition and got.repairs == 0, string.format("%s at rolls of %s wears a battery to %d with %d repairs, not %d",
-                name, case.roll, got.condition, got.repairs, case.condition))
+                name, table.concat(case.rolls, ", "), got.condition, got.repairs, case.condition))
         end
         if wear.dud then
             for _, case in ipairs(dudCases(dud)) do
@@ -269,12 +277,12 @@ local function expectBatteryWear(expect, defer)
 end
 
 -- PART_WEAR wears every found inverter and the charge controller, not a homemade inverter or the
--- battery charger: to its mean less its half width at the lowest rolls, its mean at middling ones
--- and no better than new at the highest; a roll just under its dud chance makes a dud, at
--- PART_DUD's lowest and highest condition by the next roll, worse than any working find, and a
--- roll at it doesn't. Each worn part is marked as having a condition of its own. With every roll
--- middling, the parts of a bank's stock, a crate's and an arrow board's battery box come at the
--- mean, marked.
+-- battery charger: to its mean less its half width at the lowest rolls, its mean at middling ones,
+-- no better than new at the highest and the mean of three differing ones; a roll just under its
+-- dud chance makes a dud, at PART_DUD's lowest and highest condition by the next roll, worse than
+-- any working find, and a roll at it doesn't. Each worn part is marked as having a condition of
+-- its own. With every roll middling, the parts of a bank's stock, a crate's and an arrow board's
+-- battery box come at the mean, marked.
 local function expectPartWear(expect, defer)
     local wear, dud = Finds.PART_WEAR, Finds.PART_DUD
     local lowest = wearRange(wear).min
@@ -299,9 +307,9 @@ local function expectPartWear(expect, defer)
     end
     for _, fullType in ipairs(types) do
         for _, case in ipairs(wearCases(wear)) do
-            local condition, marked = worn(fullType, { wear.dud, case.roll, case.roll, case.roll })
+            local condition, marked = worn(fullType, { wear.dud, unpack(case.rolls) })
             expect(condition == case.condition and marked, string.format("a found %s at rolls of %s has condition %d, marked %s, not %d",
-                fullType, case.roll, condition, tostring(marked), case.condition))
+                fullType, table.concat(case.rolls, ", "), condition, tostring(marked), case.condition))
         end
         for _, case in ipairs(dudCases(dud)) do
             local condition, marked = worn(fullType, { wear.dud - UNDER, case.roll })
@@ -336,7 +344,7 @@ local function expectPartWear(expect, defer)
 end
 
 -- How found batteries and parts wear, whatever stocks them.
-check("foundWear", function(expect, _, _, _, defer)
+check("foundWear", function(expect, _, _, _, _, defer)
     expectBatteryWear(expect, defer)
     expectPartWear(expect, defer)
 end)
@@ -363,7 +371,7 @@ end
 -- their chance and not at it; a bedroom's furniture and a garage's fridge never do. The chance
 -- follows the Solar Panels loot option. Each container is filled as the game hands a fill to the
 -- mod, by OnFillContainer.
-check("crackedModules", function(expect, _, _, _, defer)
+check("crackedModules", function(expect, _, expectEqual, _, _, defer)
     local container = PZHarness.Loot.scratchContainer(nil)
     local function modulesAt(roomName, containerType, roll)
         -- The chance's roll, then the cracked condition's, at the middle of its range.
@@ -384,7 +392,7 @@ check("crackedModules", function(expect, _, _, _, defer)
         expect(inRange(under[1], Finds.CRACKED), "a cracked module is at condition " .. under[1])
     end
     local elsewhere = #modulesAt("bedroom", "wardrobe", 0) + #modulesAt("garage", "fridge", 0)
-    expect(elsewhere == 0, elsewhere .. " modules in a bedroom wardrobe and a garage fridge")
+    expectEqual("modules in a bedroom wardrobe and a garage fridge", elsewhere, 0)
     options.LRMSolarPanels = 2
     local doubled = Finds.crackedModuleChance(rooms.farmstorage)
     options.LRMSolarPanels = 0

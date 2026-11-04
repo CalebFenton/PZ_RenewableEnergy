@@ -350,7 +350,7 @@ end)
 -- square, other than `taken`'s, nearest first, or nil.
 local function chargerSquareFor(bank, taken)
     local position = { x = bank:getX(), y = bank:getY(), z = bank:getZ() }
-    for r = 1, PowerBank.sourceReach().tiles do
+    for r = 1, (GeneratorReach.range()) do
         for x, y in PZHarness.Fixtures.ring(position.x, position.y, r) do
             local square = getSquare(x, y, 0)
             if square ~= taken and RuralFinds.canPlace("wind", square)
@@ -399,7 +399,7 @@ handler("siteArm", function(_, args, defer)
 end)
 
 -- The armed spots `args.spots` were placed by the world, each as its kind leaves it.
-check("sitePlaced", function(expect, expectNear, _, args)
+check("sitePlaced", function(expect, expectNear, _, _, args)
     checkSpots(expect, expectNear, args.spots)
 end)
 
@@ -408,7 +408,7 @@ end)
 -- `always` or not; and the option at 0 keeps a new `always` site out while marking it rolled. The
 -- sites are stock tank pumps whose spots wait on the outdoor squares `args.squares`; their spots
 -- and the world's rolls are put back when the test ends.
-check("siteRolledOnce", function(expect, _, _, args, defer)
+check("siteRolledOnce", function(expect, _, _, _, args, defer)
     local modData = sitesSystem():getModData()
     local saved = modData.rolled
     defer(function() modData.rolled = saved end)
@@ -469,7 +469,7 @@ end)
 
 -- The site named `args.name` was placed by the world as its armed spots `args.spots` say, and no
 -- building that counts a homestead site's find got another find of that kind by it.
-check("siteVisited", function(expect, expectNear, _, args)
+check("siteVisited", function(expect, expectNear, expectEqual, _, args)
     checkSpots(expect, expectNear, args.spots)
     local kind, at, defs = findOf(siteNamed(args.name))
     if not kind then
@@ -477,7 +477,7 @@ check("siteVisited", function(expect, expectNear, _, args)
     end
     for key, def in pairs(defs) do
         local others = Helpers.findsAround(def, kind, at)
-        expect(others == 0, args.name .. ": " .. others .. " more " .. kind .. " finds by the building at " .. key)
+        expectEqual(args.name .. ": more " .. kind .. " finds by the building at " .. key, others, 0)
     end
 end)
 

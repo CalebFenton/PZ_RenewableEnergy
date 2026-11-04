@@ -19,7 +19,8 @@ local PanelSource = require "RenewableEnergy/PowerBank/PanelSource"
 local PanelStorms = require "RenewableEnergy/PowerBank/PanelStorms"
 local Payers = require "RenewableEnergy/PowerBank/Payers"
 local Place = require "RenewableEnergy/World/Place"
-local Places = require "RenewableEnergy/Places"
+local Recipes = require "RenewableEnergy/Recipes"
+local Specs = require "RenewableEnergy/Specs"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local SourceJobs = require "RenewableEnergy/PowerBank/SourceJobs"
 local SolarSites = require "RenewableEnergy/World/SolarSites"
@@ -170,6 +171,35 @@ handler("bankPart", function(_, args)
     return stateOf(record)
 end)
 
+-- Battery.shift into the batteries of the bank at x, y, z toward full, `args.uses` giving each its
+-- whole uses first, in container order, `args.wh` counted in uses of the first battery and
+-- `args.usesPerStep` passed on. Answers what moved, in those uses and in whole uses, whether a
+-- battery is still short of full, and each battery's uses after.
+handler("shiftBatteries", function(_, args)
+    local record, bank = bankAt(args)
+    local container = bank:getContainer()
+    local batteries = {}
+    local items = container:getItems()
+    for i = 0, items:size() - 1 do
+        if Battery.isBattery(items:get(i)) then
+            table.insert(batteries, items:get(i))
+        end
+    end
+    need(#batteries == #args.uses, #args.uses .. " batteries in the bank on the server")
+    for i, item in ipairs(batteries) do
+        item:setCurrentUses(args.uses[i])
+    end
+    local useWh = batteries[1]:getUseDelta() * Battery.nominalWh(batteries[1])
+    local moved, movedUses, short = Battery.shift(container, args.wh * useWh, 1, 1, Battery.isBattery, Battery.nominalWh,
+        args.usesPerStep)
+    local after = {}
+    for i, item in ipairs(batteries) do
+        after[i] = item:getCurrentUses()
+    end
+    record:recount()
+    return { moved = moved / useWh, movedUses = movedUses, short = short, uses = after }
+end)
+
 local SNOWING = { cloud = 1, fog = 0, rain = 0, snowing = true, groundSnow = 0 }
 
 -- RenewableEnergyTest.bankPass's handler: the bank system's own pass (Bank:catchUp, then
@@ -248,7 +278,7 @@ end)
 -- What the load scan of the bank on the square at `args` finds, as the payer there: its watts and
 -- the count of each kind.
 handler("scanLoad", function(_, args)
-    local payer = { x = args.x, y = args.y, z = args.z, key = Places.key(args.x, args.y, args.z) }
+    local payer = { x = args.x, y = args.y, z = args.z, key = Squares.placeKey(args.x, args.y, args.z) }
     local load = Payers.scan(payer, Payers.running())
     local counts = {}
     for name, kind in pairs(load.kinds) do
@@ -284,6 +314,45 @@ handler("drawAt", function(_, args, defer)
 end)
 
 -- Panels ------------------------------------------------------------------------------------------
+
+-- The module `id` in a container on the square `at`, or nil.
+local function moduleInContainerAt(at, id)
+    local objects = PZHarness.squareAt(at):getObjects()
+    for i = 0, objects:size() - 1 do
+        local container = objects:get(i):getContainer()
+        local module = container and container:getItemWithID(id)
+        if module then
+            return module
+        end
+    end
+    return nil
+end
+
+-- A factory module at `args.condition` in a crate on the square at x, y, z, sent to the clients
+-- with it: an input a craft takes from beside the player's inventory.
+handler("moduleInCrate", function(_, args, defer)
+    local square = PZHarness.squareAt(args)
+    local crate = IsoObject.new(square, "carpentry_01_16", "RenewableEnergyTest")
+    crate:setContainer(ItemContainer.new("crate", square, crate))
+    local module = crate:getContainer():AddItem(Specs.factoryModule)
+    Wear.setCondition(module, args.condition)
+    square:AddTileObject(crate)
+    if isServer() then
+        crate:transmitCompleteItemToClients()
+    end
+    defer(function() Fixtures.removePlaced(crate) end)
+    return { id = module:getID() }
+end)
+
+-- Seal Cracked Module's OnCreate on the module `args.id` in a container at x, y, z, as a craft that
+-- took it from there runs it.
+handler("sealModuleInCrate", function(_, args)
+    local module = need(moduleInContainerAt(args, args.id), "the crate's module on the server")
+    local inputs = ArrayList.new()
+    inputs:add(module)
+    Recipes.repairModule({ getAllInputItems = function() return inputs end })
+    return { condition = module:getCondition(), repaired = module:getHaveBeenRepaired() }
+end)
 
 -- A panel record off the map, as `args` lists it ({ kind, material, modules }).
 local function panelRecord(args)

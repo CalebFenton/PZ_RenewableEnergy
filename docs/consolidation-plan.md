@@ -33,7 +33,7 @@ Owners after the restructure (paths under RE `media/lua/`):
 | Found-item wear, charge and rarity | `server/.../Items/Finds` |
 | Placing world objects | `World/Place`, cf_commonlib `Tiles.addToWorld` |
 | Arrow board | `shared/.../ArrowBoard/*` (one trailer registry, one OnTick) |
-| Nearest-place maths vs loaded-tile tracking | `Places` vs cf_commonlib `PlaceTracker` |
+| Nearest-place maths vs loaded-tile tracking | `Places` vs cf_commonlib `PlaceTracker`; one place key, cf_commonlib `Squares.placeKey` |
 | Loot list entries incl. stash maps | `Items/LootEntries` |
 | Waiting for buildings and site spots to load | `World/BuildingWatch.waitFor`; two-ended site spots go down in the frame their chunk loads (`SolarSites` lines) |
 | Tile numbers | `art/models/tile_numbers.py` -> generated `SpriteTiles.lua`; `dev/check/sprite_tiles.py` checks scripts against it |

@@ -37,12 +37,16 @@ def lying(builder, **options):
 # icons and the battery storage tiles.
 BATTERY_GROUND_SCALE = 0.75
 
+# The magazines' icons turn them nearly upright, tilted a little as the game's own are, for the
+# issue number on the cover to read.
+MAGAZINE_ICON_TURN = 35
+
 # The panel mount items' looks with homemade modules in place of factory ones, by item and how many:
 # with its own entry below for none, a mount item's ground models and icons by index
 # (WorldStaticModelsByIndex and IconsForTexture in Items.txt), the index the count
 # (Sprites.homemadeCount).
 HOMEMADE_MOUNTS = {
-    "SolarFlat_Homemade": {"model": lambda col: solar.solar_flat(col, homemade=True), "icon_elevation": 25},
+    "SolarFlat_Homemade": {"model": lambda col: solar.solar_flat(col, homemade=True), "icon_elevation": 45},
     "SolarWallWood_Homemade": {"model": lambda col: solar.solar_wall(col, "wood", lying=True, homemade=True),
                                "icon": lambda col: solar.solar_wall(col, "wood", homemade=True)},
     "SolarWallMetal_Homemade": {"model": lambda col: solar.solar_wall(col, "metal", lying=True, homemade=True),
@@ -57,7 +61,7 @@ ITEMS = {
     "SolarModule": {"model": solar.solar_module, "icon_elevation": 55},
     "HomemadeSolarModule": {"model": solar.homemade_module, "icon_elevation": 55},
     "SolarCells": {"model": solar.solar_cells, "icon_elevation": 60},
-    "SolarFlat": {"model": solar.solar_flat, "icon_elevation": 25},
+    "SolarFlat": {"model": solar.solar_flat, "icon_elevation": 45},
     "SolarWallWood": {"model": lambda col: solar.solar_wall(col, "wood", lying=True), "icon": lambda col: solar.solar_wall(col, "wood")},
     "SolarWallMetal": {"model": lambda col: solar.solar_wall(col, "metal", lying=True),
                        "icon": lambda col: solar.solar_wall(col, "metal")},
@@ -76,7 +80,7 @@ ITEMS = {
                         "icon": lambda col: batteries.STORAGE["BatteryBankWood"](col, batteries=8, meter_level=4)},
     "BatteryBankMetal": {"model": batteries.STORAGE["BatteryBankMetal"],
                          "icon": lambda col: batteries.STORAGE["BatteryBankMetal"](col, batteries=12, meter_level=4)},
-    "PlugInInverter": {"model": electronics.plug_in_inverter},
+    "PlugInInverter": {"model": electronics.plug_in_inverter, "icon": lambda col: electronics.plug_in_inverter(col, cord=False)},
     "PowerInverter": {"model": electronics.power_inverter},
     "InverterCharger": {"model": electronics.inverter_charger},
     "MakeshiftInverter": {"model": electronics.makeshift_inverter, "icon_elevation": 45},
@@ -89,7 +93,7 @@ ITEMS = {
     "JarBattery": {"model": batteries.jar_battery, "ground_scale": BATTERY_GROUND_SCALE},
     "SolarMaintainer": {"model": electronics.solar_maintainer, "icon_elevation": 40},
     "SolarCellCharger": {"model": electronics.solar_cell_charger, "icon_elevation": 45},
-    "SolarGardenLight": {"model": lying(solar.solar_garden_light), "icon": solar.solar_garden_light},
+    "SolarGardenLight": {"model": lying(solar.solar_garden_light), "icon_elevation": 40},
     "CarBatteryCase": {"model": lambda col: batteries.battery_case(col, "CarCase", (0.26, 0.17, 0.2), "carbattery", 6, "carlabel",
                                                                    bolt=True),
                        "icon_elevation": 40, "ground_scale": BATTERY_GROUND_SCALE},
@@ -106,10 +110,10 @@ ITEMS = {
     "BatteryPlateMold": {"model": lambda col: batteries.plate_mold(col, fired=True), "icon_elevation": 50,
                          "ground_scale": BATTERY_GROUND_SCALE},
     "BatteryElectrolyte": {"model": batteries.battery_electrolyte},
-    "HomesteadPowerMag1": {"model": lambda col: magazines.magazine(col, 1), "icon_elevation": 70},
-    "HomesteadPowerMag2": {"model": lambda col: magazines.magazine(col, 2), "icon_elevation": 70},
-    "HomesteadPowerMag3": {"model": lambda col: magazines.magazine(col, 3), "icon_elevation": 70},
-    "HomesteadPowerMag4": {"model": lambda col: magazines.magazine(col, 4), "icon_elevation": 70},
+    "HomesteadPowerMag1": {"model": lambda col: magazines.magazine(col, 1), "icon_elevation": 70, "icon_turn": MAGAZINE_ICON_TURN},
+    "HomesteadPowerMag2": {"model": lambda col: magazines.magazine(col, 2), "icon_elevation": 70, "icon_turn": MAGAZINE_ICON_TURN},
+    "HomesteadPowerMag3": {"model": lambda col: magazines.magazine(col, 3), "icon_elevation": 70, "icon_turn": MAGAZINE_ICON_TURN},
+    "HomesteadPowerMag4": {"model": lambda col: magazines.magazine(col, 4), "icon_elevation": 70, "icon_turn": MAGAZINE_ICON_TURN},
     "WoodAsh": {"model": woodgas.wood_ash, "icon_elevation": 25},
     "GasConversionKit": {"model": biogas.gas_conversion_kit, "icon_elevation": 45},
     "TarpGasBag": {"model": biogas.tarp_gas_bag, "icon_elevation": 50},
@@ -126,7 +130,8 @@ ITEMS = {
     "BrokenWoodenBlades": {"model": lambda col: wind.broken_blades(col, "wood"), "icon_elevation": 50},
     "BrokenPipeBlades": {"model": lambda col: wind.broken_blades(col, "pipe"), "icon_elevation": 50},
     "BrokenSteelBlades": {"model": lambda col: wind.broken_blades(col, "steel"), "icon_elevation": 50},
-    "HomemadeAlternator": {"model": wind.homemade_alternator, "icon_elevation": 40},
+    "HomemadeAlternator": {"model": wind.homemade_alternator, "icon": lambda col: wind.homemade_alternator(col, standing=True),
+                           "icon_turn": 30},
     "CarAlternator": {"model": wind.car_alternator, "icon_elevation": 35},
 }
 

@@ -213,11 +213,6 @@ function RuralFinds.refusal(kind, square)
     end
 end
 
---- How far outside the building's bounds the square at x, y is, in squares (0 inside).
-function RuralFinds.distanceOutside(def, x, y)
-    return math.max(def:getX() - x, x - (def:getX2() - 1), def:getY() - y, y - (def:getY2() - 1), 0)
-end
-
 -- A random square the find `kind` may stand on within its reach of the building, or nil.
 local function squareFor(def, kind)
     local found = {}
@@ -272,14 +267,13 @@ function RuralFinds.roll(def, kinds)
 end
 
 --- The buildings within BuildingWatch.REACH of x, y that could have the find `kind`. Reads the
---- map, so the buildings needn't be loaded.
+--- map, so the buildings needn't be loaded. The query takes a building whose room has a square
+--- in the square of that reach around x, y (RoomDef.intersects), which is the reach itself.
 function RuralFinds.buildingsBy(kind, x, y)
     local qualifies, reach = RuralFinds.FINDS[kind].qualifies, BuildingWatch.REACH
     local buildings = ArrayList.new()
     getWorld():getMetaGrid():getBuildingsIntersecting(x - reach, y - reach, 2 * reach + 1, 2 * reach + 1, buildings)
-    return Tables.fromList(buildings, function(def)
-        return RuralFinds.distanceOutside(def, x, y) <= reach and qualifies(def)
-    end)
+    return Tables.fromList(buildings, qualifies)
 end
 
 --- Counts a find of `kind` at x, y as the find of every building it stands by that could have one

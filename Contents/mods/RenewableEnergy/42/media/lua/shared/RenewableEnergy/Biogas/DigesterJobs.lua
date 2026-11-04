@@ -89,17 +89,28 @@ function DigesterJobs.tarpBags(character)
     return Tables.fromList(character:getInventory():getAllTypeRecurse(Digester.HOLDERS.tarp.item))
 end
 
+-- The item of `list`, a Java list, `better(a, b)` puts ahead of every other, or nil for none.
+local function best(list, better)
+    local found
+    for i = 0, list:size() - 1 do
+        local item = list:get(i)
+        if not found or better(item, found) then
+            found = item
+        end
+    end
+    return found
+end
+
 --- The Iron Sponge the character would pack a scrubber with: the one with the most packings left,
 --- or nil.
 function DigesterJobs.spongeToPack(character)
-    local sponges, best = character:getInventory():getAllTypeRecurse(Digester.IRON_SPONGE), nil
-    for i = 0, sponges:size() - 1 do
-        local sponge = sponges:get(i)
-        if not best or sponge:getCondition() > best:getCondition() then
-            best = sponge
-        end
-    end
-    return best
+    return best(character:getInventory():getAllTypeRecurse(Digester.IRON_SPONGE), function(a, b)
+        return a:getCondition() > b:getCondition()
+    end)
+end
+
+local function emptier(a, b)
+    return a:getCurrentUsesFloat() < b:getCurrentUsesFloat()
 end
 
 --- What the character could fill (Digester.FILL_SHARES): the emptiest they carry of each kind, a
@@ -107,16 +118,7 @@ end
 function DigesterJobs.toFill(character)
     local inventory, found = character:getInventory(), {}
     for _, fullType in ipairs({ Digester.TANK, Digester.TORCH, Digester.BOTTLE }) do
-        local items, best = inventory:getAllTypeRecurse(fullType), nil
-        for i = 0, items:size() - 1 do
-            local item = items:get(i)
-            if not best or item:getCurrentUsesFloat() < best:getCurrentUsesFloat() then
-                best = item
-            end
-        end
-        if best then
-            table.insert(found, best)
-        end
+        table.insert(found, best(inventory:getAllTypeRecurse(fullType), emptier))
     end
     return found
 end
@@ -182,7 +184,7 @@ local function fillJob(fields)
                 return "Tooltip_RenewableEnergy_NoPower"
             end
         end
-        return noGas(character, summary)
+        return summary.gas <= 0 and "Tooltip_RenewableEnergy_NoGasToFill" or nil
     end
     fields.minutes = function(digester, vessel)
         local summary = Digester.currentSummary(digester)
@@ -194,13 +196,18 @@ local function fillJob(fields)
     fields.with = isVessel
     fields.withMissing = "Tooltip_RenewableEnergy_NeedsVessel"
     fields.withRefusal = function(character, summary, vessel)
-        if fillAmount(fill, summary, vessel) <= 0 then
-            if vessel:getCurrentUses() >= Items.usesAt(vessel, fill.limit) then
-                return fill.full
-            end
-            return "Tooltip_RenewableEnergy_NeedsScrubbed"
+        local plain, scrubbed, perUse = DigesterJobs.fillUses(fill, summary, vessel)
+        if plain + scrubbed > 0 then
+            return nil
         end
-        return nil
+        if vessel:getCurrentUses() >= Items.usesAt(vessel, fill.limit) then
+            return fill.full
+        end
+        if summary.gas < perUse then
+            return "Tooltip_RenewableEnergy_TooLittleGas"
+        end
+        -- Only a scrubbed fill gets this far: the pump's share is filled and the scrubber is spent.
+        return "Tooltip_RenewableEnergy_NeedsScrubbed"
     end
     return fields
 end
@@ -228,7 +235,8 @@ DigesterJobs.JOBS = {
     [DigesterJobs.FIT_TARP] = {
         minutes = 15, position = "Mid", holder = "tarp", tooltip = "Tooltip_RenewableEnergy_FitTarpGasBag",
         blocker = bagBlocker,
-        with = Items.ofType(Digester.HOLDERS.tarp.item), withMissing = "Tooltip_RenewableEnergy_NeedsTarpGasBag",
+        with = function(item) return item:getFullType() == Digester.HOLDERS.tarp.item and Items.notBroken(item) end,
+        withMissing = "Tooltip_RenewableEnergy_NeedsTarpGasBag",
     },
     [DigesterJobs.TAKE_OFF_BAG] = {
         minutes = 10, position = "Mid", holder = "none", tooltip = "Tooltip_RenewableEnergy_TakeOffGasBag",

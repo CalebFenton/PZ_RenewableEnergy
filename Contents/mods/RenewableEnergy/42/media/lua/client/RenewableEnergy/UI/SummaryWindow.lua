@@ -11,6 +11,8 @@ local SummaryWindow = ObjectWindow:derive("RenewableEnergySummaryWindow")
 
 local PAD = ObjectWindow.PAD
 local WIDTH = 300
+-- How often the summary is read again, in real milliseconds: a read walks the object's containers.
+local READ_MS = 250
 
 SummaryWindow.windows = {}
 
@@ -22,8 +24,13 @@ end
 
 -- The rows are laid out again only when the summary changed. A summary read is a fresh copy with
 -- what the object's containers hold now (GlobalObjects.declare's decorate), so it is compared by
--- value.
+-- value, and read a few times a second rather than every frame.
 function SummaryWindow:refresh()
+    local now = getTimestampMs()
+    if self.summary and now - self.readAt < READ_MS then
+        return true
+    end
+    self.readAt = now
     local summary = self.owner.summaryOf(self.object)
     if not summary then
         return false

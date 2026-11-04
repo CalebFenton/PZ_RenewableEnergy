@@ -48,7 +48,7 @@ end
 -- says; each site has a unique name, a known kind, and the spots its kind uses, as many panel
 -- spots as the kind may place. Every name a world that rolled all sites at once stands for is a
 -- site's, since a renamed site would be rolled again in such worlds.
-PZHarness.checkHandler("sitesPlacedSensibly", function(expect)
+PZHarness.checkHandler("sitesPlacedSensibly", function(expect, _, expectEqual)
     local metaGrid = getWorld():getMetaGrid()
     local sites = SolarSites.sites()
     expect(#sites > 0, "this map has no solar sites")
@@ -73,7 +73,7 @@ PZHarness.checkHandler("sitesPlacedSensibly", function(expect)
                 expect(panels >= kind.panels.min and panels <= kind.panels.max, string.format(
                     "%s has %d panel spots, its kind places %d to %d", site.name, panels, kind.panels.min, kind.panels.max))
             else
-                expect(panels == 0, site.name .. " has panel spots its kind never places")
+                expectEqual(site.name .. "'s panel spots, which its kind never places", panels, 0)
             end
             for _, field in ipairs({ "bank", "crate" }) do
                 if kind[field] then

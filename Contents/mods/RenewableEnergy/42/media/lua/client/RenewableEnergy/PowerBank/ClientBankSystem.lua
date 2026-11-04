@@ -6,7 +6,6 @@
 -- sound runs) and release the squares a running bank powered when it is removed. The container's
 -- filter is set on every side (PowerBank's declaration).
 
-local Places = require "RenewableEnergy/Places"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local ClientObjects = require "cf_commonlib/ClientObjects"
 local GeneratorReach = require "cf_commonlib/GeneratorReach"
@@ -32,13 +31,13 @@ if isClient() then
     end)
 end
 
--- The banks this game's players watch, by place (Places.key), to { [player number] = true }.
+-- The banks this game's players watch, by place (Squares.placeKey), to { [player number] = true }.
 -- The server sends a bank's status only to its watchers, so once nobody here watches it, this
 -- client's copy goes rather than show stale when a window next opens.
 local watching = {}
 
 local function keyOf(position)
-    return Places.key(position.x, position.y, position.z)
+    return Squares.placeKey(position.x, position.y, position.z)
 end
 
 --- `player` watches the status of `bank` (single player too): the server sends it now, after a

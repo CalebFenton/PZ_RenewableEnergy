@@ -3,12 +3,12 @@ local Specs = require "RenewableEnergy/Specs"
 local Panel = require "RenewableEnergy/PowerBank/Panel"
 local ModuleRepair = require "RenewableEnergy/PowerBank/ModuleRepair"
 local Items = require "cf_commonlib/Items"
-local Chance = require "RenewableEnergy/Chance"
+local StormChance = require "RenewableEnergy/StormChance"
 local SourceJobs = require "RenewableEnergy/PowerBank/SourceJobs"
 local Sprites = require "RenewableEnergy/Sprites"
 local Wind = require "RenewableEnergy/Wind"
 
--- Solar storms: storms cracking panel modules (PowerBank/PanelSource.lua, Chance.lua).
+-- Solar storms: storms cracking panel modules (PowerBank/PanelSource.lua, StormChance.lua).
 
 local T = RenewableEnergyTest
 local test, expect, expectNear, expectEqual = T.test, T.expect, T.expectNear, T.expectEqual
@@ -34,7 +34,7 @@ end
 
 -- How likely a storm is to crack a module, and what a crack does. By mount: wall panels never,
 -- wooden racks most, metal racks least, and the more the longer the storm. At the Storm Damage
--- options (Chance.stormDamage): a chance an hour compounds over the hours, the rate scales the
+-- options (StormChance.stormDamage): a chance an hour compounds over the hours, the rate scales the
 -- chance an hour, a chance scaled past certain stays certain, and no hours or Storm Damage off is
 -- no chance; those expected chances are worked by hand. A roll under a panel's chance cracks a
 -- module by Specs.storm.crack, never below 0, and a roll at it doesn't.
@@ -49,7 +49,7 @@ test("renewable_energy_solar_storms_crack_chance", {
             T.read(self, "stormCrack", { trials = { stormTrial("flat", 20, 100, "under"), stormTrial("flat", 20, 100, "at"),
                 stormTrial("flat", 20, math.floor(Specs.storm.crack / 2), 0) } }, "rolls")
         end)
-        local stormDamage = Chance.stormDamage
+        local stormDamage = StormChance.stormDamage
         T.step(function()
             self.normal = { stormDamage(0.1, 1), stormDamage(0.1, 2), stormDamage(0.1, 0) }
             T.setSandbox(self, "StormDamageRate", 200)
@@ -99,7 +99,7 @@ test("renewable_energy_solar_storms_unloaded_damage_then_immediate_seal", {
         if not panel then return end
         self.bank, self.panel = bank, panel
         T.trackSquare(self, panel)
-        T.setRecipeSkills(self, ModuleRepair.sealRecipe())
+        T.setRecipeSkills(self, getScriptManager():getCraftRecipe(ModuleRepair.SEAL_RECIPE))
         T.give(self, "inputs", { { type = "Base.Screwdriver" }, { type = "Base.Epoxy" } })
         T.snowfall(self, bank, 2)
         T.forceRoll(self, 0)
@@ -203,7 +203,7 @@ test("renewable_energy_solar_storms_crack_loose_panels", {
 -- storms of up to 10 hours each that can follow it (WeatherPeriod.createWeatherPattern).
 local LONGEST_THUNDER_HOURS = 24 + 2 * 10
 
--- Storm strength (Chance.stormStrength) is none up to where the damage starts, the square of the
+-- Storm strength (StormChance.stormStrength) is none up to where the damage starts, the square of the
 -- way from there to the game's strongest wind, and all of it from there on. The worst the game
 -- blows, Specs.storm worstHours at full strength at the default rate, breaks the weakest blades
 -- with worstChance and no others any more often, and in any wind that can break both, weaker
@@ -215,18 +215,18 @@ test("renewable_energy_solar_storms_worst_case_rule", {
         local storm = Specs.storm
         T.step(function()
             local from = storm.fullKph / 2
-            self.strengths = { Chance.stormStrength(from, from), Chance.stormStrength(from, (from + storm.fullKph) / 2),
-                Chance.stormStrength(from, storm.fullKph), Chance.stormStrength(from, storm.fullKph * 2) }
+            self.strengths = { StormChance.stormStrength(from, from), StormChance.stormStrength(from, (from + storm.fullKph) / 2),
+                StormChance.stormStrength(from, storm.fullKph), StormChance.stormStrength(from, storm.fullKph * 2) }
             self.blades = {}
             for material, spec in pairs(Wind.SPEC.blades) do
-                self.blades[material] = Chance.stormDamage(Chance.stormPerHour(spec.stormShare),
-                    storm.worstHours * Chance.stormStrength(spec.breakKph, storm.fullKph))
+                self.blades[material] = StormChance.stormDamage(StormChance.stormPerHour(spec.stormShare),
+                    storm.worstHours * StormChance.stormStrength(spec.breakKph, storm.fullKph))
             end
             self.order = {}
             for kph = Wind.SPEC.blades.pipe.breakKph + 1, storm.fullKph do
                 local hourly = {}
                 for material, spec in pairs(Wind.SPEC.blades) do
-                    hourly[material] = Chance.stormPerHour(spec.stormShare) * Chance.stormStrength(spec.breakKph, kph)
+                    hourly[material] = StormChance.stormPerHour(spec.stormShare) * StormChance.stormStrength(spec.breakKph, kph)
                 end
                 if not (hourly.pipe > hourly.wood or hourly.wood == 0) or not (hourly.wood > hourly.steel or hourly.steel == 0) then
                     table.insert(self.order, string.format("%d km/h: pipe %g, wood %g, steel %g", kph, hourly.pipe, hourly.wood, hourly.steel))

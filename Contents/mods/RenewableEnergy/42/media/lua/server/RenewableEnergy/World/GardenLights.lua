@@ -169,7 +169,7 @@ end
 function GardenLights.roll(def)
     local key = BuildingWatch.key(def)
     local rolled = store()
-    if GardenLights.isRolled(def) then
+    if isRolledValue(rolled[key]) then
         return 0
     end
     local placed = 0

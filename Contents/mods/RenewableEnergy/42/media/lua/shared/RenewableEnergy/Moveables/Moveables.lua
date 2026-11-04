@@ -129,14 +129,19 @@ local function placementRefusal(fullType, square)
     return nil
 end
 
--- Whether `isoObject` is a gasifier still burning, which, like a running generator
--- (ISTakeGenerator.isValid), must be put out before it is taken.
-local function isLitGasifier(isoObject)
-    if not Gasifier.isGasifier(isoObject) then
-        return false
+-- Why the gasifier `isoObject` may not be taken, or nil: still burning, which like a running
+-- generator (ISTakeGenerator.isValid) must be put out first, or piped to a generator, which like a
+-- connected source must be disconnected first, since taking it would lose the pipe.
+local function gasifierRefusal(isoObject)
+    local summary = Gasifier.isGasifier(isoObject) and Gasifier.summaryOf(isoObject)
+    if not summary then
+        return nil
+    elseif summary.lit then
+        return "Tooltip_RenewableEnergy_PutOutFirst"
+    elseif summary.piped then
+        return "Tooltip_RenewableEnergy_DisconnectFirst"
     end
-    local summary = Gasifier.summaryOf(isoObject)
-    return summary ~= nil and summary.lit == true
+    return nil
 end
 
 -- Whether `isoObject` is connected, which, like a connected generator (ISTakeGenerator.isValid),
@@ -152,8 +157,9 @@ end
 
 -- Why `isoObject` may not be picked up or turned now: a translation key, or nil if it may.
 local function takeRefusal(isoObject)
-    if isLitGasifier(isoObject) then
-        return "Tooltip_RenewableEnergy_PutOutFirst"
+    local refusal = gasifierRefusal(isoObject)
+    if refusal then
+        return refusal
     elseif isConnected(isoObject) then
         return "Tooltip_RenewableEnergy_DisconnectFirst"
     end
@@ -167,8 +173,8 @@ function ISMoveableSpriteProps:canPlaceMoveableInternal(character, square, item,
 end
 
 -- The cursor's panel says why it refuses, in the red vanilla gives its own refusals: placing an
--- item where it may not go, or picking up or turning a gasifier still burning or anything
--- connected.
+-- item where it may not go, or picking up or turning a gasifier still burning or piped, or
+-- anything connected.
 local vanillaInfoPanel = ISMoveableSpriteProps.getInfoPanelDescription
 function ISMoveableSpriteProps:getInfoPanelDescription(square, object, player, mode)
     local infoTable = vanillaInfoPanel(self, square, object, player, mode)

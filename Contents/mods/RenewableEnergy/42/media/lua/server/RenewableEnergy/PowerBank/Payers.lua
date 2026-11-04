@@ -8,8 +8,8 @@
 -- the bank hands what lies farthest from it to the nearest other payer with room for it, until it
 -- fits. A generator has room for anything. A bank that still doesn't fit overloads and drops out,
 -- and the rest share again without it. Nearest is by tiles, each level counting as one; a tie goes
--- to the lower position (Places.key), so every payer agrees on who pays. A bank measures its own
--- load against the payers that may run now (Payers.scan). A generator's bill is vanilla's
+-- to the lower position (Squares.placeKey), so every payer agrees on who pays. A bank measures its
+-- own load against the payers that may run now (Payers.scan). A generator's bill is vanilla's
 -- totalPowerUsing, which the engine rebuilds whenever anything in its reach switches
 -- (IsoGenerator.setSurroundingElectricity) and burns at the hour (IsoGenerator.update); so its
 -- share is set after each rebuild, before the next hour. A generator also pays for an unwired
@@ -59,7 +59,7 @@ function Payers.eachGenerator(fn)
 end
 
 local function newPayer(x, y, z, fields)
-    fields.x, fields.y, fields.z, fields.key = x, y, z, Places.key(x, y, z)
+    fields.x, fields.y, fields.z, fields.key = x, y, z, Squares.placeKey(x, y, z)
     return fields
 end
 
@@ -140,7 +140,7 @@ local function drawsOf(group)
         local square = getCell():getGridSquare(member.x, member.y, member.z)
         if square then
             Loads.eachDraw(square, function(draw)
-                local place = Places.key(draw.x, draw.y, draw.z)
+                local place = Squares.placeKey(draw.x, draw.y, draw.z)
                 local onSquare = seen[place] or {}
                 seen[place] = onSquare
                 if not onSquare[draw.index] then

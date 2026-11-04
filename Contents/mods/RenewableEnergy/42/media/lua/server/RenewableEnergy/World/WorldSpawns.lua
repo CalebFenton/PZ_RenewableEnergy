@@ -33,9 +33,9 @@ WorldSpawns.BANK_ROOMS = {
     barn = { odds = 10, stock = "farmStorage" },
 }
 WorldSpawns.CRATE_ROOMS = { garagestorage = 33, storageunit = 16 }
--- The odds above are multiplied by these for each Battery Bank Spawn setting. Crates follow the
--- same setting.
-WorldSpawns.RARITY = { nil, 10, 3, 1 }
+-- The odds above are multiplied by these for each Battery Bank Spawn setting (1, None, spawns
+-- nothing). Crates follow the same setting.
+WorldSpawns.RARITY = { [2] = 10, [3] = 3, [4] = 1 }
 
 local CAR_BATTERIES = {
     { "Base.CarBattery1", 4 }, { "Base.CarBattery2", 3 }, { "Base.CarBattery3", 2 },

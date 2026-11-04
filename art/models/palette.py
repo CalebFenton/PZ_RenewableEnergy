@@ -7,14 +7,15 @@ BANK_TURF = (0.36, 0.42)
 BANK_FADE = (0.46, 0.53)
 
 PALETTE = {
-    "aluminium": lambda: material("RE_Aluminium", "#a9adb1", roughness=0.5, metallic=0.8, grime=0.08),
+    "aluminium": lambda: material("RE_Aluminium", "#a3a7aa", roughness=0.6, metallic=0.8, grime=0.2),
     "galvanised": lambda: material("RE_Galvanised", "#b4babc", roughness=0.5, metallic=0.7, grime=0.2),
     # The game's metal pipe, a dull grey as its icon draws it.
     "metalpipe": lambda: material("RE_MetalPipe", "#7f8487", roughness=0.6, metallic=0.5, grime=0.3, scale=12),
     # Cell faces and their busbars under glass, rough enough that the sun, whose mirror image off
-    # a module tilted south at a rack's angle falls on the camera, doesn't white them out.
-    "cells": lambda: material("RE_PolyCells", "#142c63", roughness=0.75, metallic=0.2, grime=0.05,
-                              speckle=("#3a60a8", 0.9)),
+    # a module tilted south at a rack's angle falls on the camera, doesn't white them out; the
+    # flakes sparkle only a little, so a module reads the dark navy of real cells, not sky blue.
+    "cells": lambda: material("RE_PolyCells", "#17295a", roughness=0.75, metallic=0.2, grime=0.05,
+                              speckle=("#2b4680", 0.5)),
     "backsheet": lambda: material("RE_Backsheet", "#e9e8df", roughness=0.5, grime=0.05),
     "busbar": lambda: material("RE_Busbar", "#aeb2b6", roughness=0.7, metallic=0.6, grime=0.0),
     "amorphous": lambda: material("RE_Amorphous", "#2c3a78", roughness=0.75, metallic=0.25, grime=0.05),
@@ -34,7 +35,7 @@ PALETTE = {
     "bolt": lambda: material("RE_Bolt", "#e9e147", roughness=0.5, grime=0.0),
     # The grey paste and sulphate a battery's plates leave smeared on the inside of its case.
     "leadstain": lambda: material("RE_LeadStain", "#99958a", roughness=0.9, grime=0.4, scale=30),
-    "marine": lambda: material("RE_MarineBlue", "#2155a8", roughness=0.45, grime=0.12),
+    "marine": lambda: material("RE_MarineBlue", "#2a4f86", roughness=0.45, grime=0.15),
     "maroon": lambda: material("RE_Maroon", "#8c2a2f", roughness=0.5, grime=0.15),
     "cream": lambda: material("RE_Cream", "#e6dfc8", roughness=0.6, grime=0.1),
     "white": lambda: material("RE_White", "#ecebe6", roughness=0.6, grime=0.08),
@@ -44,7 +45,7 @@ PALETTE = {
     "dross": lambda: material("RE_Dross", "#6b6a64", roughness=0.95, grime=0.3, scale=20, speckle=("#4f4e4a", 0.5)),
     "litharge": lambda: material("RE_Litharge", "#c49a3e", roughness=0.95, grime=0.2, scale=20),
     "red": lambda: material("RE_Red", "#b8231f", roughness=0.5, grime=0.1),
-    "plywood": lambda: material("RE_Plywood", "#b48d5c", roughness=0.8, grime=0.25, scale=12, grain="veneer"),
+    "plywood": lambda: material("RE_Plywood", "#a8875d", roughness=0.8, grime=0.35, scale=12, grain="veneer"),
     "wood": lambda: material("RE_Wood", "#94693f", roughness=0.8, grime=0.3, scale=10, grain="board"),
     "navy": lambda: material("RE_Navy", "#2c416d", roughness=0.4, metallic=0.4, grime=0.1),
     # The inverter/charger's cabinet, and the factory paint on a battery bank's steel.
@@ -160,7 +161,7 @@ PALETTE = {
     # The earth banked round the brick dome: dug soil, grassed over towards its foot, where it
     # thins into whatever ground the game draws round the square, the olive of its grass.
     "domebank": lambda: material("RE_DomeBank", "#6e5b43", roughness=1.0, grime=0.45, scale=10, speckle=("#43420a", 0.5),
-                                 turf=("#625f09", BANK_TURF[0], BANK_TURF[1]), fade=BANK_FADE, shine=0.05),
+                                 turf=("#4b5214", BANK_TURF[0], BANK_TURF[1]), fade=BANK_FADE, shine=0.05),
     # Blades of grass, green and gone to seed.
     "grass": lambda: material("RE_Grass", "#414b10", roughness=0.9, grime=0.3, scale=20, shine=0.1),
     "grassdry": lambda: material("RE_GrassDry", "#6f6828", roughness=0.9, grime=0.3, scale=20, shine=0.1),
@@ -184,19 +185,20 @@ PALETTE = {
     "tar": lambda: material("RE_Tar", "#3d2c1e", roughness=0.25, grime=0.25, scale=20, speckle=("#1f1712", 0.4)),
     "tarstraw": lambda: material("RE_TarStraw", "#7a5a2e", roughness=0.6, grime=0.3),
     # Blades: carved from the game's planks and oiled; and hammered out of sheet steel at the
-    # forge, left bare, pocked by the hammer and rusting at the edges, the amber casting resin a
-    # homemade alternator's coils are set in.
-    "carvedwood": lambda: material("RE_CarvedWood", "#a2703f", roughness=0.6, grime=0.25, scale=10, grain="fine"),
-    "hammered": lambda: material("RE_Hammered", "#9a9c9b", roughness=0.5, metallic=0.6, grime=0.3, scale=30,
-                                 speckle=("#55595b", 0.35), streaks=("#7a5434", 0.35)),
+    # forge, left bare, dark with forge scale, pocked by the hammer and rusting at the edges, so
+    # a steel set reads apart from a pale grey pipe one; the amber casting resin a homemade
+    # alternator's coils are set in.
+    "carvedwood": lambda: material("RE_CarvedWood", "#8e6a45", roughness=0.6, grime=0.3, scale=10, grain="fine"),
+    "hammered": lambda: material("RE_Hammered", "#5d5f60", roughness=0.6, metallic=0.45, grime=0.35, scale=30,
+                                 speckle=("#3c3f41", 0.4), streaks=("#7a5434", 0.5)),
     "resin": lambda: material("RE_Resin", "#c99a4a", roughness=0.35, grime=0.15),
     # The flat belt a car alternator wind charger's rotor drives its alternator with, cut from
     # leather the brown of the game's own leather belt (Belt2).
     "leather": lambda: material("RE_Leather", "#6e4a2c", roughness=0.7, grime=0.2, scale=14),
     # Iron sponge: wood shavings crusted orange-brown with rust, flecked with filed iron; spent, it
     # is blackened by iron sulphide with a few specks of yellow sulphur.
-    "rustchips": lambda: material("RE_RustChips", "#a0582a", roughness=0.95, grime=0.3, scale=25,
-                                  speckle=("#6a3418", 0.45)),
+    "rustchips": lambda: material("RE_RustChips", "#8a5634", roughness=0.95, grime=0.35, scale=25,
+                                  speckle=("#5e3a22", 0.45)),
     "ironsulphide": lambda: material("RE_IronSulphide", "#262524", roughness=0.85, grime=0.15, scale=25,
                                      speckle=("#121212", 0.4)),
     "sulphur": lambda: material("RE_Sulphur", "#d6c34a", roughness=0.9, grime=0.1),

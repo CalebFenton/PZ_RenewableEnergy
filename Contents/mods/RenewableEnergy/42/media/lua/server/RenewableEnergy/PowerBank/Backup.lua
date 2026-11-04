@@ -4,23 +4,19 @@
 if isClient() then return end
 
 local Places = require "RenewableEnergy/Places"
-local Sprites = require "RenewableEnergy/Sprites"
 local Fumes = require "RenewableEnergy/Fumes"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local Payers = require "RenewableEnergy/PowerBank/Payers"
 local GasKit = require "RenewableEnergy/GasLine/GasKit"
 local GasLines = require "RenewableEnergy/GasLine/GasLines"
 local Bank = require "RenewableEnergy/PowerBank/Bank"
+local Failsafe = require "RenewableEnergy/PowerBank/Failsafe"
 local GeneratorReach = require "cf_commonlib/GeneratorReach"
 local Squares = require "cf_commonlib/Squares"
 
 -- At or below this condition a running generator may catch fire or explode at every hour it runs
 -- (IsoGenerator.update), so a relay, which nobody stands by, never starts one that worn.
 local FIRE_CONDITION = 20
-
-local function isFailsafe(object)
-    return Sprites.nameOf(object) == Sprites.failsafe
-end
 
 local function generatorPlace(found)
     return Places.objectPlace(found.generator)
@@ -35,7 +31,7 @@ local function generatorsInReach(bank)
         local generator = square:getGenerator()
         if GeneratorReach.isVanillaGenerator(generator) and generator:isConnected() then
             Payers.track(generator)
-            table.insert(found, { generator = generator, failsafe = Squares.findObjectOn(square, isFailsafe) ~= nil })
+            table.insert(found, { generator = generator, failsafe = Squares.findObjectOn(square, Failsafe.isFailsafe) ~= nil })
         end
     end)
     Places.sortNearest(found, bank.x, bank.y, bank.z, generatorPlace)
@@ -81,9 +77,10 @@ local function runFailsafe(generator, wanted, charge)
 end
 
 --- Run every failsafe that answers to the bank (failsafeBank), and record the backup generator the
---- status shows, which carries the load while it runs: one the bank runs, a running one first,
---- else one with a failsafe, else the nearest. The failsafe runs a generator only while the bank
---- could carry its load (Bank:canCarryLoad). While the bank is unloaded, the last known state holds.
+--- status shows, which carries the load while it runs: a running one first, since any running one
+--- carries it; of those alike, one whose failsafe answers to the bank, else one with a failsafe,
+--- else the nearest. The failsafe runs a generator only while the bank could carry its load
+--- (Bank:canCarryLoad). While the bank is unloaded, the last known state holds.
 function Bank:updateGenerator()
     if not self:getSquare() then return end
     local armed = self:canCarryLoad()
@@ -95,7 +92,7 @@ function Bank:updateGenerator()
             runFailsafe(generator, armed, self.charge)
         end
         local running = generator:isActivated()
-        local rank = (controls and 4 or 0) + (controls and running and 2 or 0) + (found.failsafe and 1 or 0)
+        local rank = (running and 4 or 0) + (controls and 2 or 0) + (found.failsafe and 1 or 0)
         -- Nearest first, so of two alike the nearer stays.
         if not shown or rank > shownRank then
             shown, shownRank = {

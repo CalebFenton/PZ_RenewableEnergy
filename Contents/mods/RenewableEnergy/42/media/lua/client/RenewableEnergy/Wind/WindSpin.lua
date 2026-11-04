@@ -1,9 +1,10 @@
 -- Turns the wind chargers this client can see, a cosmetic only it draws. Each charger is drawn as a
 -- 3D model through a sprite model (Sprites.windModels), and the rotor turns by stepping the object
--- through models yawed a step apart (IsoObject.setSpriteModelName); animating keeps it out of the
--- cached chunk, so each step shows at once. An unbraked charger in a wind that can break its blades
--- strains audibly now and then, the warning to set the brake. The game's wind is the same on every
--- client, and a charger's brake is in its modData, so nothing needs sending.
+-- through models yawed a step apart (IsoObject.setSpriteModelName); animating keeps a turning one
+-- out of the cached chunk, so each step shows at once, and a still one goes back into it. An
+-- unbraked charger in a wind that can break its blades strains audibly now and then, the warning
+-- to set the brake. The game's wind is the same on every client, and a charger's brake is in its
+-- modData, so nothing needs sending.
 
 local Sprites = require "RenewableEnergy/Sprites"
 local Wind = require "RenewableEnergy/Wind"
@@ -44,6 +45,15 @@ local function stateFor(name)
         model = model, names = modelNames(prefix, model), phase = 0, shown = 0, strainIn = 0 }
 end
 
+-- Puts the charger in or out of the cached chunk as it starts or stops turning. The chunk caches
+-- only what isn't animating (FBORenderCell), so it redraws on each change.
+local function setTurning(object, state, turning)
+    if state.turning == turning then return end
+    state.turning = turning
+    object:setAnimating(turning)
+    object:invalidateRenderChunkLevel(FBORenderChunk.DIRTY_OBJECT_MODIFY)
+end
+
 --- Starts turning `object` if it is a wind charger: as its chunk loads, or as it is added to the
 --- map (OnObjectAdded, which Wind.OnCreate fires for a charger built in single player).
 function WindSpin.track(object)
@@ -53,7 +63,6 @@ function WindSpin.track(object)
     chargers[object] = state
     tracked = tracked + 1
     object:setSpriteModelName(state.names[1])
-    object:setAnimating(true)
 end
 
 local function turnsPerSecond(spec, kph)
@@ -81,7 +90,7 @@ end
 -- Each tick: drops the chargers gone from the map, and steps on those turning. A charger whose
 -- tile changed, as Replace Blades with blades of another material changes it, here or from the
 -- server, with no event for it, takes the new tile's models. A calm, braked or broken charger costs
--- only the checks that it is still there on the same tile.
+-- only the checks that it is still there on the same tile, and is drawn from the cached chunk.
 local function spin()
     local now = getTimestampMs()
     local seconds = lastMs and (now - lastMs) / 1000 or 0
@@ -91,11 +100,14 @@ local function spin()
     for object, state in pairs(chargers) do
         local name = Squares.onSquare(object) and Sprites.nameOf(object)
         if name and name ~= state.sprite then
+            local turning = state.turning
             state = stateFor(name)
             if state then
                 -- Replacing a key the walk has reached is allowed; adding one is not.
                 chargers[object] = state
+                state.turning = turning
                 object:setSpriteModelName(state.names[1])
+                object:invalidateRenderChunkLevel(FBORenderChunk.DIRTY_OBJECT_MODIFY)
             end
         end
         if not (name and state) then
@@ -103,7 +115,9 @@ local function spin()
             tracked = tracked - 1
         else
             local turns = turnsPerSecond(state.spec, kph)
-            if turns > 0 and not (Wind.isBraked(object) or Wind.isBroken(object)) then
+            local turning = turns > 0 and not (Wind.isBraked(object) or Wind.isBroken(object))
+            setTurning(object, state, turning)
+            if turning then
                 local model = state.model
                 state.phase = (state.phase + turns * model.stepsPerTurn * seconds) % model.steps
                 local step = math.floor(state.phase)
@@ -117,10 +131,13 @@ local function spin()
     end
 end
 
+local names = {}
 for kind in pairs(Sprites.windModels) do
-    Tiles.onLoad(Sprites.namesOf(kind), WindSpin.track)
+    for _, name in ipairs(Sprites.namesOf(kind)) do
+        table.insert(names, name)
+    end
 end
-Events.OnObjectAdded.Add(WindSpin.track)
+Tiles.onLoad(names, WindSpin.track, { added = true })
 Events.OnTick.Add(spin)
 
 return WindSpin

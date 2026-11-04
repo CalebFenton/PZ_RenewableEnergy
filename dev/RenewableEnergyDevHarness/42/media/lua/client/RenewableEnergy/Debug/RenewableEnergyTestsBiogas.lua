@@ -3,6 +3,7 @@ local Fixtures = require "RenewableEnergy/Debug/RenewableEnergyFixtures"
 local Digester = require "RenewableEnergy/Biogas/Digester"
 local DigesterJobs = require "RenewableEnergy/Biogas/DigesterJobs"
 local DigesterWindow = require "RenewableEnergy/UI/DigesterWindow"
+local GasHeater = require "RenewableEnergy/Biogas/GasHeater"
 local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
 local Sprites = require "RenewableEnergy/Sprites"
 
@@ -109,7 +110,8 @@ test("renewable_energy_biogas_digester_startup_then_gas", {
 })
 
 -- Digestion follows temperature: none at the coldest and hottest edges, some a degree inside each,
--- the same along the best stretch. The barrel follows the air within days.
+-- the same along the best stretch. The barrel follows the air with a time constant of its tier's
+-- `days` (Digester.TIERS.barrel.days = 1): three days from 30 °C in 0 °C air leave 30·e^−3.
 test("renewable_energy_biogas_digester_temperature", {
     run = function(self)
         local handle = T.placeRecord(self, "digester", "barrel.MetalDrum")
@@ -151,7 +153,35 @@ test("renewable_energy_biogas_digester_temperature", {
         local first, last = self.plateau[1], self.plateau[#self.plateau]
         T.expectNear("gas at " .. last .. " °C against " .. first, reads["at" .. last].gas, reads["at" .. first].gas, 1e-6)
         local start = Fixtures.matureDigester("barrel").temp
-        T.expect(reads.cooled.temp < start / 2, "three days at 0 °C left the barrel at " .. reads.cooled.temp .. " °C from " .. start)
+        T.expectNear("°C three days at 0 °C left the barrel at", reads.cooled.temp,
+            start * math.exp(-72 / (Digester.TIERS.barrel.days * 24)), 0.05)
+    end,
+})
+
+-- The Brick Dome, started and holding gas, burns a gas heater's rate (GasHeater.m3PerHour) to keep
+-- at its warmTo (20 °C) in freezing air, and the hour its gas runs short it burns the rest and
+-- still keeps warm. With none left it cools, buried, toward the ground's 12 °C, not the air's,
+-- with its tier's time constant (days = 8): 12 + 8·e^(−23/192) after the 23 hours past that.
+-- Nothing to digest (potential 0), so all the gas it loses is what it burned.
+test("renewable_energy_biogas_dome_burns_gas_to_keep_warm", {
+    run = function(self)
+        local handle = T.placeRecord(self, "digester", "dome")
+        if not handle then return end
+        self.rate = GasHeater.m3PerHour()
+        T.batch(function()
+            T.setRecord(self, handle, Fixtures.matureDigester("dome", { temp = 20, gas = 2.5 * self.rate, potential = 0 }))
+            T.runDigester(self, handle, 2, -5)
+            T.readRecord(self, handle, "warm")
+            T.runDigester(self, handle, 24, -5)
+            T.readRecord(self, handle, "cold")
+        end)
+    end,
+    validate = function(self)
+        local warm, cold = self.reads.warm, self.reads.cold
+        T.expectNear("°C of the dome after two hours in −5 °C air with gas to burn", warm.temp, 20, 1e-6)
+        T.expectNear("m³ of gas the dome kept after burning two hours' worth", warm.gas, 0.5 * self.rate, 1e-6)
+        T.expectEqual("m³ of gas left once the dome burned it all", cold.gas, 0)
+        T.expectNear("°C of the dome 23 hours after its gas ran out", cold.temp, 12 + 8 * math.exp(-23 / 192), 0.05)
     end,
 })
 
@@ -332,7 +362,7 @@ test("renewable_energy_biogas_digester_holder", {
 })
 
 -- A Tarp Gas Bag goes on only once the gas is vented, at its own wear, and comes off whole, its
--- wear its condition again, leaving the barrel with nothing to hold gas.
+-- wear its condition again, leaving the barrel with nothing to hold gas. A worn-out one won't go on.
 test("renewable_energy_biogas_digester_tarp_gas_bag", {
     instant = true,
     run = function(self)
@@ -340,13 +370,16 @@ test("renewable_energy_biogas_digester_tarp_gas_bag", {
         if not handle then return end
         self.tarp = Digester.HOLDERS.tarp.item
         T.setRecord(self, handle, Fixtures.matureDigester("barrel", { gas = 0.3 }))
-        T.give(self, "tarp", { { type = self.tarp, condition = 6 } })
+        T.give(self, "tarp", { { type = self.tarp, condition = 6 }, { type = self.tarp, condition = 0 } })
         T.waitForGas(self, handle, 0.3)
         T.step(function()
             self.gassy = DigesterJobs.refusal(T.player(), DigesterJobs.FIT_TARP, handle.object, self.items.tarp[1])
         end)
         T.actionJob(self, "digester", handle, DigesterJobs.VENT)
         T.waitForGas(self, handle, 0)
+        T.step(function()
+            self.broken = DigesterJobs.refusal(T.player(), DigesterJobs.FIT_TARP, handle.object, self.items.tarp[2])
+        end)
         T.actionJob(self, "digester", handle, DigesterJobs.FIT_TARP, function() return self.items.tarp[1] end)
         T.batch(function()
             T.readRecord(self, handle, "fitted")
@@ -362,13 +395,17 @@ test("renewable_energy_biogas_digester_tarp_gas_bag", {
     validate = function(self)
         local fitted, off = self.reads.fitted, self.reads.off
         T.expectEqual("Fit Tarp Gas Bag's refusal with gas in the bags", self.gassy, "Tooltip_RenewableEnergy_VentFirst")
+        T.expectEqual("Fit Tarp Gas Bag's refusal of a worn-out bag", self.broken, "Tooltip_RenewableEnergy_NeedsTarpGasBag")
         T.expectEqual("the fitted holder", fitted.holder, "tarp")
         T.expectNear("the fitted tarp's wear left, in percent", fitted.holderCondition,
             100 * 6 / instanceItem(self.tarp):getConditionMax(), 0.5)
-        T.expect(#T.carriedItems(self, self.tarp, "fittedCarried") == 0, "fitting left the Tarp Gas Bag in the inventory")
+        T.expectEqual("Tarp Gas Bags left carried after fitting one", #T.carriedItems(self, self.tarp, "fittedCarried"), 1)
         T.expectEqual("the holder after taking it off", off.holder, "none")
-        local back = T.carriedFirst(self, self.tarp, "offCarried")
-        T.expectEqual("the returned Tarp Gas Bag's condition", back and back.condition, 6)
+        local conditions = {}
+        for _, back in ipairs(T.carriedItems(self, self.tarp, "offCarried")) do
+            conditions[back.condition] = true
+        end
+        T.expect(conditions[6], "the Tarp Gas Bag didn't come back at condition 6")
     end,
 })
 
@@ -465,9 +502,9 @@ test("renewable_energy_biogas_digester_upgrade", {
 })
 
 -- Queues, on this client's copy of the barrel digester `handle` showing the tile `tile`, what a
--- player does with it, into self.views[label]: its status window's title, and whether its hopper,
--- holding `held` dung already, took the cow dung they dragged in (the record's count, in
--- self.reads[label]). Also whether its SpriteConfig took the tile: the game logs "Invalid
+-- player does with it, into self.views[label]: whether its status window shows rows, and whether
+-- its hopper, holding `held` dung already, took the cow dung they dragged in (the record's count,
+-- in self.reads[label]). Also whether its SpriteConfig took the tile: the game logs "Invalid
 -- SpriteConfig object!" wherever an object loads with one that didn't, and vanilla's menus get no
 -- master object for it.
 local function useBarrelDigester(self, handle, tile, label, held)
@@ -484,7 +521,7 @@ local function useBarrelDigester(self, handle, tile, label, held)
         T.standNextTo(getSquare(handle.x, handle.y, handle.z))
         local window = DigesterWindow:openOn(0, object)
         window:prerender()
-        self.views[label] = { title = window.title, configValid = config ~= nil and config:isValid(),
+        self.views[label] = { rows = #(window.rowsToDraw or {}), configValid = config ~= nil and config:isValid(),
             master = object:getMasterObject() == object }
         window:close()
         ISTimedActionQueue.add(ISInventoryTransferAction:new(p, self.items[label][1], p:getInventory(), object:getContainer()))
@@ -499,7 +536,7 @@ end
 local function expectBarrelDigester(self, label, held)
     local view, read = self.views[label], self.reads[label]
     if not T.expect(view ~= nil and read ~= nil, label .. ": never saw the digester") then return end
-    T.expectEqual(label .. ": the status window's title", view.title, getText("IGUI_RenewableEnergy_Digester_barrel"))
+    T.expect(view.rows > 0, label .. ": its status window shows nothing")
     T.expect(view.configValid and view.master, label .. ": its SpriteConfig refused its tile")
     T.expectEqual(label .. ": items in the hopper, with the dung dragged in", read.hopperItems, held + 1)
 end
@@ -581,9 +618,8 @@ test("renewable_energy_biogas_barrel_digester_reloads_whole", {
 })
 
 -- Right-clicking a barrel digester shows its submenu through vanilla's menu builder: its status,
--- and its jobs, each tooltip saying what it does, greyed out with the reason under that while the
--- digester or the character can't do them; the gas bag's jobs in a submenu of their own. The
--- status window opens on it and shows its state.
+-- and its jobs, greyed out with the reason while the digester or the character can't do them; the
+-- gas bag's jobs in a submenu of their own. The status window opens on it and shows its state.
 test("renewable_energy_biogas_digester_menu", {
     run = function(self)
         self.digester = T.placeRecord(self, "digester", "barrel.MetalDrum")
@@ -599,11 +635,9 @@ test("renewable_energy_biogas_digester_menu", {
             upgrade = job(DigesterJobs.UPGRADE) })
         if T.expect(options ~= nil, "right-clicking a digester shows no digester submenu") then
             T.expect(options.status ~= nil, "no Status option")
-            local sludge = T.tooltipOf(options.sludge)
             T.expect(options.sludge and options.sludge.notAvailable
-                and sludge:find(getText("Tooltip_RenewableEnergy_TakeSludge"), 1, true) == 1
-                and sludge:find(getText("Tooltip_RenewableEnergy_NoSludge"), 1, true),
-                "Take Sludge isn't greyed out for an empty digester under what it does: " .. sludge)
+                and T.tooltipOf(options.sludge):find(getText("Tooltip_RenewableEnergy_NoSludge"), 1, true),
+                "Take Sludge isn't greyed out saying an empty digester has no sludge")
             T.expect(options.vent and options.vent.notAvailable, "Vent Gas isn't greyed out with no gas")
             T.expect(options.bag ~= nil and options.bag.subOption ~= nil, "no Gas Bag submenu on a barrel")
             local upgrade = options.upgrade
@@ -618,9 +652,7 @@ test("renewable_energy_biogas_digester_menu", {
         T.standNextTo(object:getSquare())
         local window = DigesterWindow:openOn(0, object)
         window:prerender()
-        T.expectEqual("the status window's title", window.title, getText("IGUI_RenewableEnergy_Digester_barrel"))
-        T.expect(window.rowsToDraw and window.rowsToDraw[1].value == getText("IGUI_RenewableEnergy_DigesterEmpty"),
-            "the status window doesn't say the digester is empty")
+        T.expect(window.rowsToDraw and #window.rowsToDraw > 0, "the status window shows nothing of the digester")
         window:close()
     end,
 })

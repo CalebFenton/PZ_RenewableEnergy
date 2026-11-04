@@ -12,6 +12,8 @@
 local Sprites = require "RenewableEnergy/Sprites"
 local Tiles = require "cf_commonlib/Tiles"
 
+local Failsafe = {}
+
 local FAILSAFE = Sprites.failsafe
 
 local function moveToTop(failsafe)
@@ -27,8 +29,11 @@ local function moveToTop(failsafe)
     square:AddSpecialObject(failsafe, last)
 end
 
-local function isFailsafe(isoObject)
+--- Whether `isoObject` is a failsafe relay.
+function Failsafe.isFailsafe(isoObject)
     return Sprites.nameOf(isoObject) == FAILSAFE
 end
 
-Tiles.onLoad({ FAILSAFE }, moveToTop, { matches = isFailsafe, added = true })
+Tiles.onLoad({ FAILSAFE }, moveToTop, { matches = Failsafe.isFailsafe, added = true })
+
+return Failsafe

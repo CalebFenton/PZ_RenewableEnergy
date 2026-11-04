@@ -1,15 +1,9 @@
--- Places in the world as numbers, and the nearest of several: every choice between equally near
--- places breaks the tie the same way, so whoever asks picks the same one.
+-- The nearest of several places: every choice between equally near places breaks the tie the
+-- same way, so whoever asks picks the same one.
+
+local Squares = require "cf_commonlib/Squares"
 
 local Places = {}
-
--- World squares lie well under this in x and y, so a place key stays unique and exact in a double.
-local SPAN = 1e6
-
---- The place x, y, z as one number: string keys cost far more time and memory per lookup in Kahlua.
-function Places.key(x, y, z)
-    return (z * SPAN + y) * SPAN + x
-end
 
 local function fieldsPlace(entry)
     return entry.x, entry.y, entry.z
@@ -24,12 +18,12 @@ end
 -- the place's key.
 local function measure(x, y, z, px, py, pz)
     local dx, dy, dz = px - x, py - y, pz - z
-    return dx * dx + dy * dy + dz * dz, Places.key(px, py, pz)
+    return dx * dx + dy * dy + dz * dz, Squares.placeKey(px, py, pz)
 end
 
 --- The nearest of `list` to x, y, z that `accepts(entry)` takes (every entry without it), or nil.
---- Of equally near ones the lower place (Places.key) wins. `placeOf(entry)` gives an entry's x, y,
---- z; without it, its x, y and z fields.
+--- Of equally near ones the lower place (Squares.placeKey) wins. `placeOf(entry)` gives an entry's
+--- x, y, z; without it, its x, y and z fields.
 function Places.nearest(list, x, y, z, placeOf, accepts)
     placeOf = placeOf or fieldsPlace
     local best, bestDistance, bestKey

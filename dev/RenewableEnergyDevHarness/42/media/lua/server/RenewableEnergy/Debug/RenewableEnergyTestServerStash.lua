@@ -5,7 +5,6 @@ require "PZHarness/ServerHandlers"
 require "PZHarness/ServerChecks"
 require "PZHarness/Fixtures"
 require "PZHarness/Rolls"
-local Kinds = require "RenewableEnergy/Debug/RenewableEnergyTestKinds"
 -- The game's Java class zombie.core.stash.Stash, which the mod's module name would hide.
 local EngineStash = Stash
 local Stash = require "RenewableEnergy/Stash"
@@ -18,7 +17,7 @@ local deferOnce = PZHarness.Fixtures.deferOnce
 -- coordinate is an empty house; and the house's spawn table has loot for its crate's container
 -- type. The static check's stash-crate rule checks the crate stands in a room of the house.
 check("stashHousesResolve", function(expect)
-    for stashMap in pairs(Stash.descriptions) do
+    for _, stashMap in ipairs(Stash.descriptions) do
         local x, y = stashMap.buildingX, stashMap.buildingY
         local building = Stash.buildingOf(stashMap)
         local spawnTable = SuburbsDistributions[stashMap.spawnTable]
@@ -34,10 +33,20 @@ check("stashHousesResolve", function(expect)
     end
 end)
 
+-- Whether `description` is one of the mod's houses.
+local function isOwn(description)
+    for _, own in ipairs(Stash.descriptions) do
+        if own == description then
+            return true
+        end
+    end
+    return false
+end
+
 -- Takes the mod's houses out of StashDescriptions.
 local function unregister()
     for i = #StashDescriptions, 1, -1 do
-        if Stash.descriptions[StashDescriptions[i]] then
+        if isOwn(StashDescriptions[i]) then
             table.remove(StashDescriptions, i)
         end
     end
@@ -58,26 +67,26 @@ handler("stashRegister", function(_, _, defer)
         Stash.register()
         local count = 0
         for _, description in ipairs(StashDescriptions) do
-            if Stash.descriptions[description] then
+            if isOwn(description) then
                 count = count + 1
             end
         end
         results[mode] = count
     end
     restoreOptions()
-    return { results = results, houses = Kinds.count(Stash.descriptions) }
+    return { results = results, houses = #Stash.descriptions }
 end)
 
 -- The engine's own load and annotate path, which a found map takes, on a fresh copy of each stash
 -- so the world's stash state stays as it was.
-check("stashMapsAnnotate", function(expect)
-    for stashMap in pairs(Stash.descriptions) do
+check("stashMapsAnnotate", function(expect, _, expectEqual)
+    for _, stashMap in ipairs(Stash.descriptions) do
         local engineStash = EngineStash.new(stashMap.name)
         engineStash:load(stashMap)
         local map = instanceItem(stashMap.item)
         if expect(map ~= nil and instanceof(map, "MapItem"), stashMap.name .. ": " .. stashMap.item .. " is not a map") then
             StashSystem.doStashItem(engineStash, map)
-            expect(map:getStashMap() == stashMap.name, stashMap.name .. ": the map was not annotated")
+            expectEqual(stashMap.name .. ": the map's annotation", map:getStashMap(), stashMap.name)
         end
     end
     -- doStashItem takes the stash out of the possible list; this puts it back.
@@ -117,7 +126,7 @@ end
 handler("stashRelist", function(_, args, defer)
     local possible, alreadyRead = StashSystem.getPossibleStashes(), StashSystem.getAlreadyReadMap()
     local houses = {}
-    for stashMap in pairs(Stash.descriptions) do
+    for _, stashMap in ipairs(Stash.descriptions) do
         local building = need(Stash.buildingOf(stashMap), "the building of " .. stashMap.name)
         table.insert(houses, { name = stashMap.name, building = building,
             visited = building:isHasBeenVisited(), read = alreadyRead:contains(stashMap.name) })
@@ -171,7 +180,7 @@ handler("stashKnownOnStart", function(_, _, defer)
         end
         Stash.relistUnfound()
     end)
-    for stashMap in pairs(Stash.descriptions) do
+    for _, stashMap in ipairs(Stash.descriptions) do
         read[stashMap.name] = alreadyRead:contains(stashMap.name)
         if not StashSystem.getStash(stashMap.name) then
             local engineStash = EngineStash.new(stashMap.name)
@@ -183,12 +192,12 @@ handler("stashKnownOnStart", function(_, _, defer)
     end
     PZHarness.Rolls.with(defer, 0, Stash.stockFromStart)
     local houses = {}
-    for stashMap, extra in pairs(Stash.descriptions) do
+    for _, stashMap in ipairs(Stash.descriptions) do
         local building = Stash.buildingOf(stashMap)
         houses[stashMap.name] = {
             queued = building ~= nil and StashSystem.isStashBuilding(building),
             read = alreadyRead:contains(stashMap.name),
-            hasChance = (extra.knownOnStart or 0) > 0,
+            hasChance = (stashMap.knownOnStart or 0) > 0,
         }
     end
     restore()

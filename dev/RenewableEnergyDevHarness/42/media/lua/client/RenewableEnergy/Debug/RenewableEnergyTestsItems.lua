@@ -32,3 +32,21 @@ test("renewable_energy_items_recipes_load", {
         end
     end,
 })
+
+-- The inventory tooltip, which the mod draws its strip under, also shows a fluid container, as the
+-- Transfer Fluids window's bar does (ISFluidBar): it draws without the item methods a container lacks.
+test("renewable_energy_items_tooltip_shows_fluid_container", {
+    run = function(self)
+        local tooltip = ISToolTipInv:new(instanceItem("Base.WaterBottle"):getFluidContainer())
+        tooltip:initialise()
+        tooltip:setVisible(true)
+        tooltip:addToUIManager()
+        T.defer(self, function() tooltip:removeFromUIManager() end)
+        -- Vanilla's render sizes the tooltip, and the mod's strip is drawn in the same call.
+        T.waitFor(self, function() return tooltip:getHeight() > 0 end, "a drawn fluid container tooltip")
+        T.step(function() self.drawn = true end)
+    end,
+    validate = function(self)
+        expect(self.drawn, "the fluid container tooltip never drew")
+    end,
+})

@@ -1,6 +1,5 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
 local Specs = require "RenewableEnergy/Specs"
-local Sun = require "RenewableEnergy/Sun"
 local ClientBankSystem = require "RenewableEnergy/PowerBank/ClientBankSystem"
 local ArrowBoard = require "RenewableEnergy/ArrowBoard/Trailer"
 local BankJobs = require "RenewableEnergy/PowerBank/BankJobs"
@@ -183,9 +182,12 @@ test("renewable_energy_bank_rebuilt_bank_keeps_its_record", {
         local state, summary = self.reads.rebuilt, PowerBank.summaryOf(self.bank.square)
         expectEqual("the rebuilt bank's name", state.name, "Cellar")
         expectEqual("the rebuilt bank's panels", state.sources, 1)
+        expect(T.stateSource(state, self.panel) ~= nil, "the rebuilt bank lost the panel it was fed by")
         if not expect(summary ~= nil, "this client has no summary of the rebuilt bank") then return end
         expectEqual("the name in this client's summary of the rebuilt bank", summary.name, "Cellar")
         expectEqual("the panels in this client's summary of the rebuilt bank", #summary.sources, 1)
+        expect(T.stateSource({ status = summary }, self.panel) ~= nil,
+            "this client's summary of the rebuilt bank lists another panel than the one it was fed by")
     end,
 })
 
@@ -223,7 +225,7 @@ test("renewable_energy_bank_source_transfer_settles_both_ends", {
         expectEqual("sources at the destination", new.sources, 1)
         expect(old.solarWhToday > 0, "the old bank lost the panel's output before the transfer")
         expectEqual("destination's solar Wh before it owned the panel", new.solarWhToday, 0)
-        expect(self.new.state.solarWhToday > 0, "the destination earned nothing after the transfer")
+        expectNear("the destination's solar Wh after an hour of full sun", self.new.state.solarWhToday, T.flatPanelW(), 1e-6)
         expectEqual("old bank's solar Wh after the destination ran", self.reads.oldAfter.solarWhToday, old.solarWhToday)
         expectNear("hours between the transfer and the destination's last pass", new.age - new.lastHour, 0, 0.01)
     end,
@@ -251,12 +253,12 @@ test("renewable_energy_bank_switch_on_bills_from_switch", {
         expect(switched.on, "Turn On left the bank off")
         expectNear("hours between the switch and the bank's last pass", switched.age - switched.lastHour, 0, 0.01)
         expectEqual("load Wh today billed for the hour the bank was off", switched.loadWhToday, 0)
-        expect(passed.loadWhToday > 0, "the pass after the switch billed the mini fridge nothing")
+        expectNear("load Wh today after a tenth of an hour on", passed.loadWhToday, passed.status.loadW * 0.1, 1e-6)
     end,
 })
 
--- A pass the batteries can't last bills the load they carried: more than nothing, no more than
--- the energy they held less the inverter's losses.
+-- A pass the batteries can't last bills the load for the share of it they carried: what they held
+-- over the draw of that load through the inverter, its losses and idle draw, and leaves them flat.
 test("renewable_energy_bank_empty_pass_bills_what_it_carried", {
     run = function(self)
         T.setGrid(self, false)
@@ -275,9 +277,12 @@ test("renewable_energy_bank_empty_pass_bills_what_it_carried", {
         local before, after = self.reads.before, self.reads.after
         expect(after.storedWh == 0 and after.status.state == "empty",
             "an hour of load left the bank at " .. after.storedWh .. " Wh, " .. after.status.state)
-        local billed, most = after.loadWhToday - before.loadWhToday, before.storedWh * Specs.inverters[T.INVERTER_CHARGER].efficiency
-        expect(billed > 0 and billed <= most + 1e-6, "the pass that emptied the bank billed " .. billed
-            .. " Wh of load, expected more than 0 and at most the " .. most .. " Wh the batteries could give")
+        local inverter, loadW = Specs.inverters[T.INVERTER_CHARGER], after.status.loadW
+        local carriedHours = before.storedWh / (loadW / inverter.efficiency + inverter.idle)
+        expectNear("Wh of load the pass that emptied the bank billed", after.loadWhToday - before.loadWhToday,
+            loadW * carriedHours, 1e-6)
+        local battery = T.stateItem(after, T.CAR_BATTERY)
+        expectEqual("the battery's charge after the pass that emptied the bank", battery and battery.uses, 0)
     end,
 })
 
@@ -336,7 +341,7 @@ test("renewable_energy_bank_clock_drives_banks_and_gadgets", {
     validate = function(self)
         local before, after = self.reads.before, self.reads.after
         local function charged(name, what, ratedW, hours)
-            local gain, most = after[name] - before[name], Sun.wattsFrom(ratedW, Sun.FULL_SUN, 0) * hours
+            local gain, most = after[name] - before[name], T.fullSunW(ratedW) * hours
             expect(gain > 0 and gain <= most, string.format(
                 "%s gained %.4f Wh as the clock moved on %.2f hours, expected more than 0 and at most %.4f", what, gain, hours, most))
         end

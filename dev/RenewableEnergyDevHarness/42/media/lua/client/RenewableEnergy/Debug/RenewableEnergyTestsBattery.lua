@@ -13,8 +13,9 @@ local test, expect, expectNear, expectEqual, stateItem = T.test, T.expect, T.exp
 
 -- Wear ----------------------------------------------------------------------------------------
 
--- Discharge wear counts against rated capacity and grows with the square of the depth, and wear
--- under a point waits in the item until it makes one, which a repair forgets.
+-- Discharge wear counts against rated capacity and grows with the square of the depth, a half-deep
+-- cycle of a new battery taking 1 / cyclesAt50 of its life, and wear under a point waits in the
+-- item until it makes one, which a repair forgets.
 test("renewable_energy_battery_wear", {
     run = function(self)
         local battery = T.need(self, instanceItem(T.CAR_BATTERY), "a " .. T.CAR_BATTERY)
@@ -26,7 +27,7 @@ test("renewable_energy_battery_wear", {
         self.newFlat = Battery.cycleWear(battery, 1)
         -- Days at half discharge until their wear makes a point: until then the fractions are kept.
         self.full = battery:getConditionMax()
-        local days = math.ceil(1 / (Battery.cycleWear(battery, 0.5) * self.full))
+        local days = math.ceil(Specs.batteries[T.CAR_BATTERY].cyclesAt50 / self.full)
         for _ = 1, days - 1 do
             Battery.wear(battery, Battery.cycleWear(battery, 0.5))
         end
@@ -41,6 +42,7 @@ test("renewable_energy_battery_wear", {
         self.repaired = battery:getCondition()
     end,
     validate = function(self)
+        expectNear("wear of a half-deep cycle on a new battery", self.newHalf, 1 / Specs.batteries[T.CAR_BATTERY].cyclesAt50, 1e-12)
         expectNear("wear of a half-worn battery run flat, against a new one at half", self.wornFlat, self.newHalf, 1e-9)
         expectNear("wear of a flat night, against a half one", self.newFlat, 4 * self.newHalf, 1e-9)
         expectEqual("condition the day before the wear makes a point", self.dayBefore, self.full)
@@ -115,6 +117,27 @@ test("renewable_energy_battery_depth_of_discharge_wears_batteries", {
         if expect(status.loadW > 0, "the bank powered no load across midnight") then
             expectNear("Wh used on the new day, the load after midnight", status.loadWhToday, status.loadW * PAST_MIDNIGHT, 0.001)
         end
+    end,
+})
+
+-- Charging a set a whole use at a time (Battery.shift with usesPerStep, as the solar cell charger
+-- fills cells) moves one use per pick, the emptier battery first, so two batteries a use apart
+-- given three and a half uses end level, and the half use short of a whole one stays unmoved.
+-- Catches a pick that moves several uses at once, or part of one.
+test("renewable_energy_battery_shift_steps_whole_uses", {
+    run = function(self)
+        local bank = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY, T.CAR_BATTERY })
+        if not bank then return end
+        self.half = math.floor(instanceItem(T.CAR_BATTERY):getMaxUses() / 2)
+        T.read(self, "shiftBatteries", T.at(bank, { uses = { self.half, self.half + 1 }, wh = 3.5, usesPerStep = 1 }), "shifted")
+    end,
+    validate = function(self)
+        local shifted = self.reads.shifted
+        expectNear("uses' worth of watt-hours moved", shifted.moved, 3, 1e-6)
+        expectEqual("whole uses moved", shifted.movedUses, 3)
+        expectEqual("uses of the battery that started a use emptier", shifted.uses[1], self.half + 2)
+        expectEqual("uses of the other battery", shifted.uses[2], self.half + 2)
+        expect(shifted.short, "the half-charged batteries count as full")
     end,
 })
 

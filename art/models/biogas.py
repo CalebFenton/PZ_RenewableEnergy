@@ -222,9 +222,11 @@ def iron_sponge(col, spent=False):
             box(col, "Sponge_Chip", body, (rng.uniform(0.025, 0.04), rng.uniform(0.012, 0.018), 0.005), at=at,
                 rotate=(rng.uniform(-30, 30), rng.uniform(-30, 30), rng.uniform(0, 180)))
         else:
-            # A curled shaving sticking out of the edge.
+            # A curled shaving lying along the wad's edge: sticking out of it, a ring of them
+            # reads as quills.
             length = rng.uniform(0.03, 0.05)
-            end = (at[0] + ux * length, at[1] + uy * length, max(0.004, z + rng.uniform(-0.02, 0.01)))
+            tx, ty = around((0, 0), angle + rng.choice((90, -90)) + rng.uniform(-30, 30), 1)
+            end = (at[0] + tx * length, at[1] + ty * length, max(0.004, z + rng.uniform(-0.02, 0.01)))
             beam(col, "Sponge_Shaving", body, at, end, (0.008, 0.003))
     for _ in range(6):
         spread = rng.uniform(0.1, 0.7)

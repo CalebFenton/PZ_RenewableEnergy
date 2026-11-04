@@ -105,11 +105,6 @@ local function onGrid(object)
     return ItemContainer.isObjectPowered(object, false)
 end
 
--- A generator may power `object` where it stands (IsoGenerator.setSurroundingElectricity).
-local function mayPower(object, allowExterior)
-    return allowExterior or not object:getSquare():isOutside()
-end
-
 local function isRunningGenerator(object)
     return GeneratorReach.isVanillaGenerator(object) and object:isActivated()
 end
@@ -125,22 +120,24 @@ function Loads.eachDraw(square, fn, onGenerator)
     GeneratorReach.eachSquare(square:getX(), square:getY(), square:getZ(), function(scanned)
         local objects = scanned:getObjects()
         local x, y, z = scanned:getX(), scanned:getY(), scanned:getZ()
+        -- Whether a generator may power what stands here (IsoGenerator.setSurroundingElectricity).
+        local mayPower = allowExterior or not scanned:isOutside()
         local i = scanned:getNextNonItemObjectIndex(0)
         while i ~= -1 do
             local object = objects:get(i)
-            local fuel = object:couldBePoweredByGenerator() and object:getGeneratorPowerConsumption()
+            local fuel = mayPower and object:couldBePoweredByGenerator() and object:getGeneratorPowerConsumption()
             local draw
             if fuel and fuel > 0 then
                 draw = { fuel = fuel, watts = Specs.wattsFromFuel(fuel) }
-            elseif Treadmill.isDrawing(object) then
+            elseif mayPower and Treadmill.isDrawing(object) then
                 draw = { kind = "treadmill", watts = Specs.wattsFromFuel(Treadmill.SPEC.drawFuel) }
             elseif isRunningGenerator(object) then
                 onGenerator(object)
-            else
+            elseif mayPower then
                 local kind, modFuel = GeneratorReach.drawOf(object)
                 draw = kind and { kind = kind, watts = Specs.wattsFromFuel(modFuel) }
             end
-            if draw and mayPower(object, allowExterior) then
+            if draw then
                 draw.object, draw.x, draw.y, draw.z, draw.index = object, x, y, z, i
                 draw.onGrid = onGrid(object)
                 fn(draw)

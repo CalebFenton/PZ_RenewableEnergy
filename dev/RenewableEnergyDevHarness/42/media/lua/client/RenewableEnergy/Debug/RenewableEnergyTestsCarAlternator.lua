@@ -1,6 +1,6 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
 local CarAlternator = require "RenewableEnergy/Gadgets/CarAlternator"
-local CarAlternatorMenu = require "RenewableEnergy/UI/VehicleMechanicsMenu"
+local VehicleMechanicsMenu = require "RenewableEnergy/UI/VehicleMechanicsMenu"
 require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 local VehicleJobs = require "RenewableEnergy/Gadgets/VehicleJobs"
 
@@ -62,7 +62,7 @@ test("renewable_energy_gadgets_car_alternator_take_out_and_put_back", {
         T.count(self, "takenOut", { CarAlternator.ITEM })
         T.step(function()
             local context = T.newContext()
-            local option = CarAlternatorMenu.addOption(context, T.player(), car.vehicle)
+            local option = VehicleMechanicsMenu.addOption(context, T.player(), car.vehicle)
             self.secondOption = option and option.name
             context:hideAndChildren()
             self.canTakeTwice = VehicleJobs.refusal(T.player(), VehicleJobs.TAKE_OUT_ALTERNATOR, car.vehicle) == nil

@@ -3,19 +3,25 @@
 
 require "PZHarness/ServerHandlers"
 local Kinds = require "RenewableEnergy/Debug/RenewableEnergyTestKinds"
-local Places = require "RenewableEnergy/Places"
+local Squares = require "cf_commonlib/Squares"
 local Treadmill = require "RenewableEnergy/PowerBank/Treadmill"
 
 local handler, need = PZHarness.serverHandler, PZHarness.need
 
--- Completes the treadmill action `run` as the server finishes a client's action (complete()).
--- Answers whether it settled, and the character's Fitness XP, endurance and thirst before and
--- after.
-local function completeRun(player, run)
+-- Completes the treadmill action `run` as the server finishes a client's action (complete()), or,
+-- given `progress`, stops it that far through as the server stops a client's (serverStop(), which
+-- reads the share run off its NetTimedAction). Answers whether a whole run settled, and the
+-- character's Fitness XP, endurance and thirst before and after.
+local function completeRun(player, run, progress)
     local stats, xp = player:getStats(), player:getXp()
     local reply = { xpBefore = xp:getXP(Perks.Fitness), enduranceBefore = stats:get(CharacterStat.ENDURANCE),
         thirstBefore = stats:get(CharacterStat.THIRST) }
-    reply.done = run:complete() == true
+    if progress then
+        run.netAction = { getProgress = function() return progress end }
+        run:serverStop()
+    else
+        reply.done = run:complete() == true
+    end
     reply.xpAfter, reply.enduranceAfter = xp:getXP(Perks.Fitness), stats:get(CharacterStat.ENDURANCE)
     reply.thirstAfter = stats:get(CharacterStat.THIRST)
     return reply
@@ -39,7 +45,7 @@ handler("startTreadmillRun", function(player, args, defer)
     local tile = Kinds.find({ kind = "treadmill", x = args.x, y = args.y, z = args.z })
     local run = RenewableEnergyTreadmillAction:new(player, tile)
     run:serverStart()
-    local key = Places.key(args.x, args.y, args.z)
+    local key = Squares.placeKey(args.x, args.y, args.z)
     treadmillRuns[key] = run
     defer(function()
         if treadmillRuns[key] == run then
@@ -50,10 +56,11 @@ handler("startTreadmillRun", function(player, args, defer)
     return {}
 end)
 
--- Finishes the run startTreadmillRun started on the tile at `args` (completeRun).
+-- Finishes the run startTreadmillRun started on the tile at `args`, or stops it `args.progress`
+-- through (completeRun).
 handler("completeStartedTreadmillRun", function(player, args)
-    local key = Places.key(args.x, args.y, args.z)
+    local key = Squares.placeKey(args.x, args.y, args.z)
     local run = need(treadmillRuns[key], "a run startTreadmillRun started on the server")
     treadmillRuns[key] = nil
-    return completeRun(player, run)
+    return completeRun(player, run, args.progress)
 end)

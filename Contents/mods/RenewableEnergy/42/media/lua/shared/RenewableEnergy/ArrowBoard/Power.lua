@@ -11,6 +11,7 @@
 -- steady lamppost, since moving a lamppost relights the cell, too dear to do every flash.
 
 local Specs = require "RenewableEnergy/Specs"
+local Lamppost = require "RenewableEnergy/Lamppost"
 local Sun = require "RenewableEnergy/Sun"
 local Battery = require "RenewableEnergy/PowerBank/Battery"
 local VehicleBattery = require "RenewableEnergy/Gadgets/VehicleBattery"
@@ -241,20 +242,16 @@ end
 --- Takes away the ground lamppost of a trailer's entry (ArrowBoard.trailerEntry), if it has one.
 function ArrowBoard.forgetLamps(entry)
     if entry.light then
-        getCell():removeLamppost(entry.light)
+        Lamppost.clear(entry.light)
         entry.light = nil
     end
 end
 
 -- Gives the board a lamppost on the trailer's square, moved only when the trailer moves to another.
 local function placeGroundLight(entry, vehicle)
-    local x, y, z = math.floor(vehicle:getX()), math.floor(vehicle:getY()), math.floor(vehicle:getZ())
-    if entry.light and entry.x == x and entry.y == y and entry.z == z then
-        return
-    end
-    ArrowBoard.forgetLamps(entry)
-    entry.light = getCell():addLamppost(x, y, z, GROUND_LIGHT.r, GROUND_LIGHT.g, GROUND_LIGHT.b, ArrowBoard.SPEC.radius)
-    entry.x, entry.y, entry.z = x, y, z
+    entry.light = entry.light or {}
+    Lamppost.show(entry.light, math.floor(vehicle:getX()), math.floor(vehicle:getY()), math.floor(vehicle:getZ()),
+        GROUND_LIGHT.r, GROUND_LIGHT.g, GROUND_LIGHT.b, ArrowBoard.SPEC.radius)
 end
 
 --- Each frame, in a game that draws the trailer: shows its lamps lit when they are on and the

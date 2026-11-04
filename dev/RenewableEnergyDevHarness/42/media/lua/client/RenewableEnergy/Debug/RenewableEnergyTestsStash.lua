@@ -1,7 +1,7 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLibWorld"
 local Stash = require "RenewableEnergy/Stash"
 
--- Stash houses (Stash.lua, StashStocking.lua, MapDefinitions.lua): registered, stocked and mapped on
+-- Stash houses (Stash.lua, StashServer.lua, MapDefinitions.lua): registered, stocked and mapped on
 -- the authority (RenewableEnergyTestServerStash.lua). Where their maps drop is the loot tests'.
 
 local T = RenewableEnergyTest
@@ -32,7 +32,7 @@ test("renewable_energy_world_stash_maps_show_their_house", {
     run = function(self) T.read(self, "stashMapsAnnotate", nil, "annotate") end,
     validate = function(self)
         local symbols = MapSymbolDefinitions.getInstance()
-        for stashMap in pairs(Stash.descriptions) do
+        for _, stashMap in ipairs(Stash.descriptions) do
             local annotations = stashMap.annotations or {}
             expect(#annotations > 0, stashMap.name .. " has no annotations")
             for _, annotation in ipairs(annotations) do

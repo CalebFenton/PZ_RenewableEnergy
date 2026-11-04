@@ -73,8 +73,9 @@ local vanillaRender = ISToolTipInv.render
 
 function ISToolTipInv:render()
     vanillaRender(self)
-    -- Vanilla skips the tooltip while a context menu is open.
-    if not self.item or (ISContextMenu.instance and ISContextMenu.instance.visibleCheck) then
+    -- Vanilla skips the tooltip while a context menu is open. It also shows fluid containers
+    -- (ISFluidBar) and resources (ISEnergyBar), which lack the item methods the strip reads.
+    if not instanceof(self.item, "InventoryItem") or (ISContextMenu.instance and ISContextMenu.instance.visibleCheck) then
         return
     end
 

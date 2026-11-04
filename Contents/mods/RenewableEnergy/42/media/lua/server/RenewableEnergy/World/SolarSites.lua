@@ -364,8 +364,8 @@ local function waitToPlace(x, y, z, spot)
     end)
 end
 
--- The lines whose chunk has loaded, each { x, y, z, spot } by "x,y,z", and whether any chunk has
--- loaded since they were last tried.
+-- The lines whose chunk has loaded, each { x, y, z, spot } by place (Squares.placeKey), and whether
+-- any chunk has loaded since they were last tried.
 local lines, chunkLoaded = {}, false
 
 -- Places each line whose far end is loaded, on the tick after a chunk loads, and drops one whose
@@ -406,7 +406,7 @@ local function placeChunk(wx, wy)
         local square = getSquare(x, y, z)
         local kind = SPOTS[spot.what]
         if kind.line then
-            lines[x .. "," .. y .. "," .. z] = { x = x, y = y, z = z, spot = spot }
+            lines[Squares.placeKey(x, y, z)] = { x = x, y = y, z = z, spot = spot }
         elseif kind.waits then
             waitToPlace(x, y, z, spot)
         elseif square then

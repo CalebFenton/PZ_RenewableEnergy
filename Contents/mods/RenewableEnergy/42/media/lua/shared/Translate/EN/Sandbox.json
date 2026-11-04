@@ -21,7 +21,7 @@
     "Sandbox_RenewableEnergy_LRMBatteries": "Loot Rarity Multiplier - Batteries",
     "Sandbox_RenewableEnergy_LRMBatteries_tooltip": "Multiplies how often deep cycle and L-16 batteries and battery electrolyte spawn as loot, in containers, vehicles and crates of solar gear, and how many batteries the battery banks the mod places hold.<br>Electrolyte can't be crafted, so at 0 the only acid for rebuilding batteries is in the ones you strip. Car batteries aren't affected.",
     "Sandbox_RenewableEnergy_LRMMisc": "Loot Rarity Multiplier - Misc",
-    "Sandbox_RenewableEnergy_LRMMisc_tooltip": "Multiplies how often everything else the mod adds spawns as loot: inverters, charge controllers, solar battery maintainers and chargers, garden lights, the failsafe, car alternators, the Homestead Power magazines and the FEMA plans, in containers, vehicles, crates and placed battery banks; and how often a placed bank holds a car battery charger.<br>Inverters can't be crafted, so at 0 the only ones are in banks already standing in the world.",
+    "Sandbox_RenewableEnergy_LRMMisc_tooltip": "Multiplies how often everything else the mod adds spawns as loot: inverters, charge controllers, solar battery maintainers and chargers, garden lights, the failsafe, car alternators, the Homestead Power magazines and the FEMA plans, in containers, vehicles, crates and placed battery banks; and how often a placed bank holds a car battery charger.<br>At 0 the only found inverters are in banks already standing in the world; makeshift inverters can still be built.",
     "Sandbox_RenewableEnergy_ChargeFreq_option1": "Every Ten Minutes",
     "Sandbox_RenewableEnergy_ChargeFreq_option2": "Every Hour",
     "Sandbox_RenewableEnergy_ChargeFreq": "Charge Frequency",

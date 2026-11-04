@@ -2,7 +2,7 @@
 -- side resolves all of a recipe's Lua calls when it sets up a craft (CraftRecipeData). OnCreate runs
 -- once on the authority, after the outputs were already sent to an MP client, so item changes are
 -- re-sent: outputs (in the inventory) with syncItemFields, inputs (maybe in a nearby container or on
--- the floor) with sendItemStats. The rules they apply are their owners': Battery's repairs,
+-- the floor) with sendItemStats, or whole where that misses a field. The rules they apply are their owners': Battery's repairs,
 -- ModuleRepair's seals and new glass, Panel's module records, Wear's crafted condition.
 --
 -- OnTest is asked about every candidate item of every input, tools included, so each one
@@ -49,17 +49,6 @@ local function isModule(item)
     return Specs.modules[item:getFullType()] ~= nil
 end
 
--- Sets the item's repair count; syncItemFields carries it to clients, sendItemStats the condition.
-local function setRepairs(item, count)
-    item:setHaveBeenRepaired(count)
-    item:syncItemFields()
-    sendItemStats(item)
-end
-
-local function countRepair(item)
-    setRepairs(item, item:getHaveBeenRepaired() + 1)
-end
-
 --- Shows on the panel mount item `item` the modules it holds: its ground model and icon by how
 --- many are homemade (its model index, Sprites.homemadeCount). Also the mount items' OnCreate: the
 --- game gives a new item that has models by index a random one, and a new mount holds factory
@@ -84,6 +73,24 @@ local function resendWhole(item)
         item:setWorldItem(nil)
         square:AddWorldInventoryItem(item, x, y, z)
     end
+end
+
+-- Sets an input's repair count, and sends it with its condition. syncItemFields carries the count
+-- only for an item a player holds (InventoryItem.syncItemFields), and sendItemStats never does, so
+-- one in a nearby container or on the floor is sent whole.
+local function setRepairs(item, count)
+    item:setHaveBeenRepaired(count)
+    local outer = item:getOutermostContainer()
+    if outer and instanceof(outer:getParent(), "IsoPlayer") then
+        item:syncItemFields()
+        sendItemStats(item)
+    else
+        resendWhole(item)
+    end
+end
+
+local function countRepair(item)
+    setRepairs(item, item:getHaveBeenRepaired() + 1)
 end
 
 -- OnCreate of the mount recipes: the mount remembers its modules, as its placed object will, and
@@ -225,9 +232,7 @@ end
 -- OnCreate of Rebuild Car Battery, which has no script output: it makes the car battery type
 -- the case came out of.
 function Recipes.rebuildCarBattery(craftRecipeData, character)
-    local case = Items.firstInput(craftRecipeData, function(item)
-        return item:getFullType() == "RenewableEnergy.CarBatteryCase"
-    end)
+    local case = Items.firstInput(craftRecipeData, Items.ofType("RenewableEnergy.CarBatteryCase"))
     local battery = instanceItem(case and case:getModData()[CASE_BATTERY_KEY] or VehicleBattery.CAR_BATTERY)
     setRebuilt(battery)
     Items.giveItems(character, battery)
@@ -265,9 +270,7 @@ end
 
 -- OnCreate of Take Apart Solar Garden Light: the bulb in it comes out whole.
 function Recipes.takeApartGardenLight(craftRecipeData, character)
-    local light = Items.firstInput(craftRecipeData, function(item)
-        return item:getFullType() == SolarGardenLight.ITEM
-    end)
+    local light = Items.firstInput(craftRecipeData, Items.ofType(SolarGardenLight.ITEM))
     local bulb = light and SolarGardenLight.getBulb(light)
     if bulb then
         Items.giveItems(character, bulb)

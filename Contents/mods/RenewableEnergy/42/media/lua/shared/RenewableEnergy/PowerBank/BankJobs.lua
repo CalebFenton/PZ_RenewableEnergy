@@ -1,6 +1,6 @@
 -- The hands-on jobs at a battery bank: what each takes of the character and what refuses it
--- (cf_commonlib's Jobs). Parts enter and leave a bank only through Wire In and Unwire (see
--- RenewableEnergy/PowerBank/WiredPartsGuard.lua).
+-- (cf_commonlib's Jobs). Parts enter and leave a bank only through Wire In and Unwire
+-- (WiredPartsGuard).
 
 local Specs = require "RenewableEnergy/Specs"
 local Sprites = require "RenewableEnergy/Sprites"

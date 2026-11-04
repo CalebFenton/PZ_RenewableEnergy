@@ -33,13 +33,10 @@ for fixed, twin in pairs(Sprites.fixedTiles) do
     BANKS_BY_SPRITE[fixed] = BANKS_BY_SPRITE[twin]
 end
 
---- Every placed bank tile's sprite name.
-function PowerBank.bankSprites()
-    local names = {}
-    for name in pairs(BANKS_BY_SPRITE) do
-        table.insert(names, name)
-    end
-    return names
+-- Every placed bank tile's sprite name: PowerBank.feature.sprites once declared below.
+local bankSprites = {}
+for name in pairs(BANKS_BY_SPRITE) do
+    table.insert(bankSprites, name)
 end
 
 --- The bank a placed sprite is: { fullType, spec }, or nil.
@@ -169,19 +166,10 @@ function PowerBank.connectedBank(isoObject)
     return PowerBank.bankOfSource(isoObject:getX(), isoObject:getY(), isoObject:getZ())
 end
 
---- How far a source may be from the bank it is connected to, { tiles, levels }: as far as a
---- generator powers (IsoGenerator), a radius of the Generator Tile Range option in tiles and the
---- Generator Vertical Power Range option in floors up or down.
-function PowerBank.sourceReach()
-    return { tiles = SandboxVars.GeneratorTileRange, levels = SandboxVars.GeneratorVerticalPowerRange }
-end
-
---- Whether a source at x, y, z is within reach (PowerBank.sourceReach) of `bank`, anything with x,
---- y and z.
+--- Whether a source at x, y, z is within reach of `bank`, anything with x, y and z: as far as a
+--- generator powers (GeneratorReach.covers).
 function PowerBank.inSourceReach(bank, x, y, z)
-    local reach = PowerBank.sourceReach()
-    return IsoUtils.DistanceToSquared(x, y, bank.x, bank.y) <= reach.tiles * reach.tiles
-        and math.abs(z - bank.z) <= reach.levels
+    return GeneratorReach.covers(bank.x, bank.y, bank.z, x, y, z)
 end
 
 --- Why `bank` can't take a source that takes `slots` input slots now, or nil, in this order: "no
@@ -207,7 +195,7 @@ end
 
 GlobalObjects.declare(PowerBank, {
     prefix = Utilities.CLASS_PREFIX, name = "Bank", isObject = PowerBank.isBank,
-    sprites = PowerBank.bankSprites(), accept = "RenewableEnergy.PowerBank.acceptItem",
+    sprites = bankSprites, accept = "RenewableEnergy.PowerBank.acceptItem",
 })
 
 return PowerBank

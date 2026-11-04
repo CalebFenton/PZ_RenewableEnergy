@@ -24,7 +24,9 @@ def battery(col, name, size, case, lid, caps=(), cap_colour="cream", label=None,
     for sign, colour in ((1, "red"), (-1, "black")):
         cylinder(col, name + "_Post", M("lead"), 0.009, post_height, at=(sign * post_x, post_y, height), segments=10,
                  radius_top=0.007)
-        cylinder(col, name + "_Ring", M(colour), 0.013, 0.004, at=(sign * post_x, post_y, height), segments=10)
+        # A collar broad enough to show as a dot of its colour on a 32 px icon, as the game's own
+        # car battery's post caps do.
+        cylinder(col, name + "_Ring", M(colour), 0.016, 0.008, at=(sign * post_x, post_y, height), segments=10)
     if label:
         text_body, size_ = label
         box(col, name + "_Label", M("label"), (width * 0.8, 0.002, height * 0.32),
@@ -37,9 +39,10 @@ def battery(col, name, size, case, lid, caps=(), cap_colour="cream", label=None,
 
 
 def deep_cycle_battery(col):
-    """A group 27 marine and RV deep-cycle battery: blue, rope handle, wing-nut posts."""
-    battery(col, "DeepCycle", (0.32, 0.17, 0.23), "marine", "white", caps=(-0.06, 0.06), cap_colour="white",
-            label=("DEEP CYCLE", 0.03), handle="rope", post_height=0.03)
+    """A group 27 marine and RV deep-cycle battery: blue all over, rope handle, wing-nut posts.
+    A white lid on the blue would read as a picnic cooler."""
+    battery(col, "DeepCycle", (0.32, 0.17, 0.23), "marine", "marine", caps=(-0.06, 0.06), cap_colour="black",
+            label=("DEEP CYCLE", 0.03), handle="rope", post_height=0.04)
 
 
 # An L-16's case, a little shorter than a real one's 0.43 m: at full height it towered over the
@@ -101,11 +104,11 @@ def jar_battery(col):
 
 # How a battery in a bank or box tile looks by its type, at the one size every slot fits: case, lid,
 # vent caps and the label on its end. A car battery is grey all over with the game's own car
-# battery's green label, a deep-cycle marine blue with a white lid, an L-16 maroon with a black lid,
-# so even a box, which hides all but their tops, tells them apart.
+# battery's green label, a deep-cycle marine blue all over, an L-16 maroon with a black lid, so even
+# a box, which hides all but their tops, tells them apart.
 BANK_BATTERY_LOOKS = {
     "car": ("carbattery", "carbattery", "cream", "carlabel"),
-    "deepCycle": ("marine", "white", "white", "label"),
+    "deepCycle": ("marine", "marine", "black", "label"),
     "l16": ("maroon", "battery", "black", "label"),
 }
 

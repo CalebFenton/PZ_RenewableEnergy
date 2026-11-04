@@ -258,8 +258,8 @@ def generator_gas_pipe(col, side, body=None, facing="S"):
 
 def tarry_packing(col):
     """A wad of straw out of a gasifier's filter, soaked black-brown with tar, a glossy smear of tar
-    run out under it, patches of the straw showing through where it soaked less, and strands
-    sticking out, some soaked dark and some still pale."""
+    run out under it, patches of the straw showing through where it soaked less, and loose strands
+    matted along it, some soaked dark and some still pale."""
     rx, ry, height = 0.1, 0.08, 0.045
     mound(col, "Tarry_Smear", M("tar"), (rx * 1.2, ry * 1.15, 0.006), lumps=0.12, seed=62, segments=20, rings=3)
     mound(col, "Tarry_Wad", M("tar"), (rx, ry, height), lumps=0.25, seed=60, segments=16, rings=5)
@@ -270,13 +270,16 @@ def tarry_packing(col):
         mound(col, "Tarry_Patch", M("tarstraw"), (rng.uniform(0.012, 0.018), rng.uniform(0.008, 0.012), 0.008),
               at=(u * rx, v * ry, height * math.sqrt(1 - spread * spread) * 1.05), rotate=(0, 0, rng.uniform(0, 180)),
               lumps=0.1, seed=63 + i, segments=10, rings=3)
-    for k in range(18):
+    for k in range(12):
         angle, reach = rng.uniform(0, 360), rng.uniform(0.5, 0.85)
         ux, uy = around((0, 0), angle, 1)
         z = height * math.sqrt(1 - reach * reach) + 0.003
         start = (ux * rx * reach, uy * ry * reach, z)
-        length = rng.uniform(0.04, 0.07)
-        end = (start[0] + ux * length, start[1] + uy * length, max(0.004, z + rng.uniform(-0.03, 0.01)))
+        # Strands lie along the wad, matted into it: straight out of its edge, a ring of them
+        # reads as legs.
+        tx, ty = around((0, 0), angle + rng.choice((90, -90)) + rng.uniform(-35, 35), 1)
+        length = rng.uniform(0.03, 0.05)
+        end = (start[0] + tx * length, start[1] + ty * length, max(0.004, z + rng.uniform(-0.02, 0.005)))
         # Thicker than a decal (models.DECAL_THICKNESS), so the ground model keeps them standing out.
         beam(col, "Tarry_Strand", M("straw" if k % 3 == 0 else "tarstraw"), start, end, (0.006, 0.003))
 

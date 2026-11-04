@@ -1,5 +1,6 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
 local Specs = require "RenewableEnergy/Specs"
+local Yardsticks = require "RenewableEnergy/Debug/RenewableEnergyYardsticks"
 
 local T = RenewableEnergyTest
 
@@ -60,8 +61,10 @@ function T.billGenerators(self)
 end
 
 --- The fuel an hour vanilla bills a generator for `watts`, at the GeneratorFuelConsumption option.
+--- Scaled from vanilla's bill for a standing car battery charger, which a bank charger's watts
+--- match by design, rather than by Specs.wattsPerFuel, so the mod's conversion is checked too.
 function T.fuelPerHour(watts)
-    return Specs.fuelFromWatts(watts) * SandboxVars.GeneratorFuelConsumption
+    return watts / Specs.chargerWatts * Yardsticks.APPLIANCE_FUEL.batteryCharger * SandboxVars.GeneratorFuelConsumption
 end
 
 --- Queues taking `litres` from the generator's fuel, as vanilla's hourly bill and a bank charging

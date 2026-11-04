@@ -26,7 +26,7 @@ local Items = require "cf_commonlib/Items"
 local JobOptions = require "cf_commonlib/JobOptions"
 local Needs = require "cf_commonlib/Needs"
 
-local CarAlternatorMenu = {}
+local VehicleMechanicsMenu = {}
 
 local function jobOf(putBack)
     return putBack and VehicleJobs.PUT_BACK_ALTERNATOR or VehicleJobs.TAKE_OUT_ALTERNATOR
@@ -34,7 +34,7 @@ end
 
 --- Queues `character`'s Take Out Alternator (`item` nil) or Put Back Alternator with `item` on
 --- `vehicle`, with the walk, the hood and the wrench around it.
-function CarAlternatorMenu.queue(character, vehicle, item)
+function VehicleMechanicsMenu.queue(character, vehicle, item)
     if character:getVehicle() then
         ISVehicleMenu.onExit(character)
     end
@@ -64,14 +64,14 @@ end
 --- Adds Take Out Alternator, or Put Back Alternator where it is out, to `context` for `vehicle`,
 --- listing what it takes and greyed out while `character` can't. Returns the option, or nil for a
 --- vehicle whose alternator can't come out (a wreck, a trailer).
-function CarAlternatorMenu.addOption(context, character, vehicle)
+function VehicleMechanicsMenu.addOption(context, character, vehicle)
     if not CarAlternator.isCar(vehicle) then
         return nil
     end
     local putBack = CarAlternator.isOut(vehicle)
     local item = putBack and character:getInventory():getFirstTypeRecurse(CarAlternator.ITEM) or nil
     local option = context:addOption(getText(putBack and "IGUI_RenewableEnergy_PutBackAlternator"
-        or "IGUI_RenewableEnergy_TakeOutAlternator"), character, CarAlternatorMenu.queue, vehicle, item)
+        or "IGUI_RenewableEnergy_TakeOutAlternator"), character, VehicleMechanicsMenu.queue, vehicle, item)
     Needs.show(option, VehicleJobs.needs(character, jobOf(putBack), vehicle, item),
         CarAlternator.blocker(character, vehicle, putBack))
     return option
@@ -118,10 +118,10 @@ function ISVehicleMechanics:doPartContextMenu(part, x, y)
         return
     end
     if part:getId() == CarAlternator.ENGINE then
-        CarAlternatorMenu.addOption(self.context, self.chr, part:getVehicle())
+        VehicleMechanicsMenu.addOption(self.context, self.chr, part:getVehicle())
     else
         addInstallOptions(self, part)
     end
 end
 
-return CarAlternatorMenu
+return VehicleMechanicsMenu

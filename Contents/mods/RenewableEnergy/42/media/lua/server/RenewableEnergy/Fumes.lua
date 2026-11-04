@@ -1,5 +1,6 @@
--- Buildings the mod's objects fill with fumes (a sour digester, a lit gasifier), on the authority,
--- and the one place generators are switched, since switching one writes its building's toxicity.
+-- Buildings the mod's objects fill with fumes (a sour or leaking digester, a lit gasifier), on the
+-- authority, and the one place generators are switched, since switching one writes its building's
+-- toxicity.
 --
 -- Toxicity belongs to the whole building and isn't saved. Vanilla writes it too: a generator sets
 -- it as it starts indoors and clears it as it stops (IsoGenerator.setActivated), and while it runs

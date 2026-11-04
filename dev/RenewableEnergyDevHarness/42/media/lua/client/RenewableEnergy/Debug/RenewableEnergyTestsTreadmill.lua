@@ -290,6 +290,55 @@ test("renewable_energy_treadmill_run_draws_from_the_bank_only_unwired", {
     end,
 })
 
+-- Half a run, stopped as the server stops a client's action, settles half of one: on an unwired,
+-- powered treadmill it costs half a run's endurance and its draw on the bank ends; on a wired one
+-- it banks half a run's watt-hours as well. Treadmill.SPEC: 240 W, 0.6 endurance an hour, 30
+-- minutes a run, so a quarter hour: 60 Wh and 0.15 endurance. Catches a part run paid in full or
+-- not at all, and one that leaves the unwired treadmill drawing.
+test("renewable_energy_treadmill_half_run_settles_half", {
+    run = function(self)
+        T.setGrid(self, false)
+        local bank = T.bank(self, "batteryRackWood", { T.L16, T.L16, T.INVERTER_CHARGER }, { charge = 0.5 })
+        local squares = bank and T.squares(self, 2, { indoors = true, near = bank })
+        if not T.need(self, squares, "free indoor squares for two treadmills") then return end
+        local unwired = T.panel(self, Sprites.treadmill.N.console, { square = squares[1] })
+        local wired = T.panel(self, Sprites.treadmill.N.console, { square = squares[2], near = bank, connect = true, wired = true })
+        if not (unwired and wired) then return end
+        self.wired = wired
+        T.switchOn(self, bank)
+        T.waitFor(self, function() return unwired.square:haveElectricity() end,
+            "power from the switched-on bank on the treadmill's square here")
+        restRunner(self)
+        T.goNextTo(self, unwired.square)
+        T.batch(function()
+            T.server(self, "startTreadmillRun", T.at(unwired))
+            T.read(self, "scanLoad", T.at(bank), "unwiredLoad")
+            T.read(self, "completeStartedTreadmillRun", T.at(unwired, { progress = 0.5 }), "unwiredRun")
+            T.read(self, "scanLoad", T.at(bank), "stoppedLoad")
+        end)
+        restRunner(self)
+        T.goNextTo(self, wired.square)
+        T.batch(function()
+            T.readRecord(self, bank, "before")
+            T.server(self, "startTreadmillRun", T.at(wired))
+            T.read(self, "completeStartedTreadmillRun", T.at(wired, { progress = 0.5 }), "wiredRun")
+            -- An hour: long enough to pay out all a half run banked.
+            T.bankPass(self, bank, 0, { label = "after" })
+        end)
+    end,
+    validate = function(self)
+        if not T.expectConnected(self.wired) then return end
+        local reads = self.reads
+        T.expectEqual("treadmills the unwired run drew through while running", reads.unwiredLoad.counts.treadmill, 1)
+        T.expectEqual("treadmills drawing once the unwired run stopped", reads.stoppedLoad.counts.treadmill or 0, 0)
+        for _, name in ipairs({ "unwiredRun", "wiredRun" }) do
+            local run = reads[name]
+            T.expectNear("endurance half the " .. name .. " cost", run.enduranceBefore - run.enduranceAfter, 0.15, 0.001)
+        end
+        T.expectNear("Wh half the wired run banked", reads.after.status.runWhToday - reads.before.status.runWhToday, 60, 0.5)
+    end,
+})
+
 -- A run on a wired treadmill whose bank was disconnected banks nothing, so it costs the runner
 -- nothing and trains nothing: the menu and the action say why, and the authority settling a whole
 -- run, as a server finishes a client's action, changes nothing. Connected again, the same run

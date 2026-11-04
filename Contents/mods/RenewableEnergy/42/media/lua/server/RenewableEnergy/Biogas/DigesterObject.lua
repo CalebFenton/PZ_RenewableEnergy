@@ -448,8 +448,7 @@ end
 function DigesterObject:show()
     local isoObject = self:getIsoObject()
     if not isoObject then return end
-    local capacity = Digester.HOLDERS[self.holder].capacity
-    showOverlay(isoObject, Digester.isHolderOverlay, Digester.holderOverlay(self.holder, self.gas / capacity, self:isTorn()))
+    showOverlay(isoObject, Digester.isHolderOverlay, Digester.holderOverlay(self.holder, self.gas, self:isTorn()))
     showOverlay(isoObject, Digester.isScrubberOverlay, Digester.scrubberOverlay(self.tier, self))
     showOverlay(isoObject, Digester.isSourOverlay, self.sour and Sprites.digesterSour[self.tier] or nil)
     if not self.heaterLit then

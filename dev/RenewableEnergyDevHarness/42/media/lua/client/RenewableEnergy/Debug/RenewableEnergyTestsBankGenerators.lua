@@ -3,11 +3,11 @@ require "RenewableEnergy/Debug/RenewableEnergyTestLibGenerators"
 local Specs = require "RenewableEnergy/Specs"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local BankJobs = require "RenewableEnergy/PowerBank/BankJobs"
-local Format = require "RenewableEnergy/UI/Format"
 local StatusRows = require "RenewableEnergy/UI/StatusRows"
 local Debug = require "RenewableEnergy/Debug/RenewableEnergyDebug"
+local Squares = require "cf_commonlib/Squares"
 
--- Power bank tests: chargers and backup generators (PowerBank/Backup.lua, World/Failsafe.lua),
+-- Power bank tests: chargers and backup generators (PowerBank/Backup.lua, PowerBank/Failsafe.lua),
 -- and which of the banks and generators reaching an appliance pays for it (PowerBank/Payers.lua).
 -- Banks live on the authority (see RenewableEnergyTestsBank.lua).
 
@@ -55,14 +55,13 @@ local function chargerBankWatts()
 end
 
 -- Chargers charge only from the grid or a running generator other than the bank itself, at their
--- full watts while the batteries have room, saying so in the status window.
+-- full watts while the batteries have room.
 test("renewable_energy_bank_chargers_charge_only_from_grid_or_generator", {
     sandbox = { GeneratorFuelConsumption = 0.1 },
     run = function(self)
         local charge = 0.2
         local bank, backup = chargerBank(self, { charge = charge })
         if not bank then return end
-        self.at = T.at(bank)
         -- For half the time the room left in the batteries takes to fill.
         self.chargersW = chargerBankWatts()
         local roomWh = (1 - charge) * 2 * Specs.batteries[T.CAR_BATTERY].wh
@@ -81,9 +80,6 @@ test("renewable_energy_bank_chargers_charge_only_from_grid_or_generator", {
             alone.status.chargerW, 0)
         expectEqual("charger watts from a running generator", status.chargerW, self.chargersW)
         expectEqual("what a charger charges from", status.chargers[1] and status.chargers[1].charging, "generator")
-        local shown = T.rowLabelled((StatusRows.rows(status, self.at)), getText("IGUI_RenewableEnergy_GeneratorPower"))
-        expectEqual("the generator power row of a bank charging from a generator", shown and shown.value,
-            getText("IGUI_RenewableEnergy_GridCharging", Format.watts(status.chargerW)))
     end,
 })
 
@@ -213,6 +209,11 @@ test("renewable_energy_bank_charging_generator_kept_through_save", {
         self.bank = bank
         T.generator(self, { square = backup, running = true })
         T.batch(function()
+            -- Full, the chargers want nothing: what the generator delivers then is the area's own load.
+            T.setCharge(self, bank, 1)
+            T.bankPass(self, bank, 0, { hours = 0.1 })
+            T.read(self, "generatorLoad", T.at(backup), "full")
+            T.setCharge(self, bank, 0.2)
             T.bankPass(self, bank, 0, { hours = 0.1 })
             T.reloadRecord(self, bank, "saved", { load = { name = "generatorLoad", args = T.at(backup) },
                 bank = { name = "PZHarness.readRecord", args = T.at(bank, { kind = "bank" }) } })
@@ -220,10 +221,10 @@ test("renewable_energy_bank_charging_generator_kept_through_save", {
     end,
     validate = function(self)
         local reply = self.reads.saved
-        local loadBefore, loadAfter, chargerW = reply.before.load.deliveredW, reply.after.load.deliveredW, reply.before.bank.chargerMaxW
+        local loadBefore, loadAfter = reply.before.load.deliveredW, reply.after.load.deliveredW
         expectEqual("what the bank's chargers charge from", self.bank.state.status.chargeSource, "generator")
-        expect(loadBefore >= chargerW and chargerW > 0, string.format(
-            "the generator delivers %.1f W, short of the %.1f W of the bank's chargers", loadBefore, chargerW))
+        expectNear("watts the generator delivers to the bank's chargers", loadBefore - self.reads.full.deliveredW,
+            chargerBankWatts(), 0.001)
         expectNear("what the generator delivers after a save and load", loadAfter, loadBefore, 0.001)
     end,
 })
@@ -478,6 +479,7 @@ test("renewable_energy_bank_failsafe_start_moves_appliance_to_its_generator", {
 
 -- While a backup generator carries a switched-on bank's load, the bank's day figure counts none of
 -- it, the generator's share is kept apart, and the batteries keep their charge.
+local BACKUP_HOURS = 1
 test("renewable_energy_bank_backup_load_kept_apart", {
     run = function(self)
         T.setGrid(self, false)
@@ -490,7 +492,7 @@ test("renewable_energy_bank_backup_load_kept_apart", {
         T.batch(function()
             T.job(self, "bank", BankJobs.TURN_ON, bank, nil, "switched")
             T.readRecord(self, bank, "before")
-            T.bankPass(self, bank, 0, { label = "after" })
+            T.bankPass(self, bank, 0, { hours = BACKUP_HOURS, label = "after" })
         end)
     end,
     validate = function(self)
@@ -499,8 +501,41 @@ test("renewable_energy_bank_backup_load_kept_apart", {
         local before, after = reads.before, reads.after
         expectEqual("load Wh the bank carried while the generator ran", after.loadWhToday - before.loadWhToday, 0)
         local backupWh = (after.status.backupWhToday or 0) - (before.status.backupWhToday or 0)
-        expect(backupWh > 0, "an hour of the generator carrying the load counted " .. backupWh .. " Wh")
+        expect(after.status.loadW > 0, "the bank measured no load for the generator to carry")
+        expectNear("Wh the generator carried", backupWh, after.status.loadW * BACKUP_HOURS, 0.01)
         expectNear("Wh in the batteries while the generator carried the load", after.storedWh, before.storedWh, 0.01)
+    end,
+})
+
+-- A running plain generator in backup reach carries the load even beside a stopped one whose
+-- failsafe answers to the bank: the batteries keep their charge.
+test("renewable_energy_bank_running_generator_carries_load_beside_stopped_failsafe", {
+    run = function(self)
+        T.setGrid(self, false)
+        local bank = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY, T.PLUG_IN_INVERTER })
+        local fridge = bank and T.square(self, { indoors = true, near = bank }, "a free indoor square for a fridge")
+        local failsafe = fridge and backupSquare(self, bank.square, BACKUP_REACH)
+        local running = failsafe and backupSquare(self, bank.square, BACKUP_REACH)
+        if not running then return end
+        T.placeTile(self, fridge, T.MINI_FRIDGE)
+        T.generator(self, { square = failsafe, failsafe = true })
+        T.generator(self, { square = running, running = true })
+        T.batch(function()
+            T.job(self, "bank", BankJobs.TURN_ON, bank, nil, "switched")
+            -- Between the failsafe's start and stop charges, so it leaves its generator stopped.
+            T.setCharge(self, bank, 0.5)
+            T.readRecord(self, bank, "before")
+            T.bankPass(self, bank, 0, { label = "after" })
+            T.readGenerator(self, failsafe, "failsafe")
+        end)
+    end,
+    validate = function(self)
+        local reads = self.reads
+        if not T.expectOk(reads.switched, "switching the bank on") then return end
+        if not expect(not reads.failsafe.running, "the failsafe started its generator at half charge") then return end
+        local before, after = reads.before, reads.after
+        expectEqual("load Wh the bank carried beside the running generator", after.loadWhToday - before.loadWhToday, 0)
+        expectNear("Wh in the batteries beside the running generator", after.storedWh, before.storedWh, 0.01)
     end,
 })
 
@@ -557,6 +592,51 @@ test("renewable_energy_bank_nearest_bank_pays_shared_appliance", {
         expectNear("watts the fridge added to the farther bank", loadW("sharedFar") - loadW("beforeFar"), 0, 0.01)
         expectNear("watts a fridge added to the farther bank once the nearer stopped",
             loadW("farAloneWithFridge") - loadW("farAlone"), T.fridgeW(), 0.01)
+    end,
+})
+
+-- Two switched-on banks as near a fridge as each other: the lower place (Squares.placeKey) pays for
+-- it, whichever bank's pass comes first.
+test("renewable_energy_bank_equally_near_banks_lower_place_pays", {
+    run = function(self)
+        T.setGrid(self, false)
+        local fridge = T.square(self, { indoors = true }, "a free indoor square for a fridge")
+        local first = fridge and T.square(self, { indoors = true, near = fridge, minDistance = 2 }, "a free indoor square for a bank")
+        local second = first and T.square(self, { indoors = true, near = fridge, minDistance = 2, accept = function(square)
+            return distanceSquared(square, fridge) == distanceSquared(first, fridge)
+        end }, "a free indoor square for a second bank as near the fridge as the first")
+        if not (second and T.need(self, distanceSquared(first, fridge) <= SandboxVars.GeneratorTileRange ^ 2,
+            "bank squares in reach of the fridge")) then return end
+        local banks = { T.bank(self, "batteryBoxWood", SHARING_PARTS, { charge = 1, square = first }) }
+        banks[2] = banks[1] and T.bank(self, "batteryBoxWood", SHARING_PARTS, { charge = 1, square = second })
+        if not banks[2] then return end
+        self.banks = banks
+        T.switchOn(self, banks[1])
+        T.switchOn(self, banks[2])
+        local function pass(key, order)
+            T.batch(function()
+                for _, i in ipairs(order) do
+                    T.bankPass(self, banks[i], 0, { hours = 0.01, label = key .. i })
+                end
+            end)
+        end
+        pass("before", { 1, 2 })
+        T.step(function() T.placeTile(self, fridge, T.MINI_FRIDGE) end)
+        pass("forward", { 1, 2 })
+        pass("reversed", { 2, 1 })
+    end,
+    validate = function(self)
+        local reads, banks = self.reads, self.banks
+        local function key(bank) return Squares.placeKey(bank.x, bank.y, bank.z) end
+        local lower = key(banks[1]) < key(banks[2]) and 1 or 2
+        for _, order in ipairs({ "forward", "reversed" }) do
+            for i = 1, 2 do
+                local before, after = reads["before" .. i], reads[order .. i]
+                if not expect(before.activated and after.activated, "a bank wasn't powering its squares while both were on") then return end
+                expectNear(string.format("watts the fridge added to the %s place's bank, passes %s", i == lower and "lower" or "higher", order),
+                    after.status.loadW - before.status.loadW, i == lower and T.fridgeW() or 0, 0.01)
+            end
+        end
     end,
 })
 

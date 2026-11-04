@@ -4,6 +4,7 @@
 require "Items/Distributions"
 require "Items/ProceduralDistributions"
 require "Vehicles/VehicleDistributions"
+local Specs = require "RenewableEnergy/Specs"
 local Stash = require "RenewableEnergy/Stash"
 local Loot = require "cf_commonlib/Loot"
 
@@ -66,12 +67,15 @@ procLists.RenewableEnergyPowerAisle = {
 -- (LootRespawn.respawnInContainer), and a bank is an IsoGenerator, so the table a room gives these
 -- types is what a player's own bank, charger or crate would be refilled with. Empty tables refill
 -- nothing. addOwnContainersToRooms gives every room these, since a room's own "other" table comes
--- before "all" (ItemPickerJava.fillContainer).
-Distributions.OWN_CONTAINER_TYPES = {
-    "RenewableEnergyBatteryBoxWood", "RenewableEnergyBatteryBoxMetal", "RenewableEnergyBatteryRackWood",
-    "RenewableEnergyBatteryRackMetal", "RenewableEnergyBatteryBankWood", "RenewableEnergyBatteryBankMetal",
-    "RenewableEnergyCellCharger", Stash.CRATE_TYPE,
-}
+-- before "all" (ItemPickerJava.fillContainer). A bank tile's container type is "RenewableEnergy"
+-- and its item's name (tools/make_tiles.py), so every bank in Specs.banks is listed.
+Distributions.OWN_CONTAINER_TYPES = {}
+for fullType in pairs(Specs.banks) do
+    table.insert(Distributions.OWN_CONTAINER_TYPES, "RenewableEnergy" .. fullType:match("%.(.+)$"))
+end
+table.sort(Distributions.OWN_CONTAINER_TYPES)
+table.insert(Distributions.OWN_CONTAINER_TYPES, "RenewableEnergyCellCharger")
+table.insert(Distributions.OWN_CONTAINER_TYPES, Stash.CRATE_TYPE)
 for _, containerType in ipairs(Distributions.OWN_CONTAINER_TYPES) do
     subDist.all[containerType] = { rolls = 0, items = {} }
 end

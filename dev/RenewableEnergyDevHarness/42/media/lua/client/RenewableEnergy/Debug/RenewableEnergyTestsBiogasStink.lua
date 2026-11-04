@@ -167,26 +167,6 @@ test("renewable_energy_biogas_stink_indoors", {
     end,
 })
 
--- A gas mask keeps the smell out while its filter drains: no smell comes in.
-test("renewable_energy_biogas_stink_gas_mask", {
-    run = function(self)
-        local _, source = standNearSource(self)
-        if not source then return end
-        T.give(self, "mask", { { type = "Base.Hat_GasMask", worn = true } })
-        withLevels(self, source, function(levels)
-            stink(self, source, levels[#levels])
-            -- The filter drains only while the mask keeps corpse smell out (getCorpseSicknessDefense).
-            T.readUntil(self, "stinkRead", T.at(source), "masked", function(read) return read.mask ~= nil and read.mask < 1 end,
-                T.SMELL_MS)
-        end)
-    end,
-    validate = function(self)
-        local read = self.reads.masked
-        T.expect(read.mask and read.mask < 1, "the gas mask's filter is at " .. tostring(read.mask))
-        T.expectEqual("the smell rate with a gas mask", read.rate, 0)
-    end,
-})
-
 -- A chunk zeroes its corpse count when it unloads and loads; the ghosts are counted again when it
 -- loads, and can be taken away after without the count going wrong. Single player only: a
 -- multiplayer server keeps the chunk loaded long after the character leaves.

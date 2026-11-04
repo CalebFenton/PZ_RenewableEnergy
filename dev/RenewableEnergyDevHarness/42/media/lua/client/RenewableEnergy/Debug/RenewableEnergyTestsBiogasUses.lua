@@ -166,6 +166,32 @@ test("renewable_energy_biogas_pump_fills_tank_to_limit", {
     end,
 })
 
+-- An empty holder refuses a fill as having no gas; gas short of one use of a blowtorch (a tank's
+-- use is below what the summary resolves), as too little, not as the compressor's want of scrubbed gas.
+test("renewable_energy_biogas_pump_refuses_too_little_gas", {
+    instant = true,
+    run = function(self)
+        local handle = T.placeRecord(self, "digester", "dome")
+        if not handle then return end
+        local torch = instanceItem(Digester.TORCH)
+        local gas = Digester.M3_PER_TANK * Digester.FILL_SHARES[Digester.TORCH] * torch:getUseDelta() / 2
+        T.give(self, "tools", { { type = Digester.PUMP }, { type = Digester.TORCH, uses = 0 } })
+        local function refusal()
+            return DigesterJobs.refusal(T.player(), DigesterJobs.FILL_PUMP, handle.object, self.items.tools[2])
+        end
+        T.setRecord(self, handle, Fixtures.matureDigester("dome", { gas = 0 }))
+        T.waitForGas(self, handle, 0)
+        T.step(function() self.empty = refusal() end)
+        T.setRecord(self, handle, Fixtures.matureDigester("dome", { gas = gas }))
+        T.waitForGas(self, handle, gas)
+        T.step(function() self.little = refusal() end)
+    end,
+    validate = function(self)
+        T.expectEqual("the pump's refusal from an empty holder", self.empty, "Tooltip_RenewableEnergy_NoGasToFill")
+        T.expectEqual("the pump's refusal for half a use of gas", self.little, "Tooltip_RenewableEnergy_TooLittleGas")
+    end,
+})
+
 -- Fill With Compressor runs the compressor fitted to the digester, which takes the carried one in,
 -- on power at the digester: refused with none fitted, and with one fitted while the digester has
 -- no power. A powered compressor won't fill a tank past the pump's share with unscrubbed gas. A

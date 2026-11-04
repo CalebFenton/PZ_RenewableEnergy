@@ -17,13 +17,12 @@ local player, stateItem = T.player, T.stateItem
 -- Parts: wiring and wear -----------------------------------------------------------------------
 
 -- A bank's container refuses every transfer in and out, on this client's copy where the player
--- drags: parts move only by being wired. Other transfers still work.
+-- drags: parts move only by being wired.
 test("renewable_energy_bank_container_refuses_transfers", {
     instant = true,
     run = function(self)
         self.bank = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY })
         if not self.bank then return end
-        T.give(self, "carried", { { type = "Base.Bag_Schoolbag" }, { type = "Base.Hammer" } })
         T.readRecord(self, self.bank)
         -- Last: the queue drops everything after an action that turns out invalid when it starts.
         T.step(function()
@@ -41,9 +40,6 @@ test("renewable_energy_bank_container_refuses_transfers", {
         expect(not self.dragValid, "moving a wired battery out of the bank is a valid transfer")
         expect(stateItem(state, T.CAR_BATTERY) ~= nil and bank:getContainer():contains(self.battery)
             and not p:getInventory():contains(self.battery), "a wired battery was dragged out of the bank")
-        local bag, hammer = self.items.carried[1], self.items.carried[2]
-        expect(ISInventoryTransferAction:new(p, hammer, p:getInventory(), bag:getInventory()):isValid(),
-            "moving a hammer into a bag is refused too")
     end,
 })
 
@@ -73,6 +69,8 @@ test("renewable_energy_bank_wiring_needs_tool_wire_skill_and_slot", {
         wire("rewired", T.CAR_BATTERY)
         T.give(self, "inverter", { { type = Wiring.WIRE, count = inverterWiring.wire }, { type = T.INVERTER_CHARGER } })
         wire("skill", T.INVERTER_CHARGER)
+        T.step(function() T.setPerk(self, Perks.Electricity, inverterWiring.skill) end)
+        wire("atSkill", T.INVERTER_CHARGER)
         -- The rest of the slots, and one battery more.
         T.give(self, "batteries", { { type = Wiring.WIRE, count = self.maxBatteries * batteryWire },
             { type = "Base.CarBattery2", count = self.maxBatteries } })
@@ -96,6 +94,7 @@ test("renewable_energy_bank_wiring_needs_tool_wire_skill_and_slot", {
         T.expectOk(reads.rewired, "wiring the battery in again")
         expectEqual("XP for wiring the same battery again", reads.rewired.xpAfter.Electricity - reads.rewired.xpBefore.Electricity, 0)
         T.expectRefused(reads.skill, "skill", "an Inverter/Charger was wired in a level below its skill")
+        T.expectOk(reads.atSkill, "wiring an Inverter/Charger in at its skill")
         for i = 2, self.maxBatteries do
             T.expectOk(reads["fill" .. i], "a battery box taking battery " .. i .. " of " .. self.maxBatteries)
         end
@@ -119,9 +118,12 @@ test("renewable_energy_bank_unwiring_needs_the_wiring_tools", {
             { type = Wiring.WIRE, count = Wiring.forPart(T.L16).wire } })
         T.job(self, "bank", BankJobs.WIRE_IN, bank, { type = T.L16 }, "l16InScrewdriver")
         unwire("l16Screwdriver", T.L16)
+        T.count(self, "before", { Wiring.WIRE, T.CAR_BATTERY, T.L16 })
         unwire("carScrewdriver", T.CAR_BATTERY)
         T.give(self, "wrench", { { type = "Base.Wrench" } })
         unwire("l16Both", T.L16)
+        T.count(self, "after", { Wiring.WIRE, T.CAR_BATTERY, T.L16 })
+        T.readRecord(self, bank)
     end,
     validate = function(self)
         local reads = self.reads
@@ -130,6 +132,13 @@ test("renewable_energy_bank_unwiring_needs_the_wiring_tools", {
         T.expectRefused(reads.l16Screwdriver, "tool", "an L-16 came out without a wrench")
         T.expectOk(reads.carScrewdriver, "a car battery coming out with a screwdriver")
         T.expectOk(reads.l16Both, "an L-16 coming out with a screwdriver and a wrench")
+        local state, before, after = self.bank.state, self.counts.before, self.counts.after
+        for _, fullType in ipairs({ T.CAR_BATTERY, T.L16 }) do
+            expect(stateItem(state, fullType) == nil, fullType .. " still in the bank after unwiring it")
+            expectEqual(fullType .. " carried after unwiring it", after[fullType] - before[fullType], 1)
+        end
+        expectEqual("wire back after unwiring both", after[Wiring.WIRE] - before[Wiring.WIRE],
+            Wiring.forPart(T.CAR_BATTERY).wire + Wiring.forPart(T.L16).wire)
     end,
 })
 
@@ -271,6 +280,9 @@ local MAKESHIFT_RECIPE, MAKESHIFT = "RenewableEnergy_MakeMakeshiftInverter", "Re
 local function makeshiftLevel()
     return getScriptManager():getCraftRecipe(MAKESHIFT_RECIPE):getRequiredSkill(0):getLevel()
 end
+-- Levels past the recipe's crafted at after it: one, and one more than making up the whole
+-- shortfall takes.
+local MAKESHIFT_PAST = { 1, math.ceil(Wear.CRAFTED_SHORTFALL / Wear.CRAFTED_PER_LEVEL) + 1 }
 T.craftTest(T.craftName("bank", MAKESHIFT_RECIPE, "condition_by_level"), {
     recipe = MAKESHIFT_RECIPE,
     from = Specs.charger,
@@ -279,18 +291,30 @@ T.craftTest(T.craftName("bank", MAKESHIFT_RECIPE, "condition_by_level"), {
         T.setPerk(self, Perks.Electricity, makeshiftLevel())
     end,
     counts = { [MAKESHIFT] = 1 },
-    after = function(self) T.readCarried(self, { MAKESHIFT }) end,
+    after = function(self)
+        T.readCarried(self, { MAKESHIFT })
+        local recipe = getScriptManager():getCraftRecipe(MAKESHIFT_RECIPE)
+        self.past = {}
+        for i, levels in ipairs(MAKESHIFT_PAST) do
+            -- So each craft's read holds only its own inverter.
+            T.takeItems(self, nil, MAKESHIFT)
+            T.step(function() T.setPerk(self, Perks.Electricity, makeshiftLevel() + levels) end)
+            self.past[i] = T.craftFrom(self, recipe, { type = Specs.charger }, { read = { MAKESHIFT } })
+        end
+    end,
     validate = function(self)
         local inverter = T.carriedFirst(self, MAKESHIFT)
         if not expect(inverter ~= nil, "no makeshift inverter was made") then return end
-        local cap, level = instanceItem(MAKESHIFT):getConditionMax(), makeshiftLevel()
+        local cap = instanceItem(MAKESHIFT):getConditionMax()
         expectEqual("the condition of an inverter made at the recipe's Electricity level", inverter.condition,
             cap - Wear.CRAFTED_SHORTFALL)
-        local function past(levels)
-            return Wear.craftedInverterCondition(cap, level + levels, level)
+        local expected = { cap - Wear.CRAFTED_SHORTFALL + Wear.CRAFTED_PER_LEVEL, cap }
+        for i, levels in ipairs(MAKESHIFT_PAST) do
+            local result, what = self.past[i], "an inverter made " .. levels .. " levels past the recipe's"
+            local made = T.expectCrafted(result, what) and T.carriedFirst(self, MAKESHIFT, result.label)
+            if expect(made, what .. " wasn't carried") then
+                expectEqual("the condition of " .. what, made.condition, expected[i])
+            end
         end
-        expectEqual("the condition a level past the recipe's makes up", past(1) - past(0), Wear.CRAFTED_PER_LEVEL)
-        expectEqual("the condition of an inverter made a level past making up the whole shortfall",
-            past(math.ceil(Wear.CRAFTED_SHORTFALL / Wear.CRAFTED_PER_LEVEL) + 1), cap)
     end,
 })

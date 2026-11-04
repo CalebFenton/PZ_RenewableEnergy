@@ -146,7 +146,7 @@ test("renewable_energy_gadgets_garden_light_update", {
             local after = row.after
             if row.sunlit then
                 expect(reply.flat > 0, "no sun for a light " .. row.what)
-                after = Sun.wattsFrom(SPEC.watts, reply.flat, 0) * row.hours
+                after = T.fullSunW(SPEC.watts) * reply.flat / Sun.FULL_SUN * row.hours
             end
             expectNear("charge of a light " .. row.what, reply.charge, after)
         end

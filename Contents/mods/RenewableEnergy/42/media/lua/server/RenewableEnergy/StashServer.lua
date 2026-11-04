@@ -18,8 +18,8 @@ end
 --- map (ISWorldMap.renderStashMaps), which would give the house away on day one.
 function Stash.stockFromStart()
     local alreadyRead = StashSystem.getAlreadyReadMap()
-    for description, extra in pairs(Stash.descriptions) do
-        if extra.knownOnStart and Chance.hit(extra.knownOnStart / 100) then
+    for _, description in ipairs(Stash.descriptions) do
+        if description.knownOnStart and Chance.hit(description.knownOnStart / 100) then
             StashSystem.prepareBuildingStash(description.name)
             alreadyRead:remove(description.name)
         end
@@ -39,7 +39,7 @@ function Stash.relistUnfound()
         listed[possible:get(i):getName()] = true
     end
     local alreadyRead = StashSystem.getAlreadyReadMap()
-    for description in pairs(Stash.descriptions) do
+    for _, description in ipairs(Stash.descriptions) do
         local name = description.name
         if not listed[name] and not alreadyRead:contains(name) then
             local building = Stash.buildingOf(description)
@@ -69,3 +69,5 @@ local function onInitGlobalModData(isNewGame)
 end
 
 Events.OnInitGlobalModData.Add(onInitGlobalModData)
+
+return Stash

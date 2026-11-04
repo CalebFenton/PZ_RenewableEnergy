@@ -231,7 +231,11 @@ for first, model, blades in WIND_TILES:
 TILESETS = {"renewable_energy_01": TILES, "renewable_energy_02": TILES_02}
 
 # Build-menu icons by the name after RenewableEnergy_Build_: each digester as it stands built and
-# working, its holder full, each gasifier and each wind charger.
+# working, its holder full, each gasifier and each wind charger; a bladed charger's head on the top
+# of its mast (BUILD_ICON_MAST metres of it), since its whole mast leaves the head a smudge on 48 px,
+# turned BUILD_ICON_TURN degrees for its rotor to open out towards the camera.
+BUILD_ICON_MAST = 0.6
+BUILD_ICON_TURN = 30
 BUILD_ICONS = {
     "BarrelDigester": [layer(biogas.barrel_digester, holder="bags")],
     "InsulatedDigester": [layer(biogas.insulated_digester, level=3)],
@@ -240,7 +244,7 @@ BUILD_ICONS = {
     "Gasifier": [layer(woodgas.gasifier, tier="standard")],
     "AdvancedGasifier": [layer(woodgas.gasifier, tier="advanced")],
     "ScoopRotor": [layer(wind.scoop_rotor)],
-    "Propeller": [layer(wind.propeller_charger)],
-    "CarAlternator": [layer(wind.car_alternator_charger)],
-    "Alternator": [layer(wind.alternator_charger)],
+    "Propeller": [layer(wind.propeller_charger, turn=BUILD_ICON_TURN, stub=BUILD_ICON_MAST)],
+    "CarAlternator": [layer(wind.car_alternator_charger, turn=BUILD_ICON_TURN, stub=BUILD_ICON_MAST)],
+    "Alternator": [layer(wind.alternator_charger, turn=BUILD_ICON_TURN, stub=BUILD_ICON_MAST)],
 }

@@ -71,7 +71,9 @@ end)
 -- (ISMoveableSpriteProps.scrapObject), first giving the character the tools its scrap definition
 -- asks for that it lacks. With `args.chanceOf`, a scrap material, every roll is `args.roll` ("under"
 -- or "at") the character's vanilla chance for that material (ISMoveableSpriteProps.getChanceByDef),
--- the chance a part the mod takes out of an appliance follows. Answers whether every tile went,
+-- the chance a part the mod takes out of an appliance follows. With `args.vanillaRoll`, every
+-- ZombRandFloat vanilla's scrap draws (0 to 101 against a piece's chance) is that, as a bank's
+-- Material scrap rolls with no roll of the mod's. Answers whether every tile went,
 -- how many `args.type` it gave and how many of each type (`counts`), into the inventory or onto the
 -- object's squares; what the dismantling gave and the tools go away.
 handler("scrapItems", function(player, args, defer)
@@ -112,7 +114,13 @@ handler("scrapItems", function(player, args, defer)
             "the scrap definition " .. args.chanceOf)
         PZHarness.Rolls.force(defer, PZHarness.Rolls.trialRoll(args.roll, props:getChanceByDef(chanceDef, player) / 100))
     end
-    props:scrapObject(player)
+    if args.vanillaRoll then
+        local restore = Fixtures.replace(defer, _G, "ZombRandFloat", function() return args.vanillaRoll end)
+        props:scrapObject(player)
+        restore()
+    else
+        props:scrapObject(player)
+    end
     local count, counts, scrapped = 0, {}, true
     for _, tile in ipairs(tiles) do
         scrapped = scrapped and Fixtures.objectWithSprite(tile.square, tile.sprite) == nil

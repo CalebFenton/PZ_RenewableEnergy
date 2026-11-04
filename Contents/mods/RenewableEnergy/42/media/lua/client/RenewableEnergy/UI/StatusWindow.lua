@@ -131,10 +131,6 @@ function StatusWindow:clearHighlight()
     end
 end
 
-local function positionKey(p)
-    return p.x .. "," .. p.y .. "," .. p.z
-end
-
 --- Highlights the sources of a row's Bank status `sources` entries in the world for a few
 --- seconds, the way vanilla shows the object a moveable action works on. Sources on squares that
 --- aren't loaded are left out. Returns how many were highlighted.
@@ -149,7 +145,7 @@ function StatusWindow:highlightSources(sources)
             object:setHighlighted(self.playerNum, true, false)
             table.insert(objects, object)
         end
-        positions[positionKey(source)] = true
+        positions[Squares.placeKey(source.x, source.y, source.z)] = true
     end
     self.highlight = { objects = objects, positions = positions, count = #sources,
         untilMs = getTimestampMs() + HIGHLIGHT_MS }
@@ -197,7 +193,7 @@ function StatusWindow:isRowHighlighted(r)
         return false
     end
     for _, source in ipairs(r.sources) do
-        if not highlight.positions[positionKey(source)] then
+        if not highlight.positions[Squares.placeKey(source.x, source.y, source.z)] then
             return false
         end
     end

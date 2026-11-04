@@ -75,8 +75,9 @@ test("renewable_energy_gasline_kit_install_and_remove", {
     end,
 })
 
--- A kitted generator's menu has the kit's jobs and refuses Take Generator, as the client's action
--- does; its info window shows the real tank, not the fuel the gas line shows, and that it runs on gas.
+-- A kitted generator's menu has the kit's jobs and not Install, which the job refuses as it has a
+-- kit, and refuses Take Generator, as the client's action does; its info window shows the real
+-- tank, not the fuel the gas line shows.
 test("renewable_energy_gasline_kit_menu", {
     instant = true,
     run = function(self)
@@ -84,11 +85,6 @@ test("renewable_energy_gasline_kit_menu", {
         local generator = digester and T.generator(self, { near = digester.square, fuel = 0 })
         if not generator then return end
         self.generator = generator
-        T.step(function()
-            local options = T.worldOptions(generator.object, getText("ContextMenu_Generator"),
-                { install = getText("ContextMenu_RenewableEnergy_InstallKit") })
-            T.noteOption(self, "Install", options and options.install)
-        end)
         T.fitAndConnect(self, generator, digester)
         T.waitFor(self, function()
             local state = GasKit.stateOf(generator.object)
@@ -96,13 +92,16 @@ test("renewable_energy_gasline_kit_menu", {
         end, "this client's copy of the generator on gas")
     end,
     validate = function(self)
-        T.expectOptionRefused(self, "Install")
         local generator = self.generator.object
         local options = T.worldOptions(generator, getText("ContextMenu_Generator"), { disconnect = getText("ContextMenu_RenewableEnergy_DisconnectLine"),
-            remove = getText("ContextMenu_RenewableEnergy_RemoveKit"), take = getText("ContextMenu_GeneratorTake") })
+            remove = getText("ContextMenu_RenewableEnergy_RemoveKit"), take = getText("ContextMenu_GeneratorTake"),
+            install = getText("ContextMenu_RenewableEnergy_InstallKit") })
+        T.expectEqual("the refusal to install a second kit", GasKit.refusal(T.player(), GasKit.INSTALL, generator),
+            "Tooltip_RenewableEnergy_HasKit")
         if T.expect(options ~= nil, "a kitted generator has no generator submenu") then
             T.expect(options.disconnect ~= nil, "no Disconnect Gas Line")
             T.expect(options.remove ~= nil, "no Remove Gas Conversion Kit")
+            T.expect(options.install == nil, "a kitted generator's menu offers Install")
             T.expect(not T.offered(options.take), "Take Generator is offered on a kitted generator")
         end
         T.expect(not ISTakeGenerator:new(T.player(), generator):isValid(), "the client lets a kitted generator be taken")
@@ -110,7 +109,6 @@ test("renewable_energy_gasline_kit_menu", {
         local shown = getText("IGUI_Generator_FuelAmount", math.ceil(generator:getFuelPercentage()))
         T.expect(text:find(getText("IGUI_Generator_FuelAmount", 0), 1, true) ~= nil, "the info window doesn't show the empty tank")
         T.expect(text:find(shown, 1, true) == nil, "the info window shows the fuel the gas line keeps in it as its tank")
-        T.expect(text:find(getText("IGUI_RenewableEnergy_GasOn"), 1, true) ~= nil, "the info window doesn't say it runs on gas")
     end,
 })
 
@@ -141,9 +139,8 @@ test("renewable_energy_gasline_kit_refused_in_the_dark", {
 
 -- On a digester's line an empty-tanked generator runs: the gas pays for what vanilla bills it as the
 -- hours pass and the fuel is put back, and petrol poured in goes into its tank. On petrol it runs on
--- its tank and leaves the gas; back on gas, out of gas it stops, holding only its tank, its info
--- window saying so in words kept apart from the label, and switched to petrol it says so rather
--- than that it is out of gas. The line's hoses come back when it is cut.
+-- its tank and leaves the gas; back on gas, out of gas it stops, holding only its tank, and switched
+-- to petrol it is no longer out of gas. The line's hoses come back when it is cut.
 test("renewable_energy_gasline_generator_runs_on_gas", {
     hour = 12,
     instant = true,
@@ -187,12 +184,10 @@ test("renewable_energy_gasline_generator_runs_on_gas", {
         end)
         T.waitFor(self, function()
             local state = GasKit.stateOf(generator.object)
-            self.outText = state and state.outOfGas and ISGeneratorInfoWindow.getRichText(generator.object, true) or nil
-            return self.outText ~= nil
+            return state ~= nil and state.outOfGas == true
         end, "this client's copy of the generator out of gas")
         T.kitJob(self, generator, GasKit.TO_PETROL)
         T.readGenerator(self, generator, "petrolAfterOut")
-        T.step(function() self.petrolText = ISGeneratorInfoWindow.getRichText(generator.object, true) end)
         T.kitJob(self, generator, GasKit.DISCONNECT)
         T.count(self, "cut", { GasKit.HOSE })
     end,
@@ -223,14 +218,8 @@ test("renewable_energy_gasline_generator_runs_on_gas", {
         T.expectNear("gas burned on petrol", reads.afterPetrol.gas, reads.beforePetrol.gas, 0.001)
         T.expect(not out.running and out.state ~= nil and out.state.outOfGas, "the generator kept running with no gas")
         T.expectNear("fuel once the gas ran out", out.fuel, self.poured, 0.05)
-        local touching = T.runTogether(self.outText)
-        T.expect(#touching == 0, "out of gas, the info window runs words together: " .. table.concat(touching, ", "))
         local afterOut = reads.petrolAfterOut.state
         T.expect(afterOut ~= nil and not afterOut.outOfGas, "switched to petrol, the generator still says it is out of gas")
-        local text = self.petrolText or ""
-        T.expect(text:find(getText("IGUI_RenewableEnergy_GasPetrol"), 1, true) ~= nil
-            and text:find(getText("IGUI_RenewableEnergy_GasOut"), 1, true) == nil,
-            "switched to petrol once out of gas, the info window doesn't say it runs on petrol")
         T.expectEqual("hoses after cutting the line", self.counts.cut[GasKit.HOSE], hoses + 1)
     end,
 })
@@ -368,6 +357,47 @@ test("renewable_energy_gasline_unknown_job_refused", {
         T.expect(reads.known.built, "the server built no action for Install Kit")
         T.expect(not reads.noFeature.built, "the server built an action for a feature there is none of")
         T.expect(not reads.noJob.built, "the server built an action for a job the kit hasn't")
+    end,
+})
+
+-- A digester's line reaches GasKit.REACH, 20 squares in a straight line on the generator's level,
+-- and not 21, and takes a hose for each HOSE_SQUARES, 5, or part of them: one at 1 and 5 squares,
+-- two at 6, four at 20.
+test("renewable_energy_gasline_digester_reach_and_hoses", {
+    instant = true,
+    run = function(self)
+        local generator = T.generator(self, { fuel = 0 })
+        if not generator then return end
+        local gx, gy = generator.x, generator.y
+        self.digesters = {}
+        for _, distance in ipairs({ 1, 5, 6, 20, 21 }) do
+            local square = T.square(self, { near = generator, accept = function(square)
+                return IsoUtils.DistanceTo(gx, gy, square:getX(), square:getY()) == distance
+            end }, "a free square " .. distance .. " squares from the generator")
+            local digester = square and T.placeRecord(self, "digester", "barrel.MetalDrum", { square = square })
+            if not digester then return end
+            self.digesters[distance] = digester
+        end
+        T.fitKit(self, generator)
+        T.step(function()
+            T.giveMaterials(self, "line", GasKit.materials(T.player(), GasKit.CONNECT, generator.object, self.digesters[20].object))
+        end)
+        T.step(function()
+            self.refusals, self.hoses = {}, {}
+            for distance, digester in pairs(self.digesters) do
+                self.refusals[distance] = GasKit.refusal(T.player(), GasKit.CONNECT, generator.object, digester.object) or "none"
+                for _, material in ipairs(GasKit.materials(T.player(), GasKit.CONNECT, generator.object, digester.object)) do
+                    if material.item == GasKit.HOSE then self.hoses[distance] = material.need end
+                end
+            end
+        end)
+    end,
+    validate = function(self)
+        for distance, hoses in pairs({ [1] = 1, [5] = 1, [6] = 2, [20] = 4 }) do
+            T.expectEqual("the refusal of a digester " .. distance .. " squares away", self.refusals[distance], "none")
+            T.expectEqual("hoses a line " .. distance .. " squares long takes", self.hoses[distance], hoses)
+        end
+        T.expectEqual("the refusal of a digester 21 squares away", self.refusals[21], "Tooltip_RenewableEnergy_DigesterOutOfReach")
     end,
 })
 

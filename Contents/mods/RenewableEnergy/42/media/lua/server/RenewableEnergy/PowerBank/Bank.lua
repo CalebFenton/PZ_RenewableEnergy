@@ -1,6 +1,7 @@
 -- One battery bank on the authority (single player or the server): its batteries, inverters,
--- chargers, controllers and sources, and the energy that moves between them each pass. Its backup
--- generator is Backup.lua's, and what it tells the clients BankStatus.lua's; both add to this class.
+-- chargers, controllers and sources, and the energy that moves between them each pass. Its parts
+-- are BankParts.lua's, its backup generator Backup.lua's, and what it tells the clients
+-- BankStatus.lua's; each adds to this class.
 --
 -- The table is the bank's global object, a cf_commonlib ObjectSystem.Object record, so every field
 -- in SAVED_FIELDS is saved with the world and kept while the chunk is unloaded. While loaded, the
@@ -28,6 +29,7 @@ local Loads = require "RenewableEnergy/PowerBank/Loads"
 local Fumes = require "RenewableEnergy/Fumes"
 local Clock = require "cf_commonlib/Clock"
 local LibObjectSystem = require "cf_commonlib/ObjectSystem"
+local Squares = require "cf_commonlib/Squares"
 local Telemetry = require "cf_commonlib/Telemetry"
 local Tiles = require "cf_commonlib/Tiles"
 
@@ -43,6 +45,8 @@ Bank.SAVED_FIELDS = {
     "inverters", "chargers", "controllers", "sources", "loadW", "loadByKind", "chargeSource", "chargeWantW",
     "generator", "day", "cycleHigh", "cycleDepth", "pendingDepths", "pendingPartWear",
     "solarWhToday", "loadWhToday", "empty", "windWhToday", "runWhToday", "backupWhToday", "connected",
+    -- The last pass's sun and watts, for a status built before the next pass.
+    "now",
 }
 
 -- How the bank runs each family of source (Sources.FAMILIES): connect(player, source, isoObject,
@@ -169,14 +173,14 @@ function Bank.reconcileSource(source, object)
     end
 end
 
--- Takes the source at `index` off the bank. What it still owed the bank, a treadmill run not yet
--- paid out (TreadmillSource.credit), goes into the batteries now, up to full, so taking a source
--- away forfeits nothing it made.
-local function dropSource(bank, index)
+-- Takes the source at `index`, whose object (if still there) is `object`, off the bank. What it
+-- still owed the bank, a treadmill run not yet paid out (TreadmillSource.credit), goes into the
+-- batteries now, up to full, so taking a source away forfeits nothing it made.
+local function dropSource(bank, index, object)
     local source = table.remove(bank.sources, index)
     local disconnect = familyOf(source).disconnect
     if disconnect then
-        disconnect(source, Sources.findOn(getSquare(source.x, source.y, source.z)))
+        disconnect(source, object)
     end
     local wh = source.pendingWh
     if wh and bank.nominalWh > 0 then
@@ -194,7 +198,7 @@ end
 function Bank:removeSource(x, y, z)
     local _, index = self:findSource(x, y, z)
     if index then
-        dropSource(self, index)
+        dropSource(self, index, Sources.findOn(getSquare(x, y, z)))
     end
 end
 
@@ -215,7 +219,7 @@ function Bank:updateSources(hours, context)
         local object = Sources.findOn(square)
         if square and not (object and Sources.squareOk(square, source.kind)
             and PowerBank.inSourceReach(self, source.x, source.y, source.z)) then
-            dropSource(self, i)
+            dropSource(self, i, object)
         else
             local size = Sources.slotsOf(source.kind)
             local inSlot = used + size <= slots
@@ -278,7 +282,7 @@ end
 
 -- The place key of `generator`, as chargeSource names a charging generator.
 local function keyOf(generator)
-    return Places.key(Places.objectPlace(generator))
+    return Squares.placeKey(Places.objectPlace(generator))
 end
 
 --- What the chargers charge from, saved as `chargeSource`: "grid", the place key (keyOf) of the
@@ -353,8 +357,8 @@ end
 function Bank:powerUp()
     self.empty = false
     self:recount()
-    -- Keep the pass's room-limited demand, bounded by the hardware still present. New capacity
-    -- takes effect at the next elapsed pass; do not integrate that time twice to refresh a bill.
+    -- The pass's room-limited demand stands, clamped to the hardware still present: a job may have
+    -- taken chargers out, and integrating the pass's hours again here would count them twice.
     self.chargeWantW = self.nominalWh > 0 and math.min(self.chargeWantW or 0, self:chargerMaxW()) or 0
     self:measure()
     self:checkOverload()
@@ -366,7 +370,8 @@ end
 -- discharge: now, or while the bank is unloaded, when it next loads. Returns whether the day turned,
 -- which starts the day's watt-hour totals again.
 function Bank:trackCycle(container, midnight)
-    local day, finished = Battery.today()
+    local day = Battery.today()
+    local finished
     self.cycleHigh, self.cycleDepth, finished = Battery.trackCycle(self.day, self.cycleHigh, self.cycleDepth,
         self.charge, day, midnight)
     if finished then

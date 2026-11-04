@@ -111,7 +111,7 @@ VehicleJobs.JOBS = {
     end, "Tooltip_RenewableEnergy_PanelSealedFully", { position = "Mid", area = areaOf }),
     [VehicleJobs.REGLAZE_PANEL] = ModuleRepair.jobRow(ModuleRepair.REGLAZE, function(vehicle, partId)
         return ArrowBoard.reglazablePanel(vehicle, partId) ~= nil
-    end, "not damaged", { position = "Mid", area = areaOf }),
+    end, "Tooltip_RenewableEnergy_NotDamaged", { position = "Mid", area = areaOf }),
 }
 
 Jobs.define(VehicleJobs, {

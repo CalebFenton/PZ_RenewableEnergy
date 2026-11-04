@@ -10,8 +10,9 @@ local Stash = {}
 -- Values of the StashMode sandbox option.
 Stash.MODE = { NONE = 1, MAPS = 2, MAPS_AND_STOCKED = 3, STOCKED = 4 }
 
--- Description (the table StashSystem reads) -> what only the mod uses: knownOnStart, the percent
--- chance that the house is stocked from the start.
+-- Each house's description, the table StashSystem reads (Stash.load), with what only the mod
+-- uses beside the fields it reads: knownOnStart, the percent chance that the house is stocked
+-- from the start.
 Stash.descriptions = {}
 
 -- The room definition that stocks a stash house (Distributions.lua) and the crate it brings.
@@ -128,6 +129,7 @@ local function describe(house)
         type = "Map",
         item = house.map,
         customName = ANNOTATED_MAP,
+        knownOnStart = house.knownOnStart,
         buildingX = house.buildingX,
         buildingY = house.buildingY,
         spawnTable = Stash.SPAWN_TABLE,
@@ -153,7 +155,7 @@ end
 Stash.mapAreas = {}
 
 for _, house in ipairs(HOUSES) do
-    Stash.descriptions[describe(house)] = { knownOnStart = house.knownOnStart }
+    table.insert(Stash.descriptions, describe(house))
     Stash.mapAreas[house.name] = house.mapArea
 end
 
@@ -179,7 +181,7 @@ function Stash.register()
     if not Stash.enabled() then
         return
     end
-    for description in pairs(Stash.descriptions) do
+    for _, description in ipairs(Stash.descriptions) do
         table.insert(StashDescriptions, description)
     end
 end

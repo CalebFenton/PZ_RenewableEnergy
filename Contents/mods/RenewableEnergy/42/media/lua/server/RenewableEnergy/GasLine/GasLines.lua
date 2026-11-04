@@ -26,8 +26,10 @@ local Tiles = require "cf_commonlib/Tiles"
 
 local GasLines = {}
 
--- Cap on one pass (a save loaded after the clock jumped). Time a generator spent unloaded is billed
--- by vanilla to its fuel when it loads (IsoGenerator.update), and the next pass bills that to the gas.
+-- Cap on the hours one pass wears a generator for, or bills it before any pass saw it run (a save
+-- loaded after the clock jumped). What vanilla billed its fuel meanwhile is not capped: it bills
+-- time spent unloaded when the chunk loads (IsoGenerator.update), and the next pass bills all of
+-- that, or the hours since its last bill when that stopped it (dryBill), to the gas.
 local LONGEST_PASS = 24
 local EPSILON = Utilities.EPSILON
 -- Vanilla's wear chance for a generator whose item script it can't find (IsoGenerator.update).

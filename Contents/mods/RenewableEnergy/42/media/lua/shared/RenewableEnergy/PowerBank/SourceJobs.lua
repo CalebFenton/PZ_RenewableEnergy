@@ -100,8 +100,7 @@ end
 -- Every job, by name (Jobs.define), at the source's tile; `with` is the bank Connect Source wires
 -- it to, the tool or blades a job works with, or the module slot Seal Cracked Module or Reglaze Module mends.
 SourceJobs.JOBS = {
-    -- A source feeds one bank, and connecting it again to the bank it feeds leaves it as it is,
-    -- snow and all.
+    -- A source feeds one bank: connecting it again to the bank it feeds is refused (connectRefusal).
     [SourceJobs.CONNECT] = {
         minutes = function(source, bank, character) return connectMinutes(character) end,
         light = true, sound = "GeneratorConnect", tooltip = "Tooltip_RenewableEnergy_ConnectSource",
@@ -139,7 +138,8 @@ SourceJobs.JOBS = {
     -- the crafting window takes for each.
     [SourceJobs.SEAL_MODULE] = ModuleRepair.jobRow(ModuleRepair.SEAL, SourceJobs.sealableModule,
         "Tooltip_RenewableEnergy_ModuleSealedFully"),
-    [SourceJobs.REGLAZE_MODULE] = ModuleRepair.jobRow(ModuleRepair.REGLAZE, SourceJobs.reglazableModule, "not damaged"),
+    [SourceJobs.REGLAZE_MODULE] = ModuleRepair.jobRow(ModuleRepair.REGLAZE, SourceJobs.reglazableModule,
+        "Tooltip_RenewableEnergy_NotDamaged"),
     [SourceJobs.BRAKE] = brakeJob(true),
     [SourceJobs.RELEASE_BRAKE] = brakeJob(false),
     -- Lowering the head, unbolting the broken blades and bolting new ones on.

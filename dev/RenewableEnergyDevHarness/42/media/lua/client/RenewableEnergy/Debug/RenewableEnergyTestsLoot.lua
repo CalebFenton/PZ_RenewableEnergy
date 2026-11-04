@@ -51,9 +51,18 @@ test("renewable_energy_loot_finds_readied_once", {
 -- Containers the player owns --------------------------------------------------------------------
 
 -- Loot respawn (LootRespawn.respawnInContainer) never refills a player's bank, charger or crate
--- with free items: every room's table for the tiles' container types is empty, and they get no
--- cracked modules.
-serverCheck("renewable_energy_loot_player_containers_not_refilled", "lootPlayerContainers", { sprites = {
-    "batteryBoxWood", "batteryBoxMetal", "batteryRackWood", "batteryRackMetal", "batteryBankWood", "batteryBankMetal",
-    "cellCharger", "crate",
-} })
+-- with free items, in a room or outside any: the fill that would hand an unprotected one loot adds
+-- nothing, every room's table for the tiles' container types is empty, and they get no cracked
+-- modules.
+test("renewable_energy_loot_player_containers_not_refilled", {
+    run = function(self)
+        local indoor = T.square(self, { indoors = true }, "a free indoor square")
+        local outdoor = T.square(self, nil, "a free outdoor square")
+        if not (indoor and outdoor) then return end
+        T.read(self, "lootPlayerContainers", { indoor = T.at(indoor), outdoor = T.at(outdoor), sprites = {
+            "batteryBoxWood", "batteryBoxMetal", "batteryRackWood", "batteryRackMetal", "batteryBankWood", "batteryBankMetal",
+            "cellCharger", "crate",
+        } }, "containers")
+    end,
+    validate = function(self) T.expectNoFailures(self.reads.containers) end,
+})

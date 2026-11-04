@@ -176,29 +176,6 @@ test("renewable_energy_tiles_bank_overlays", {
     end,
 })
 
--- Dismantling a bank, in any facing, gives parts back: its material names a scrap definition
--- whose items exist. The definition is in shared Lua, because scrapping completes on the server.
-test("renewable_energy_tiles_bank_scraps_to_parts", {
-    validate = function()
-        for field in pairs(Sprites.bankFill) do
-            for facing, tile in pairs(Sprites[field]) do
-                local what = field .. " facing " .. facing
-                local props = ISMoveableSpriteProps.new(tile)
-                expect(props.canScrap, what .. " can't be dismantled")
-                local def = ISMoveableDefinitions:getInstance().getScrapDefinition(props.material)
-                if expect(def ~= nil, what .. "'s material " .. tostring(props.material) .. " has no scrap definition") then
-                    for _, entries in ipairs({ def.returnItemsStatic or {}, def.returnItems or {} }) do
-                        for _, entry in ipairs(entries) do
-                            expect(getScriptManager():FindItem(entry.returnItem) ~= nil,
-                                "dismantling " .. what .. " gives " .. tostring(entry.returnItem) .. ", no item")
-                        end
-                    end
-                end
-            end
-        end
-    end,
-})
-
 -- Whether `square` and the squares around it are free, room for any appliance of up to two tiles
 -- to stand with a tile on `square`.
 local function roomAround(square)
@@ -212,7 +189,8 @@ end
 -- counts by full type. `case.place(self)` places it and returns its handle; without it the whole
 -- object of `case.sprite` goes on a square with room around it. Every roll is `case.roll`, or
 -- with `case.chanceOf`, a scrap material, just "under" or "at" the character's vanilla chance
--- for that material, worked out on the authority. `premise`, if given, checks the tiles first.
+-- for that material, worked out on the authority; with `case.vanillaRoll`, every roll vanilla's
+-- own scrap draws is that. `premise`, if given, checks the tiles first.
 local function dismantleTest(name, cases, premise)
     test(name, {
         instant = true,
@@ -235,7 +213,7 @@ local function dismantleTest(name, cases, premise)
                     T.forceRoll(self, case.roll)
                 end
                 T.read(self, "scrapItems", T.at(handle, { sprite = case.sprite, chanceOf = case.chanceOf,
-                    roll = case.chanceOf and case.roll or nil }), case.label)
+                    roll = case.chanceOf and case.roll or nil, vanillaRoll = case.vanillaRoll }), case.label)
             end
         end,
         validate = function(self)
@@ -341,6 +319,23 @@ dismantleTest("renewable_energy_tiles_built_in_place_scraps_to_recipe", {
             ["RenewableEnergy.WoodenBlades"] = 1, ["RenewableEnergy.TreadmillMotor"] = 1, ["Base.SheetMetal"] = 0,
             ["Base.MetalBar"] = 0,
         } },
+})
+
+-- Dismantling a bank, in any facing, gives back its Material's parts, every piece of them on the
+-- luckiest roll: the counts are the mod's bank scrap table's (Moveables.lua).
+local function bankCase(field, facing, gives)
+    return { label = "a " .. field .. " facing " .. facing, sprite = Sprites[field][facing], perk = Perks.Electricity,
+        level = 10, roll = 0, vanillaRoll = 0, gives = gives }
+end
+dismantleTest("renewable_energy_tiles_banks_scrap_to_parts", {
+    bankCase("batteryBoxWood", "S", { ["Base.Plank"] = 2, ["Base.Nails"] = 4, ["Base.ElectricWire"] = 1 }),
+    bankCase("batteryBoxMetal", "E", { ["Base.SmallSheetMetal"] = 1, ["Base.ElectricWire"] = 1 }),
+    bankCase("batteryRackWood", "N", { ["Base.Plank"] = 3, ["Base.Nails"] = 6, ["Base.ElectricWire"] = 2, ["Base.Screws"] = 2 }),
+    bankCase("batteryRackMetal", "W",
+        { ["Base.SmallSheetMetal"] = 2, ["Base.MetalBar"] = 1, ["Base.ElectricWire"] = 2, ["Base.Screws"] = 2 }),
+    bankCase("batteryBankWood", "S", { ["Base.Plank"] = 5, ["Base.Nails"] = 10, ["Base.ElectricWire"] = 3, ["Base.Screws"] = 4 }),
+    bankCase("batteryBankMetal", "E",
+        { ["Base.SheetMetal"] = 1, ["Base.MetalBar"] = 2, ["Base.ElectricWire"] = 3, ["Base.Screws"] = 4 }),
 })
 
 -- The tiles' PickUpTool and PlaceTool, Electrician, are a screwdriver and some Electricity.
@@ -513,7 +508,9 @@ test("renewable_energy_tiles_battery_box_on_a_table", {
         expect(self.boxFits, "the cursor refuses a battery box on a table")
         expect(not self.rackFits, "the cursor takes a battery rack on a table")
         expect(self.height ~= nil, "the box placed on the table isn't a working bank")
-        expect((self.height or 0) > 0, "the bank stands on the floor under the table, at height " .. tostring(self.height))
+        -- The table stands on the floor, so its top is its tile's Surface.
+        local top = tonumber(properties(PZHarness.Fixtures.WORK_TABLE_SPRITE):get("Surface"))
+        expectEqual("the height the bank stands at on the table", self.height, top)
     end,
 })
 
@@ -692,5 +689,30 @@ test("renewable_energy_tiles_lit_gasifier_not_picked_up", {
     validate = function(self)
         expect(not self.pickUp, "the cursor picks up a lit gasifier")
         expect(self.says, "the cursor's panel doesn't say to put the gasifier out")
+    end,
+})
+
+-- A gasifier piped to a generator can't be picked up, as a connected source can't, and the
+-- cursor's panel says to disconnect it first. Catches the pipe lost to a pickup.
+test("renewable_energy_tiles_piped_gasifier_not_picked_up", {
+    instant = true,
+    run = function(self)
+        local generator, gasifier = T.gasifierBeside(self, "primitive")
+        if not gasifier then return end
+        T.fitAndConnect(self, generator, gasifier)
+        T.waitForSummary(self, gasifier, function(summary) return summary.piped end, "this client's summary of the piped gasifier")
+        T.step(function()
+            local character, object = T.player(), gasifier.object
+            local props = ISMoveableSpriteProps.fromObject(object)
+            self.pickUp = props:canPickUpMoveable(character, gasifier.square, object)
+            local refusal = "- " .. getText("Tooltip_RenewableEnergy_DisconnectFirst")
+            for _, line in ipairs(props:getInfoPanelDescription(gasifier.square, object, character, "pickup")) do
+                self.says = self.says or line[1].txt == refusal
+            end
+        end)
+    end,
+    validate = function(self)
+        expect(not self.pickUp, "the cursor picks up a piped gasifier")
+        expect(self.says, "the cursor's panel doesn't say to disconnect the gasifier first")
     end,
 })

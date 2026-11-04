@@ -11,7 +11,7 @@
 
 if isClient() then return end
 
-local StormChance = require "RenewableEnergy/Chance"
+local StormChance = require "RenewableEnergy/StormChance"
 local Specs = require "RenewableEnergy/Specs"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local Chance = require "cf_commonlib/Chance"

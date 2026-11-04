@@ -29,6 +29,11 @@ local function forgetRoll(def, defer)
     Helpers.forgetBuildingRoll(RuralFinds.MOD_DATA, def, defer)
 end
 
+-- How far outside the building's bounds the square at x, y is, in squares (0 inside).
+local function distanceOutside(def, x, y)
+    return math.max(def:getX() - x, x - (def:getX2() - 1), def:getY() - y, y - (def:getY2() - 1), 0)
+end
+
 -- Where each placed find stands and how far out from the building `def`; each is taken away when
 -- the test ends.
 local function track(placed, defer, def)
@@ -38,7 +43,7 @@ local function track(placed, defer, def)
         local square = object:getSquare()
         local x, y = square:getX(), square:getY()
         positions[kind] = { x = x, y = y, z = square:getZ(), outdoors = square:isOutside() and square:getBuilding() == nil,
-            out = RuralFinds.distanceOutside(def, x, y) }
+            out = distanceOutside(def, x, y) }
     end
     return positions
 end
@@ -124,7 +129,7 @@ end
 
 -- Vanilla's barn, farm storeroom and survivalist camp story clutter lists hold the mod's additions,
 -- each as many times as vanilla's adder puts an item in for every time RuralFinds.CLUTTER lists it.
-PZHarness.checkHandler("ruralClutter", function(expect)
+PZHarness.checkHandler("ruralClutter", function(_, _, expectEqual)
     local base = getWorld():getRandomizedWorldBase()
     for getter, items in pairs(RuralFinds.CLUTTER) do
         local list = base[getter](base)
@@ -136,8 +141,7 @@ PZHarness.checkHandler("ruralClutter", function(expect)
             local once = ArrayList.new()
             StoryTables.addItemToClutterTable(once, item)
             local held = countIn(list, item)
-            expect(held == count * once:size(), getter .. " holds " .. item .. " " .. held .. " times, not "
-                .. count .. " × " .. once:size())
+            expectEqual("the times " .. getter .. " holds " .. item, held, count * once:size())
         end
     end
 end)

@@ -63,7 +63,7 @@ When a gale sets the blades creaking and rattling, **Set the Brake** or you'll b
 
 ![A survivor running on a treadmill wired to a battery box in a garage](art/promo/images/treadmill.png)
 
-No sun, no wind? **Wire the Motor**, connect the treadmill to a bank, and **Run on Treadmill**: half an hour banks about what a fridge-freezer draws in that time, at the cost of endurance. Taken apart, it gives up the motor wind chargers are built around.
+No sun, no wind? **Connect to a Battery Bank** from the treadmill's menu, then **Run on Treadmill**: half an hour banks about what a fridge-freezer draws in that time, at the cost of endurance. Taken apart, it gives up the motor wind chargers are built around.
 
 ## Biogas
 
@@ -79,7 +79,7 @@ FEMA's 1989 plans run an engine on wood: a gasifier from a trash can, a steel dr
 
 ## Crafting
 
-Learn recipes from the Homestead Power magazines and FEMA's plans, by levelling the skills they use, or by researching a part you found. Most need a table and enough light; battery rebuilds need a furnace, a hand press and a kiln. A homemade inverter, wound on a microwave's transformer, gets a bank going until you find a real one. The maintainer and the battery charger can't be crafted. Every recipe is on [one sheet](art/promo/images/recipes.png).
+Learn recipes from the Homestead Power magazines and FEMA's plans, by levelling the skills they use, or by researching a part you found. Most need a table and enough light; battery rebuilds need a furnace, a hand press and a kiln. A makeshift inverter gets a bank going until you find a real one. The maintainer and the battery charger can't be crafted. Every recipe is on [one sheet](art/promo/images/recipes.png).
 
 ## Where to look
 

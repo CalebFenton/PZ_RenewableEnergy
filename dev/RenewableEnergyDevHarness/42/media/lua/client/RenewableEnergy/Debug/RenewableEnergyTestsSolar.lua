@@ -74,6 +74,29 @@ test("renewable_energy_solar_sun_noon_night", {
     end,
 })
 
+-- A catch-up pass samples the sun up to a week back (BankSystem.passContext): a sample whole days
+-- ago stands where the sun stands that hour today.
+test("renewable_energy_solar_sun_whole_days_ago_same_hour", {
+    hour = 12,
+    run = function(self)
+        self.differ = {}
+        for _, offset in ipairs({ 0, 3, 15 }) do
+            local today = Sun.positionNow(offset)
+            for days = 1, 7 do
+                local back = Sun.positionNow(offset + 24 * days)
+                local apart = math.max(math.abs(back.up - today.up), math.abs(back.east - today.east),
+                    math.abs(back.north - today.north))
+                if apart > 1e-6 then
+                    table.insert(self.differ, string.format("%d h + %d days", offset, days))
+                end
+            end
+        end
+    end,
+    validate = function(self)
+        expectEqual("samples whole days back that stand elsewhere than today's", table.concat(self.differ, ", "), "")
+    end,
+})
+
 -- Overcast lets some light through, all of it diffuse, so a rack loses its edge from facing the sun.
 test("renewable_energy_solar_sun_clouds", {
     run = function(self)
@@ -93,8 +116,9 @@ test("renewable_energy_solar_sun_clouds", {
     end,
 })
 
--- The Sunlight Multiplier scales what a panel makes and snow blocks it; a garden light's cell
--- under a roof makes nothing, and one in the open at noon makes some.
+-- A module makes its rating times the system efficiency in full sun, the Sunlight Multiplier
+-- scales that and snow blocks it; a garden light's cell under a roof makes nothing, and one in the
+-- open at noon makes some.
 test("renewable_energy_solar_sun_watts_multiplier_snow_roof", {
     hour = 12,
     sandbox = { SunlightMultiplier = 1 },
@@ -112,8 +136,8 @@ test("renewable_energy_solar_sun_watts_multiplier_snow_roof", {
         self.outdoors = Sun.squareWatts(outdoor, 50, sky)
     end,
     validate = function(self)
-        expect(self.real > 0 and self.real <= 50, "a 50 W module in full sun makes " .. self.real .. " W")
-        expectNear("a module at x3 over x1", self.boosted / self.real, 3, 0.0001)
+        expectNear("a 50 W module in full sun", self.real, 50 * T.SOLAR_EFFICIENCY, 1e-9)
+        expectNear("a 50 W module in full sun at x3", self.boosted, 3 * 50 * T.SOLAR_EFFICIENCY, 1e-9)
         expectEqual("the same under snow", self.snowed, 0)
         expectEqual("a cell with no square", self.noSquare, 0)
         expectEqual("a cell under a roof at noon", self.indoors, 0)
@@ -124,8 +148,8 @@ test("renewable_energy_solar_sun_watts_multiplier_snow_roof", {
 -- Panels on a bank ----------------------------------------------------------------------------
 
 -- A module makes its rating times its condition: a half-worn module half what a whole one does,
--- and a homemade one at its best less than a whole factory one. The cracked panel says why it is
--- low.
+-- and a homemade one at its best its type's rating against a factory one's. The cracked panel says
+-- why it is low.
 test("renewable_energy_solar_module_condition_sets_watts", {
     run = function(self)
         local bank = T.bank(self, "batteryRackMetal", { T.CAR_BATTERY, Specs.controller }, { charge = 0.1 })
@@ -155,10 +179,11 @@ test("renewable_energy_solar_module_condition_sets_watts", {
         if not expect(cracked and homemade and rack, "the status lists fewer than three panels") then return end
         -- The rack's whole module is the measure: same type, same sun.
         local whole = rack.watts
-        expect(whole > 0, "a rack with a whole module made nothing at 1000 W/m²")
+        expectNear("a rack with one whole module at 1000 W/m²", whole,
+            T.fullSunW(Specs.modules[T.FACTORY_MODULE].watts), 1e-9)
         expectNear("a module at condition 50 over a whole one", cracked.watts / whole, 0.5, 0.01)
-        local made = homemade.watts / whole
-        expect(made > 0 and made < 1, "a homemade module at its best makes " .. made .. " of a whole factory one")
+        expectNear("a homemade module at its best over a whole factory one", homemade.watts / whole,
+            Specs.modules[T.HOMEMADE_MODULE].watts / Specs.modules[T.FACTORY_MODULE].watts, 1e-9)
         expectEqual("the half-cracked panel's reason", cracked.reason, "cracked")
         expectEqual("the half-cracked panel's module condition", cracked.modules[1] and cracked.modules[1].condition, 50)
     end,
@@ -309,6 +334,30 @@ test("renewable_energy_solar_snow_settles_dims_and_melts", {
         local thawed = T.stateSource(self.bank.state, self.flat) or {}
         expectEqual("snow on the flat panel after a mild sunny day", thawed.snow, 0)
         expectEqual("the thawed panel's share of full sun", thawed.fullSunPct, 100)
+    end,
+})
+
+-- At night only air above freezing melts snow off a flat panel, which sheds none: an hour at 0 °C
+-- keeps every bit of it, an hour just above takes some. Catches the thaw starting at freezing.
+test("renewable_energy_solar_snow_melts_only_above_freezing", {
+    run = function(self)
+        local bank = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY }, { charge = 0.5 })
+        self.panel = bank and T.panel(self, Sprites.flat, { near = bank, connect = true })
+        if not self.panel then return end
+        T.batch(function()
+            T.snowfall(self, bank, 2, "night")
+            T.bankPass(self, bank, 0, { airC = 0, label = "freezing" })
+            T.bankPass(self, bank, 0, { airC = 0.1, label = "thawing" })
+        end)
+    end,
+    validate = function(self)
+        if not T.expectConnected(self.panel) then return end
+        local function snowAt(label) return (T.stateSource(self.reads[label], self.panel) or {}).snow or -1 end
+        local night = snowAt("night")
+        if not expect(night > 0, "a frosty night of snowfall left no snow on the panel") then return end
+        expectEqual("snow on the panel after a dark hour at 0 °C", snowAt("freezing"), night)
+        local thawed = snowAt("thawing")
+        expect(thawed >= 0 and thawed < night, "a dark hour at 0.1 °C took the snow from " .. night .. " to " .. thawed)
     end,
 })
 

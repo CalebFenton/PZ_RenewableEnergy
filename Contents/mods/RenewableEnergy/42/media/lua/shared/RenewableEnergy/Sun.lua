@@ -127,10 +127,11 @@ function Sun.positionNow(hoursAgo)
     local dayOfYear = Sun.dayOfYear(time:getMonth(), time:getDay())
     local latitude = season:getLat()
     local gameHalfDay = season:getDaylight() / 2
-    local hoursFromNoon = time:getTimeOfDay() - (hoursAgo or 0) - season:getDayHighNoon()
-    if hoursFromNoon < -12 then
-        hoursFromNoon = hoursFromNoon + 24
-    end
+    -- A catch-up pass looks up to a week back, so the hour folds onto one day, by floor since
+    -- Kahlua's % truncates toward zero; the day of the year stays today's, whose sun moves little
+    -- in a week.
+    local hours = time:getTimeOfDay() - (hoursAgo or 0) - season:getDayHighNoon()
+    local hoursFromNoon = hours - 24 * math.floor((hours + 12) / 24)
     if gameHalfDay <= 0 then
         return Sun.position(dayOfYear, 12, latitude)
     end

@@ -14,7 +14,7 @@ local handler = PZHarness.serverHandler
 
 -- Carried bags count as inventory for jobs, including water split across nested bags. The same
 -- selection must satisfy the menu's needs and consume fullest first without taking tainted water.
-PZHarness.checkHandler("baggedWaterMaterials", function(expect, expectNear, player)
+PZHarness.checkHandler("baggedWaterMaterials", function(expect, expectNear, _, player)
     local inventory = player:getInventory()
     local outer = inventory:AddItem("Base.Bag_DuffelBag")
     local inner = outer:getInventory():AddItem("Base.Bag_DuffelBag")
@@ -51,30 +51,20 @@ handler("stinkSet", function(player, args, defer)
     return {}
 end)
 
--- What the authority's copy of the character smells: its noxious smell moodle level and corpse
--- sickness rate; the corpses and moving objects on the square at x, y, z, which ghosts never join;
--- what is left of the filter of a worn gas mask, if any; and the corpse counts at which the game's
--- smell levels start (Stink.LEVEL_CORPSES), which a multiplayer client's Lua doesn't have.
+-- What the authority's copy of the character smells: its noxious smell moodle level; the corpses
+-- and moving objects on the square at x, y, z, which ghosts never join; and the corpse counts at
+-- which the game's smell levels start (Stink.LEVEL_CORPSES), which a multiplayer client's Lua
+-- doesn't have.
 handler("stinkRead", function(player, args)
     local square = PZHarness.Fixtures.squareAt(args)
-    local mask
-    local worn = player:getWornItems()
-    for i = 0, worn:size() - 1 do
-        local item = worn:getItemByIndex(i)
-        if item and item:hasTag(ItemTag.GAS_MASK) then
-            mask = item:getUsedDelta()
-        end
-    end
     local levels = {}
     for i, count in ipairs(Stink.LEVEL_CORPSES) do
         levels[i] = count
     end
     return {
         level = player:getMoodles():getMoodleLevel(MoodleType.NOXIOUS_SMELL),
-        rate = player:getCorpseSicknessRate(),
         bodies = square and square:getDeadBodys():size() or -1,
         objects = square and square:getMovingObjects():size() or -1,
-        mask = mask,
         levels = levels,
     }
 end)

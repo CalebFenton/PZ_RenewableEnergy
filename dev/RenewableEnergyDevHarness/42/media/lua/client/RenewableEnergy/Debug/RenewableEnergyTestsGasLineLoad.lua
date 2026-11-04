@@ -15,9 +15,10 @@ local test = T.test
 local BANK_RINGS = { 2, 4, 8 }
 
 -- A load past what the line carries stalls the generator, at exactly that it runs, and once the
--- load fits again it starts by itself. Cutting the line while stalled forgets the stall, so a new
--- line doesn't start it. The loads are made up (gasLoad): no set of appliances adds up to exactly
--- the cap; renewable_energy_gasline_generator_stalls_on_real_load measures a real one.
+-- load fits again it starts by itself; this client's copy shows the stall, as its info window does.
+-- Cutting the line while stalled forgets the stall, so a new line doesn't start it. The loads are
+-- made up (gasLoad): no set of appliances adds up to exactly the cap;
+-- renewable_energy_gasline_generator_stalls_on_real_load measures a real one.
 test("renewable_energy_gasline_generator_stalls_over_cap", {
     instant = true,
     run = function(self)
@@ -32,6 +33,10 @@ test("renewable_energy_gasline_generator_stalls_over_cap", {
                 T.readGenerator(self, generator, case[1])
             end
         end)
+        T.waitFor(self, function()
+            local state = GasKit.stateOf(generator.object)
+            return state ~= nil and state.stalled == true
+        end, "this client's copy of the stalled generator")
         -- Cutting the line gives its hoses back, for the next.
         T.kitJob(self, generator, GasKit.DISCONNECT)
         T.readGenerator(self, generator, "cut")
