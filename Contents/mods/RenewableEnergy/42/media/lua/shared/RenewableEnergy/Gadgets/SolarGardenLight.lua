@@ -162,15 +162,30 @@ local function drawLamp(x, y, z, bulb)
     Lamppost.show(lamps[key], x, y, z, r, g, b, SolarGardenLight.SPEC.radius)
 end
 
+-- A multiplayer client: what its server last said each lamp became (a bulb, or false for none),
+-- by place key, until its copy of the light's tile and bulb agree. Until then a sync from the copy
+-- would put out, or light, the lamp the server just changed, for up to a minute.
+local told = {}
+
 --- Gives a lit light a lamp in its bulb's colour and takes an unlit one's away. Not on a
 --- dedicated server, which draws nothing.
 function SolarGardenLight.syncLamp(light)
     if isServer() then
         return
     end
+    local x, y, z = light:getX(), light:getY(), light:getZ()
+    local key = Squares.placeKey(x, y, z)
     -- A client can get the bulb's removal before the unlit tile that follows it, hence the bulb
     -- and the tile both.
-    drawLamp(light:getX(), light:getY(), light:getZ(), SolarGardenLight.lampBulb(light))
+    local bulb, said = SolarGardenLight.lampBulb(light), told[key]
+    if said ~= nil then
+        if (said or nil) == bulb then
+            told[key] = nil
+        else
+            bulb = said or nil
+        end
+    end
+    drawLamp(x, y, z, bulb)
 end
 
 -- The lights this side has seen: the authority runs them, the drawing side lights them. A light
@@ -180,7 +195,9 @@ local lights = PlaceTracker.new({
     matches = SolarGardenLight.isLight,
     onFound = SolarGardenLight.syncLamp,
     onLost = function(x, y, z)
-        removeLamp(Squares.placeKey(x, y, z))
+        local key = Squares.placeKey(x, y, z)
+        told[key] = nil
+        removeLamp(key)
     end,
 })
 
@@ -203,8 +220,9 @@ if not isServer() then
         local square = getCell():getGridSquare(args.x, args.y, args.z)
         local light = SolarGardenLight.findOn(square)
         if light then
+            told[Squares.placeKey(args.x, args.y, args.z)] = args.bulb or false
             lights:add(light)
-            drawLamp(args.x, args.y, args.z, args.bulb)
+            SolarGardenLight.syncLamp(light)
         end
     end)
 end

@@ -509,7 +509,7 @@ test("renewable_energy_biogas_digester_upgrade", {
 -- master object for it.
 local function useBarrelDigester(self, handle, tile, label, held)
     T.waitFor(self, function()
-        handle.object = T.objectWithSprite(getSquare(handle.x, handle.y, handle.z), tile)
+        handle.object = PZHarness.Fixtures.objectWithSprite(getSquare(handle.x, handle.y, handle.z), tile)
         return handle.object ~= nil and Digester.summaryOf(handle.object) ~= nil
     end, "this client's copy of the " .. tile .. " digester")
     T.give(self, label, { { type = FEED, count = 1 } })

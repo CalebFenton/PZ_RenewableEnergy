@@ -19,7 +19,9 @@ end
 --- dropped it, as it drops the lamps of a chunk that unloads.
 function Lamppost.show(lamp, x, y, z, r, g, b, radius)
     local cell, source = getCell(), lamp.source
-    if source and lamp.x == x and lamp.y == y and lamp.z == z and cell:getLightSourceAt(x, y, z) == source then
+    -- Whether the cell still holds this very source: getLightSourceAt answers the first at the
+    -- place, which can be one removed by object that the next lighting pass has yet to drop.
+    if source and lamp.x == x and lamp.y == y and lamp.z == z and cell:getLamppostPositions():contains(source) then
         if lamp.r ~= r or lamp.g ~= g or lamp.b ~= b then
             -- As a vanilla lamp takes a new bulb's colour (IsoLightSwitch.setPrimaryR); the next
             -- lighting pass hands it to the native lighting.

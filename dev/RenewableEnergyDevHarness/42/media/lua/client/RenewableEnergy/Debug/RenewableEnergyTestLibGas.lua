@@ -19,7 +19,7 @@ function T.buildRecord(self, kind, entity, tile, prefer)
     if not square then return nil end
     local handle = T.where(square)
     handle.kind = kind
-    if not T.build(self, entity, square, prefer, function() return T.objectWithSprite(square, tile) ~= nil end,
+    if not T.build(self, entity, square, prefer, function() return PZHarness.Fixtures.objectWithSprite(square, tile) ~= nil end,
         "this client's copy of the " .. tostring(tile) .. " " .. kind) then
         return nil
     end

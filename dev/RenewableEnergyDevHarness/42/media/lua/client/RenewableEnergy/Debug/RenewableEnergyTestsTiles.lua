@@ -101,7 +101,7 @@ test("renewable_energy_tiles_fixed_tiles_work_as_their_twins", {
             fixed = twin == Sprites.gasHeater.off.S and name or fixed
         end
         ISMoveableSpriteProps.new(fixed):placeMoveableInternal(T.player(), square, instanceItem("RenewableEnergy.GasHeater"), fixed)
-        self.twin, self.fixed = T.objectWithSprite(square, Sprites.gasHeater.off.S), T.objectWithSprite(square, fixed)
+        self.twin, self.fixed = PZHarness.Fixtures.objectWithSprite(square, Sprites.gasHeater.off.S), PZHarness.Fixtures.objectWithSprite(square, fixed)
         for _, placed in ipairs({ self.twin, self.fixed }) do
             T.track(self, placed)
         end
@@ -401,7 +401,7 @@ test("renewable_energy_tiles_place_and_pick_up", {
                 T.readCarried(self, { item })
                 T.step(function()
                     local items = T.carriedItems(self, item)
-                    result.removed = T.objectWithSprite(square, sprite) == nil
+                    result.removed = PZHarness.Fixtures.objectWithSprite(square, sprite) == nil
                     result.returned, result.items = #items, self.reads.carried.total
                     result.pickedUpData = carried and describe(items[1] and items[1].modData[carried.key])
                 end)
@@ -467,7 +467,7 @@ test("renewable_energy_tiles_turned_banks_place_and_pick_up", {
             T.pickUpAsPlayer(self, square, tile)
             T.readCarried(self, { item })
             T.step(function()
-                result.removed = T.objectWithSprite(square, tile) == nil
+                result.removed = PZHarness.Fixtures.objectWithSprite(square, tile) == nil
                 result.returned, result.items = #T.carriedItems(self, item), self.reads.carried.total
             end)
             T.takeItems(self, nil, item)
@@ -500,7 +500,7 @@ test("renewable_energy_tiles_battery_box_on_a_table", {
             self.rackFits = ISMoveableSpriteProps.new(rack):canPlaceMoveable(T.player(), square, instanceItem("RenewableEnergy.BatteryRackWood"))
             ISMoveableSpriteProps.new(box):placeMoveableInternal(T.player(), square, item, box)
             local bank = PowerBank.findOn(square)
-            T.track(self, bank or T.objectWithSprite(square, box))
+            T.track(self, bank or PZHarness.Fixtures.objectWithSprite(square, box))
             self.height = bank and bank:getRenderYOffset()
         end)
     end,
@@ -587,7 +587,7 @@ test("renewable_energy_tiles_modules_show", {
                 if not panel then return end
                 T.read(self, "panelCracks", T.at(panel, { sprite = case.sprite, change = case.change }), case.name)
                 T.waitFor(self, function()
-                    return table.concat(T.overlaysOf(T.objectWithSprite(panel.square, case.sprite)), ",")
+                    return table.concat(T.overlaysOf(PZHarness.Fixtures.objectWithSprite(panel.square, case.sprite)), ",")
                         == table.concat(self.reads[case.name].overlays, ",")
                 end, "this client's overlays of " .. case.what)
             end

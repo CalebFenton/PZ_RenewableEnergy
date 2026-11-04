@@ -12,7 +12,7 @@ local test, expect, expectEqual, serverCheck = T.test, T.expect, T.expectEqual, 
 -- This client's copy of the first object of `sprite` on `square`, and how many items its
 -- container holds (nil without one).
 local function copyOf(square, sprite)
-    local object = T.objectWithSprite(square, sprite)
+    local object = PZHarness.Fixtures.objectWithSprite(square, sprite)
     local container = object and object:getContainer()
     return object, container and container:getItems():size()
 end

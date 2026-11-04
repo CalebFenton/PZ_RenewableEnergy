@@ -219,7 +219,7 @@ test("renewable_energy_bank_box_and_rack_both_offered", {
 -- Whether the moveables cursor would pick up and turn the object drawn as `sprite` on `handle`,
 -- and whether its panel says to disconnect it first.
 local function takeable(handle, sprite)
-    local object = T.objectWithSprite(handle.square, sprite)
+    local object = PZHarness.Fixtures.objectWithSprite(handle.square, sprite)
     local props = ISMoveableSpriteProps.fromObject(object)
     local refusal = "- " .. getText("Tooltip_RenewableEnergy_DisconnectFirst")
     local says = false
