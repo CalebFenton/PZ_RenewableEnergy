@@ -111,8 +111,8 @@ test("renewable_energy_world_arrow_board_plain_spawn_keeps_stock", {
     end,
 })
 
--- A trailer saved before its panels and frame were parts gets them on its first load: modules at
--- found conditions, a frame, and the script's colour over the random one it spawned with. Panels
+-- A trailer saved before its panels were parts gets them on its first load, modules at found
+-- conditions, and the script's colour over the random one it spawned with. Panels
 -- taken off later stay off through the next load.
 test("renewable_energy_world_arrow_board_old_trailer_gets_its_new_parts_once", {
     sandbox = { LRMSolarPanels = 1 },
@@ -131,9 +131,6 @@ test("renewable_energy_world_arrow_board_old_trailer_gets_its_new_parts_once", {
         expect(panelShown(second, LEFT) == "" and panelShown(second, RIGHT) == "",
             "empty panels show " .. panelShown(second, LEFT) .. " and " .. panelShown(second, RIGHT))
         local frame = self.reads.frame
-        for _, part in ipairs(ArrowBoard.FRAME) do
-            expect(frameCondition(frame.state, part.id) ~= nil, "the old trailer's " .. part.id .. " loaded empty")
-        end
         expect(frame.state.colorSat == frame.forcedSat and frame.state.colorVal == frame.forcedVal,
             string.format("the old trailer kept its colour, saturation %.2f and value %.2f", frame.state.colorSat, frame.state.colorVal))
     end,
@@ -269,7 +266,7 @@ end
 
 -- A module sealed before, low enough for one more seal, which would take a module never sealed
 -- further: only a seal that reads the module's own seal count stops where it should.
-local SEALED_BEFORE, SEAL_FROM = 2, 34
+local SEALED_BEFORE, SEAL_FROM = 2, 50
 
 -- Seal Cracked Panel seals the panel's module as Seal Cracked Module seals one in hand
 -- (ModuleRepair.sealed, whose steps and caps the module repair tests check), counting the seal,

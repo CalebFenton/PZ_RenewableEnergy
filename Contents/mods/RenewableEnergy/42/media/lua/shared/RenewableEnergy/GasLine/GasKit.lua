@@ -40,6 +40,8 @@ GasKit.CAP_W = 3000
 -- Biogas a generator burns for each litre of petrol vanilla bills it, by energy: petrol about
 -- 9.5 kWh a litre, biogas about 6 kWh a m³.
 GasKit.M3_PER_LITRE = 1.6
+-- Litres a vanilla generator's tank holds (IsoGenerator.getMaxFuel, a constant there).
+GasKit.TANK_LITRES = 10
 -- Litres an hour vanilla bills an idling generator before the GeneratorFuelConsumption option
 -- (IsoGenerator's GeneratorBasePowerConsumption; only a generator's getBasePowerConsumption gives
 -- it). A fire kept going with no generator to feed, a lit gasifier's or a gas heater's, burns it.

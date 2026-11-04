@@ -31,7 +31,7 @@ function Wear.setCondition(item, condition)
     item:setCondition(math.max(0, math.min(item:getConditionMax(), math.floor(condition))))
 end
 
--- Each patch-up repair (a battery's Service or Recondition, a module's seal) counts on vanilla's
+-- Each patch-up repair (a battery's Recondition, a module's seal) counts on vanilla's
 -- per-item repair count ("Repaired: Nx") and lowers the most the next can bring the item to by
 -- this step, so patching runs out. Remaking it with fresh parts (Rebuild Battery, Reglaze Module)
 -- starts the count again.

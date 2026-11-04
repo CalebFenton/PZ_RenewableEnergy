@@ -239,7 +239,7 @@ handler("applyLoad", function(_, args)
     for _, appliance in ipairs(args.appliances or {}) do
         Loads.add(load, appliance.name, appliance.watts)
     end
-    record.loadW, record.loadByKind = load.watts, Loads.byKind(load)
+    record.loadW, record.loadByKind, record.loadElsewhere = load.watts, Loads.byKind(load), Loads.elsewhere(load) or false
     record:checkOverload()
     record:switchGenerator()
     record:afterChange()
@@ -276,13 +276,15 @@ end)
 -- Loads -------------------------------------------------------------------------------------------
 
 -- What the load scan of the bank on the square at `args` finds, as the payer there: its watts and
--- the count of each kind.
+-- the count of each kind, in this building or another.
 handler("scanLoad", function(_, args)
     local payer = { x = args.x, y = args.y, z = args.z, key = Squares.placeKey(args.x, args.y, args.z) }
     local load = Payers.scan(payer, Payers.running())
     local counts = {}
-    for name, kind in pairs(load.kinds) do
-        counts[name] = kind.count
+    for _, group in ipairs({ load, load.elsewhere }) do
+        for name, kind in pairs(group.kinds) do
+            counts[name] = (counts[name] or 0) + kind.count
+        end
     end
     return { watts = load.watts, counts = counts }
 end)

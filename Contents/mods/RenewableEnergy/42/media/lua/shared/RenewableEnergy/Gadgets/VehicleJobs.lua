@@ -106,12 +106,11 @@ VehicleJobs.JOBS = {
         with = VehicleJobs.isBoltCutters, withMissing = "Tooltip_RenewableEnergy_NeedsBoltCutters",
     },
     -- Seal Cracked Module's and Reglaze Module's twins for a panel still on the trailer.
-    [VehicleJobs.SEAL_PANEL] = ModuleRepair.jobRow(ModuleRepair.SEAL, function(vehicle, partId)
-        return ArrowBoard.sealablePanel(vehicle, partId) ~= nil
-    end, "Tooltip_RenewableEnergy_PanelSealedFully", { position = "Mid", area = areaOf }),
+    [VehicleJobs.SEAL_PANEL] = ModuleRepair.jobRow(ModuleRepair.SEAL, ArrowBoard.sealRefusal,
+        { position = "Mid", area = areaOf }),
     [VehicleJobs.REGLAZE_PANEL] = ModuleRepair.jobRow(ModuleRepair.REGLAZE, function(vehicle, partId)
-        return ArrowBoard.reglazablePanel(vehicle, partId) ~= nil
-    end, "Tooltip_RenewableEnergy_NotDamaged", { position = "Mid", area = areaOf }),
+        return not ArrowBoard.reglazablePanel(vehicle, partId) and "Tooltip_RenewableEnergy_NotDamaged" or nil
+    end, { position = "Mid", area = areaOf }),
 }
 
 Jobs.define(VehicleJobs, {

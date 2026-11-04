@@ -32,7 +32,7 @@ Keep the lights on after the grid and the gas are gone, with what a Kentucky far
 ![Every item's model and icon: panels, storage, parts, batteries, gas and wind parts, gadgets and magazines](art/promo/images/items.png)
 
 - **Banks** hold the batteries and what you wire into them: inverters, charge controllers, a charger and a **Solar Failsafe** that starts the generator when they run low.
-- **Batteries wear** with every deep drain. Service and recondition them, each repair bringing them back less far, then strip and rebuild them with plates you cast yourself.
+- **Batteries wear** with every deep drain. Service them, recondition them less far each time, then strip and rebuild them with plates you cast yourself.
 - **Panels follow the sun**: flat ones for summer, wall panels for winter, ground racks for the year. Storms crack modules; seal them with epoxy or glue, or reglaze them.
 - **Wind chargers, treadmills, digesters and gasifiers** fill in when the sun won't.
 - **Small gadgets** need no bank: a maintainer for a parked car's battery, a charger for flashlight batteries, and garden lights.
@@ -49,7 +49,7 @@ Keep the lights on after the grid and the gas are gone, with what a Kentucky far
 4. Put up a panel outside, then **Connect Sources in Reach**.
 5. **Turn On**. **Status** shows what it's doing, and which sources need fixing.
 
-The bank powers everything a generator in its spot would, the neighbours' lights included, so set up away from town.
+The bank powers everything a generator in its spot would, the neighbours' fridges included, so set up away from town. Its status window shows what draws in other buildings.
 
 ## Wind
 

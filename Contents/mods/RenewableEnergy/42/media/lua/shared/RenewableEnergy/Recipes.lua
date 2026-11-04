@@ -188,16 +188,21 @@ local function inputBattery(craftRecipeData)
     return Items.firstInput(craftRecipeData, Battery.isBattery)
 end
 
--- OnTest of Service Battery and Recondition Battery.
-function Recipes.canRepairBattery(item, character)
+-- OnTest of Service Battery.
+function Recipes.canServiceBattery(item, character)
+    return not Battery.isBattery(item) or item:getCondition() < Battery.serviceLimit(item:getHaveBeenRepaired())
+end
+
+-- OnTest of Recondition Battery.
+function Recipes.canReconditionBattery(item, character)
     return not Battery.isBattery(item) or item:getCondition() < Battery.repairLimit(item:getHaveBeenRepaired())
 end
 
--- OnCreate of Service Battery.
+-- OnCreate of Service Battery: a top-up, not a repair, so it leaves the repair count be.
 function Recipes.serviceBattery(craftRecipeData, character)
     local battery = inputBattery(craftRecipeData)
     Wear.setCondition(battery, Battery.serviced(battery:getCondition(), battery:getHaveBeenRepaired()))
-    countRepair(battery)
+    sendItemStats(battery)
 end
 
 -- OnCreate of Recondition Battery.

@@ -6,12 +6,13 @@ local StatusRows = require "RenewableEnergy/UI/StatusRows"
 local Items = require "cf_commonlib/Items"
 local Sprites = require "RenewableEnergy/Sprites"
 local Yardsticks = require "RenewableEnergy/Debug/RenewableEnergyYardsticks"
+local GeneratorReach = require "cf_commonlib/GeneratorReach"
 
 -- Power bank tests: the status window (UI/StatusWindow.lua, UI/StatusRows.lua).
 -- Banks live on the authority (see RenewableEnergyTestsBank.lua).
 
 local T = RenewableEnergyTest
-local test, expect, expectEqual, player = T.test, T.expect, T.expectEqual, T.player
+local test, expect, expectEqual, expectNear, player = T.test, T.expect, T.expectEqual, T.expectNear, T.player
 
 -- The watts appliances of the kinds `names` draw together, at vanilla's figures.
 local function loadW(names)
@@ -196,6 +197,83 @@ test("renewable_energy_bank_window_reflects_status", {
         expect(own.label:find(rackName, 1, true) ~= nil and own.value:find(noSlot, 1, true) ~= nil
             and own.color == "bad", "the panel past the slots reads " .. own.label .. ": " .. own.value)
         expectEqual("the sources the slotless panel's row highlights", #own.sources, 1)
+    end,
+})
+
+-- The rows under the header `text` in `rows`, up to the next header; nil without that header.
+local function rowsUnder(rows, text)
+    local under
+    for _, r in ipairs(rows) do
+        if r.header then
+            if under then return under end
+            if r.header == text then under = {} end
+        elseif under and r.label then
+            table.insert(under, r)
+        end
+    end
+    return under
+end
+
+-- Fridges in another building in the bank's reach are billed to it, as a generator in its spot
+-- would bill them, and listed apart: enough of them overload the bank, the overload line says how
+-- much of the load stands in other buildings, and this client's window lists them under a header
+-- of their own. Catches a split that drops them from the bill, or a status that loses them on its
+-- way to a client.
+test("renewable_energy_bank_window_lists_other_buildings_apart", {
+    run = function(self)
+        T.setGrid(self, false)
+        local bank = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY, T.PLUG_IN_INVERTER })
+        if not bank then return end
+        self.bank = bank
+        T.watch(self, bank)
+        T.switchOn(self, bank)
+        T.bankPass(self, bank, 0, { label = "without" })
+        -- Steps, since single player places a tile at once.
+        T.step(function()
+            local status = self.reads.without.status
+            local home = bank.square:getBuilding()
+            local function inOtherBuilding(square)
+                local building = square:getBuilding()
+                return building ~= nil and (home == nil or building:getID() ~= home:getID())
+                    and GeneratorReach.covers(bank.x, bank.y, bank.z, square:getX(), square:getY(), square:getZ())
+            end
+            self.count = math.floor((status.limitW - status.loadW) / T.fridgeW()) + 1
+            local squares = T.need(self, self.count > 0
+                and T.squares(self, self.count, { indoors = true, near = bank.square, accept = inOtherBuilding }),
+                self.count .. " free indoor squares in another building in the bank's reach, for fridges")
+            if not squares then return end
+            for _, square in ipairs(squares) do
+                T.placeTile(self, square, T.MINI_FRIDGE)
+            end
+            T.bankPass(self, bank, 0, { label = "with" })
+            T.waitForStatus(self, bank, function(s) return s.overloaded == true end,
+                "this client's status of the overloaded bank")
+        end)
+    end,
+    validate = function(self)
+        local without, with = self.reads.without.status, self.reads.with.status
+        local function elsewhereW(status) return status.loadElsewhere and status.loadElsewhere.watts or 0 end
+        local added = self.count * T.fridgeW()
+        expect(with.overloaded, "fridges in another building didn't overload the bank")
+        expectNear("the load the fridges in another building add", with.loadW - without.loadW, added, 0.01)
+        expectNear("the load they add in other buildings", elsewhereW(with) - elsewhereW(without), added, 0.01)
+        local status = T.clientStatus(self.bank)
+        local elsewhere = status and status.loadElsewhere
+        if not expect(elsewhere ~= nil, "this client's status holds nothing in other buildings") then return end
+        local summary = StatusRows.summary(status)
+        expect(T.hasLine(summary, getText("IGUI_RenewableEnergy_OverloadedElsewhere", Format.watts(status.loadW),
+            Format.watts(status.limitW), Format.watts(elsewhere.watts))), "the overload doesn't say how much is in other buildings")
+        local left = StatusRows.rows(status, self.bank)
+        expect(rowsUnder(left, getText("IGUI_RenewableEnergy_DrawingHere")) ~= nil, "the window has no list for this building")
+        local under = rowsUnder(left, getText("IGUI_RenewableEnergy_DrawingElsewhere", Format.away(self.bank, elsewhere)))
+        if not expect(under ~= nil, "the window has no list for other buildings") then return end
+        local fridges = T.findIn(elsewhere.byKind, "kind", "fridgeFreezer")
+        if not expect(fridges ~= nil and fridges.count >= self.count, "the status lists too few fridge-freezers in other buildings") then
+            return
+        end
+        local name = getText("IGUI_RenewableEnergy_LoadFridgeFreezer")
+        local label = fridges.count > 1 and getText("IGUI_RenewableEnergy_Count", name, fridges.count) or name
+        expect(T.rowLabelled(under, label) ~= nil, "the list for other buildings has no row " .. label)
     end,
 })
 

@@ -57,40 +57,55 @@ local function kindOf(object)
     return "other"
 end
 
--- Adds to `load` each appliance `object` runs now, at vanilla's figure for it.
-local function addAppliances(load, object, fuel)
+-- Adds to `load` each appliance `object` runs now, at vanilla's figure for it, `elsewhere` or not.
+local function addAppliances(load, object, fuel, elsewhere)
     local watts = Specs.wattsFromFuel(fuel)
     if instanceof(object, "IsoStackedWasherDryer") then
         -- Vanilla bills the two halves together, the same for each.
         local washer, dryer = object:isWasherActivated(), object:isDryerActivated()
         local halves = (washer and 1 or 0) + (dryer and 1 or 0)
-        if washer then Loads.add(load, "washer", watts / halves) end
-        if dryer then Loads.add(load, "dryer", watts / halves) end
+        if washer then Loads.add(load, "washer", watts / halves, elsewhere) end
+        if dryer then Loads.add(load, "dryer", watts / halves, elsewhere) end
     else
-        Loads.add(load, kindOf(object), watts)
+        Loads.add(load, kindOf(object), watts, elsewhere)
     end
 end
 
---- A new, empty load: the `watts` it takes, per kind its count and watts, the running generators
---- found, and `othersFuel`, vanilla's bill for the appliances in reach that others pay for.
-function Loads.new()
-    return { watts = 0, kinds = {}, generators = {}, othersFuel = 0 }
+-- The building `square` stands in, by its id, or nil outdoors.
+local function buildingOf(square)
+    local building = square and square:getBuilding()
+    return building and building:getID()
 end
 
---- Add an appliance of kind `name` (StatusWindow's LOAD_KINDS) drawing `watts` to `load`.
-function Loads.add(load, name, watts)
+--- A new, empty load of the payer at `at` ({ x, y, z }; nil for one made up): the `watts` it takes,
+--- per kind its count and watts, the running generators found, `othersFuel`, vanilla's bill for the
+--- appliances in reach that others pay for, and `elsewhere`, the share of `watts` that stands in
+--- other buildings than the payer's, with its own kinds and the place of the nearest.
+function Loads.new(at)
+    return { watts = 0, kinds = {}, generators = {}, othersFuel = 0, at = at,
+        home = at and buildingOf(getSquare(at.x, at.y, at.z)), elsewhere = { watts = 0, kinds = {} } }
+end
+
+--- Add an appliance of kind `name` (StatusWindow's LOAD_KINDS) drawing `watts` to `load`, in
+--- another building if `elsewhere`.
+function Loads.add(load, name, watts, elsewhere)
     load.watts = load.watts + watts
-    local kind = load.kinds[name] or { count = 0, watts = 0 }
+    local group = load
+    if elsewhere then
+        group = load.elsewhere
+        group.watts = group.watts + watts
+    end
+    local kind = group.kinds[name] or { count = 0, watts = 0 }
     kind.count = kind.count + 1
     kind.watts = kind.watts + watts
-    load.kinds[name] = kind
+    group.kinds[name] = kind
 end
 
 local function byWattsDescending(a, b)
     return a.watts > b.watts
 end
 
---- The load by kind, biggest first: { { kind, count, watts }, ... }.
+--- The load, or its `elsewhere` share, by kind, biggest first: { { kind, count, watts }, ... }.
 function Loads.byKind(load)
     local list = {}
     for name, kind in pairs(load.kinds) do
@@ -98,6 +113,22 @@ function Loads.byKind(load)
     end
     table.sort(list, byWattsDescending)
     return list
+end
+
+--- The watts `load` takes for the kind `name`, in whatever building.
+function Loads.kindW(load, name)
+    local here, elsewhere = load.kinds[name], load.elsewhere.kinds[name]
+    return (here and here.watts or 0) + (elsewhere and elsewhere.watts or 0)
+end
+
+--- What of the load stands in other buildings, for the status: { watts, byKind (Loads.byKind),
+--- x, y, z of the nearest }; nil if nothing does.
+function Loads.elsewhere(load)
+    local elsewhere = load.elsewhere
+    if elsewhere.watts <= 0 then
+        return nil
+    end
+    return { watts = elsewhere.watts, byKind = Loads.byKind(elsewhere), x = elsewhere.x, y = elsewhere.y, z = elsewhere.z }
 end
 
 -- Whether the grid powers `object` now (ItemContainer.isObjectPowered), so a generator wouldn't.
@@ -113,7 +144,8 @@ end
 --- banks aside, as `onGenerator(generator)`: those power the payer's square. A draw is { object,
 --- x, y, z, index (its object index on its square), watts, fuel (vanilla's bill an hour for an
 --- appliance; nil for a treadmill or another mod's draw), kind (a treadmill's or another mod's),
---- onGrid (whether the grid powers it now) }.
+--- onGrid (whether the grid powers it now), building (the id of the building it stands in, nil
+--- outdoors) }.
 ---@param square IsoGridSquare the payer's square
 function Loads.eachDraw(square, fn, onGenerator)
     local allowExterior = SandboxVars.AllowExteriorGenerator
@@ -139,7 +171,7 @@ function Loads.eachDraw(square, fn, onGenerator)
             end
             if draw then
                 draw.object, draw.x, draw.y, draw.z, draw.index = object, x, y, z, i
-                draw.onGrid = onGrid(object)
+                draw.onGrid, draw.building = onGrid(object), buildingOf(scanned)
                 fn(draw)
             end
             i = scanned:getNextNonItemObjectIndex(i + 1)
@@ -154,12 +186,30 @@ function Loads.counts(draw, gridGone, vanilla)
     return (gridGone or not draw.onGrid) and not (vanilla and draw.kind and draw.kind ~= "treadmill")
 end
 
---- Adds `draw` (Loads.eachDraw) to `load`, at vanilla's figure for an appliance.
+-- Notes `draw` as the nearest of `load`'s other buildings' draws if it is, by tiles, each level
+-- counting as one, as Payers measures; of draws as near, the first.
+local function noteNearest(load, draw)
+    local elsewhere, at = load.elsewhere, load.at
+    local dx, dy, dz = draw.x - at.x, draw.y - at.y, draw.z - at.z
+    local distance = dx * dx + dy * dy + dz * dz
+    if not elsewhere.distance or distance < elsewhere.distance then
+        elsewhere.distance, elsewhere.x, elsewhere.y, elsewhere.z = distance, draw.x, draw.y, draw.z
+    end
+end
+
+--- Adds `draw` (Loads.eachDraw) to `load`, at vanilla's figure for an appliance. A draw in another
+--- building than the payer's goes in its `elsewhere` share; one outdoors counts as the payer's own.
+--- A vanilla generator in the same spot bills both alike, so the bank does: the split only tells
+--- the player where the load is.
 function Loads.addDraw(load, draw)
+    local elsewhere = draw.building ~= nil and draw.building ~= load.home
+    if elsewhere then
+        noteNearest(load, draw)
+    end
     if draw.fuel then
-        addAppliances(load, draw.object, draw.fuel)
+        addAppliances(load, draw.object, draw.fuel, elsewhere)
     else
-        Loads.add(load, draw.kind, draw.watts)
+        Loads.add(load, draw.kind, draw.watts, elsewhere)
     end
 end
 

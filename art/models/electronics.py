@@ -333,9 +333,9 @@ def _battery_clamp(col, name, colour, at, turn=0):
 
 
 def makeshift_inverter(col):
-    """A 300 W inverter knocked up on an offcut of pine: a car battery charger's transformer screwed
+    """A 400 W inverter knocked up on an offcut of pine: a car battery charger's transformer screwed
     down, a heat sink with two power transistors, one outlet in a steel handy box, loose hookup wire
-    twisted under a wire nut, a zip cord patched with tape, "300W" in marker, and a pair of leads
+    twisted under a wire nut, a zip cord patched with tape, "400W" in marker, and a pair of leads
     ending in the charger's battery clamps."""
     top = BOARD
     box(col, "MakeInv_Board", M("pine"), (0.19, 0.135, top), bevel=0.002)
@@ -357,7 +357,7 @@ def makeshift_inverter(col):
             (0.0375, -0.042, top + 0.02)]
     tube(col, "MakeInv_Cord", M("white"), cord, 0.0028)
     tube(col, "MakeInv_Tape", M("black"), [(-0.008, -0.0315, top + 0.005), (0.004, -0.0335, top + 0.007)], 0.0042, 8)
-    text(col, "MakeInv_Marker", M("ink"), "300W", 0.016, at=(-0.018, -0.062, top + 0.0005), rotate=(0, 0, 0))
+    text(col, "MakeInv_Marker", M("ink"), "400W", 0.016, at=(-0.018, -0.062, top + 0.0005), rotate=(0, 0, 0))
     for colour, points, clamp in (
             ("red", [(-0.055, -0.011, top + 0.02), (-0.058, -0.04, top + 0.004), (-0.052, -0.065, top + 0.003), (-0.045, -0.079, 0.012),
                      (-0.038, -0.092, 0.006), (-0.033, -0.097, 0.004)], (-0.071, -0.097)),

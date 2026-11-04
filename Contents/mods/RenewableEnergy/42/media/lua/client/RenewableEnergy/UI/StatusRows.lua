@@ -17,8 +17,9 @@ local function chargingLine(status)
     local watts, hours = status.charging.watts, status.charging.hours
     local shownWatts = round(watts)
     if shownWatts > 0 then
+        -- Charging with no time to full: the batteries are full, and the surplus goes to waste.
         local text = hours and getText("IGUI_RenewableEnergy_ChargingFullIn", Format.signedWatts(watts), Format.duration(hours))
-            or getText("IGUI_RenewableEnergy_Charging", Format.signedWatts(watts))
+            or getText("IGUI_RenewableEnergy_FullSpare", Format.watts(watts))
         return { text = text, color = "good" }
     elseif shownWatts < 0 then
         local text = hours and getText("IGUI_RenewableEnergy_DrainingEmptyIn", Format.signedWatts(watts), Format.duration(hours))
@@ -30,7 +31,12 @@ end
 
 local function loadLine(status)
     if status.overloaded then
-        return { text = getText("IGUI_RenewableEnergy_Overloaded", Format.watts(status.loadW), Format.watts(status.limitW)), color = "bad" }
+        local elsewhere = status.loadElsewhere
+        local text = elsewhere
+            and getText("IGUI_RenewableEnergy_OverloadedElsewhere", Format.watts(status.loadW), Format.watts(status.limitW),
+                Format.watts(elsewhere.watts))
+            or getText("IGUI_RenewableEnergy_Overloaded", Format.watts(status.loadW), Format.watts(status.limitW))
+        return { text = text, color = "bad" }
     elseif status.limitW <= 0 then
         return { text = getText("IGUI_RenewableEnergy_NoWorkingInverter"), color = "bad" }
     end
@@ -172,8 +178,8 @@ local function counted(name, count)
     return name
 end
 
--- "TV" or "Lights ×3": a kind of load from Bank status `loadByKind`. Another mod's kind is its own
--- translation key (GeneratorReach.addDraw).
+-- "TV" or "Lights ×3": a kind of load from Bank status `loadByKind` or `loadElsewhere.byKind`.
+-- Another mod's kind is its own translation key (GeneratorReach.addDraw).
 local function loadLabel(entry)
     local key = LOAD_KINDS[entry.kind] or (entry.kind:find("^IGUI_") and entry.kind) or LOAD_KINDS.other
     return counted(getText(key), entry.count)
@@ -195,15 +201,29 @@ local function groupBy(list, nameOf)
     return groups
 end
 
-local function loadRows(rows, status)
-    header(rows, "IGUI_RenewableEnergy_Drawing")
-    if #status.loadByKind == 0 then
+local function kindRows(rows, byKind)
+    if #byKind == 0 then
         row(rows, getText("IGUI_RenewableEnergy_NothingOn"), "", "dim")
-        return
     end
-    for _, entry in ipairs(status.loadByKind) do
+    for _, entry in ipairs(byKind) do
         row(rows, loadLabel(entry), Format.watts(entry.watts))
     end
+end
+
+-- What the bank pays for by kind. Its reach takes in the neighbours' fridges, as a generator's
+-- does, so what stands in other buildings gets a list of its own, headed by how far the nearest
+-- is, for the player to know where to switch off or pick up.
+local function loadRows(rows, status, bankPosition)
+    local elsewhere = status.loadElsewhere
+    if not elsewhere then
+        header(rows, "IGUI_RenewableEnergy_Drawing")
+        kindRows(rows, status.loadByKind)
+        return
+    end
+    header(rows, "IGUI_RenewableEnergy_DrawingHere")
+    kindRows(rows, status.loadByKind)
+    header(rows, "IGUI_RenewableEnergy_DrawingElsewhere", Format.away(bankPosition, elsewhere))
+    kindRows(rows, elsewhere.byKind)
 end
 
 local function storageRows(rows, status)
@@ -359,7 +379,7 @@ end
 function StatusRows.rows(status, bankPosition)
     local left, right = {}, {}
     powerRows(left, status)
-    loadRows(left, status)
+    loadRows(left, status, bankPosition)
     storageRows(left, status)
     partRows(left, status)
     batteryRows(right, status)

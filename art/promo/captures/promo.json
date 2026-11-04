@@ -538,7 +538,7 @@
         26,
         26,
         100,
-        76
+        75
       ]
     },
     {
@@ -1145,12 +1145,14 @@
           {
             "level": 6,
             "name": "Electrical"
+          },
+          {
+            "level": 4,
+            "name": "Blacksmithing"
           }
         ],
         "autoAll": [],
-        "magazines": [
-          "Magazine: Homestead Power #2 - Power Trip"
-        ],
+        "magazines": [],
         "needed": true,
         "research": [
           "Battery Plate Mold"
@@ -1425,12 +1427,14 @@
           {
             "level": 6,
             "name": "Electrical"
+          },
+          {
+            "level": 4,
+            "name": "Blacksmithing"
           }
         ],
         "autoAll": [],
-        "magazines": [
-          "Magazine: Homestead Power #2 - Power Trip"
-        ],
+        "magazines": [],
         "needed": true,
         "research": [
           "Unfired Battery Plate Mold"
@@ -1867,9 +1871,7 @@
           }
         ],
         "autoAll": [],
-        "magazines": [
-          "Magazine: Homestead Power #2 - Power Trip"
-        ],
+        "magazines": [],
         "needed": true,
         "research": [
           "Car Battery Case",
@@ -2632,9 +2634,7 @@
           }
         ],
         "autoAll": [],
-        "magazines": [
-          "Magazine: Homestead Power #2 - Power Trip"
-        ],
+        "magazines": [],
         "needed": true,
         "research": [
           "Broken Glass",
@@ -3348,9 +3348,7 @@
           }
         ],
         "autoAll": [],
-        "magazines": [
-          "Magazine: Homestead Power #2 - Power Trip"
-        ],
+        "magazines": [],
         "needed": true,
         "research": [
           "L-16 Battery"
@@ -3486,9 +3484,7 @@
           }
         ],
         "autoAll": [],
-        "magazines": [
-          "Magazine: Homestead Power #2 - Power Trip"
-        ],
+        "magazines": [],
         "needed": true,
         "research": [
           "Deep Cycle Battery Case",
@@ -3575,9 +3571,7 @@
           }
         ],
         "autoAll": [],
-        "magazines": [
-          "Magazine: Homestead Power #2 - Power Trip"
-        ],
+        "magazines": [],
         "needed": true,
         "research": [
           "Battery Plates"
@@ -4069,9 +4063,7 @@
           }
         ],
         "autoAll": [],
-        "magazines": [
-          "Magazine: Homestead Power #2 - Power Trip"
-        ],
+        "magazines": [],
         "needed": true,
         "research": [
           "L-16 Battery Case",
@@ -4153,78 +4145,6 @@
               "fullType": "Base.GlassPanel",
               "icon": "icon_Base_GlassPanel",
               "name": "Glass Pane"
-            },
-            {
-              "count": 1,
-              "fullType": "Base.Windshield1",
-              "icon": "icon_Base_Windshield1",
-              "name": "Windshield"
-            },
-            {
-              "count": 1,
-              "fullType": "Base.Windshield2",
-              "icon": "icon_Base_Windshield2",
-              "name": "Windshield"
-            },
-            {
-              "count": 1,
-              "fullType": "Base.Windshield3",
-              "icon": "icon_Base_Windshield3",
-              "name": "Windshield"
-            },
-            {
-              "count": 1,
-              "fullType": "Base.RearWindshield1",
-              "icon": "icon_Base_RearWindshield1",
-              "name": "Rear Windshield"
-            },
-            {
-              "count": 1,
-              "fullType": "Base.RearWindshield2",
-              "icon": "icon_Base_RearWindshield2",
-              "name": "Rear Windshield"
-            },
-            {
-              "count": 1,
-              "fullType": "Base.RearWindshield3",
-              "icon": "icon_Base_RearWindshield3",
-              "name": "Rear Windshield"
-            },
-            {
-              "count": 1,
-              "fullType": "Base.FrontWindow1",
-              "icon": "icon_Base_FrontWindow1",
-              "name": "Front Window"
-            },
-            {
-              "count": 1,
-              "fullType": "Base.FrontWindow2",
-              "icon": "icon_Base_FrontWindow2",
-              "name": "Front Window"
-            },
-            {
-              "count": 1,
-              "fullType": "Base.FrontWindow3",
-              "icon": "icon_Base_FrontWindow3",
-              "name": "Front Window"
-            },
-            {
-              "count": 1,
-              "fullType": "Base.RearWindow1",
-              "icon": "icon_Base_RearWindow1",
-              "name": "Rear Window"
-            },
-            {
-              "count": 1,
-              "fullType": "Base.RearWindow2",
-              "icon": "icon_Base_RearWindow2",
-              "name": "Rear Window"
-            },
-            {
-              "count": 1,
-              "fullType": "Base.RearWindow3",
-              "icon": "icon_Base_RearWindow3",
-              "name": "Rear Window"
             }
           ],
           "keep": false,
@@ -4470,12 +4390,14 @@
           {
             "level": 6,
             "name": "Electrical"
+          },
+          {
+            "level": 4,
+            "name": "Blacksmithing"
           }
         ],
         "autoAll": [],
-        "magazines": [
-          "Magazine: Homestead Power #2 - Power Trip"
-        ],
+        "magazines": [],
         "needed": true,
         "research": [
           "Wooden Battery Plate Pattern"
@@ -4655,9 +4577,7 @@
           }
         ],
         "autoAll": [],
-        "magazines": [
-          "Magazine: Homestead Power #2 - Power Trip"
-        ],
+        "magazines": [],
         "needed": true,
         "research": [
           "Jar Battery"
@@ -4870,12 +4790,14 @@
           {
             "level": 6,
             "name": "Electrical"
+          },
+          {
+            "level": 4,
+            "name": "Blacksmithing"
           }
         ],
         "autoAll": [],
-        "magazines": [
-          "Magazine: Homestead Power #2 - Power Trip"
-        ],
+        "magazines": [],
         "needed": true,
         "research": [
           "Battery Plates",
@@ -5293,9 +5215,7 @@
           }
         ],
         "autoAll": [],
-        "magazines": [
-          "Magazine: Homestead Power #2 - Power Trip"
-        ],
+        "magazines": [],
         "needed": true,
         "research": []
       },
@@ -5761,12 +5681,14 @@
           {
             "level": 6,
             "name": "Electrical"
+          },
+          {
+            "level": 4,
+            "name": "Blacksmithing"
           }
         ],
         "autoAll": [],
-        "magazines": [
-          "Magazine: Homestead Power #2 - Power Trip"
-        ],
+        "magazines": [],
         "needed": true,
         "research": [
           "Battery Plates"
@@ -6699,78 +6621,6 @@
               "fullType": "Base.GlassPanel",
               "icon": "icon_Base_GlassPanel",
               "name": "Glass Pane"
-            },
-            {
-              "count": 1,
-              "fullType": "Base.Windshield1",
-              "icon": "icon_Base_Windshield1",
-              "name": "Windshield"
-            },
-            {
-              "count": 1,
-              "fullType": "Base.Windshield2",
-              "icon": "icon_Base_Windshield2",
-              "name": "Windshield"
-            },
-            {
-              "count": 1,
-              "fullType": "Base.Windshield3",
-              "icon": "icon_Base_Windshield3",
-              "name": "Windshield"
-            },
-            {
-              "count": 1,
-              "fullType": "Base.RearWindshield1",
-              "icon": "icon_Base_RearWindshield1",
-              "name": "Rear Windshield"
-            },
-            {
-              "count": 1,
-              "fullType": "Base.RearWindshield2",
-              "icon": "icon_Base_RearWindshield2",
-              "name": "Rear Windshield"
-            },
-            {
-              "count": 1,
-              "fullType": "Base.RearWindshield3",
-              "icon": "icon_Base_RearWindshield3",
-              "name": "Rear Windshield"
-            },
-            {
-              "count": 1,
-              "fullType": "Base.FrontWindow1",
-              "icon": "icon_Base_FrontWindow1",
-              "name": "Front Window"
-            },
-            {
-              "count": 1,
-              "fullType": "Base.FrontWindow2",
-              "icon": "icon_Base_FrontWindow2",
-              "name": "Front Window"
-            },
-            {
-              "count": 1,
-              "fullType": "Base.FrontWindow3",
-              "icon": "icon_Base_FrontWindow3",
-              "name": "Front Window"
-            },
-            {
-              "count": 1,
-              "fullType": "Base.RearWindow1",
-              "icon": "icon_Base_RearWindow1",
-              "name": "Rear Window"
-            },
-            {
-              "count": 1,
-              "fullType": "Base.RearWindow2",
-              "icon": "icon_Base_RearWindow2",
-              "name": "Rear Window"
-            },
-            {
-              "count": 1,
-              "fullType": "Base.RearWindow3",
-              "icon": "icon_Base_RearWindow3",
-              "name": "Rear Window"
             }
           ],
           "keep": false,
@@ -6780,18 +6630,6 @@
         {
           "count": 1,
           "items": [
-            {
-              "count": 1,
-              "fullType": "Base.Glue",
-              "icon": "icon_Base_Glue",
-              "name": "Glue"
-            },
-            {
-              "count": 1,
-              "fullType": "Base.Woodglue",
-              "icon": "icon_Base_Woodglue",
-              "name": "Wood Glue"
-            },
             {
               "count": 1,
               "fullType": "Base.Epoxy",
@@ -7028,9 +6866,7 @@
           }
         ],
         "autoAll": [],
-        "magazines": [
-          "Magazine: Homestead Power #2 - Power Trip"
-        ],
+        "magazines": [],
         "needed": true,
         "research": [
           "Deep Cycle Battery"
@@ -8916,9 +8752,6 @@
       "icon_Base_EmptyJar",
       "icon_Base_Epoxy",
       "icon_Base_File",
-      "icon_Base_FrontWindow1",
-      "icon_Base_FrontWindow2",
-      "icon_Base_FrontWindow3",
       "icon_Base_Funnel",
       "icon_Base_Garbagebag",
       "icon_Base_GardeningSprayAphids",
@@ -8962,12 +8795,6 @@
       "icon_Base_Propane_Refill",
       "icon_Base_RadioBlack",
       "icon_Base_RadioRed",
-      "icon_Base_RearWindow1",
-      "icon_Base_RearWindow2",
-      "icon_Base_RearWindow3",
-      "icon_Base_RearWindshield1",
-      "icon_Base_RearWindshield2",
-      "icon_Base_RearWindshield3",
       "icon_Base_RemoteCraftedV3",
       "icon_Base_RippedSheets",
       "icon_Base_RubberHose",
@@ -8994,9 +8821,6 @@
       "icon_Base_WaterBottle",
       "icon_Base_WeldingMask",
       "icon_Base_WeldingRods",
-      "icon_Base_Windshield1",
-      "icon_Base_Windshield2",
-      "icon_Base_Windshield3",
       "icon_Base_Woodglue",
       "icon_Base_Wrench",
       "icon_Moveables_fixtures_windows_01_0",

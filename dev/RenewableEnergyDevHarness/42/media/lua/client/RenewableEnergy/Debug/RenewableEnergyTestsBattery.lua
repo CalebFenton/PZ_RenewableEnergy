@@ -154,15 +154,18 @@ local function limit(repairs) return Battery.REPAIR_LIMIT - repairs * Wear.REPAI
 local SPENT = 0
 while limit(SPENT) > 1 do SPENT = SPENT + 1 end
 
--- Service adds a step up to the limit and keeps the charge; Recondition sets the limit and empties
--- the battery; the one OnTest both share refuses a battery at its limit, tried here through
--- Recondition. A repair counts once.
+-- Service adds a step up to Battery.SERVICE_SHORTFALL short of the limit, keeps the charge and
+-- doesn't count as a repair, and its own OnTest refuses a battery at its stopping point;
+-- Recondition sets the limit, empties the battery and counts once, and its OnTest refuses a
+-- battery at the limit.
 local SERVICE, RECONDITION, STEP = "RenewableEnergy_ServiceBattery", "RenewableEnergy_ReconditionBattery", Battery.SERVICE_REPAIR
+local function serviceLimit(repairs) return limit(repairs) - Battery.SERVICE_SHORTFALL end
 T.conditionCraftsTest("renewable_energy_battery_craft_repairs_stop_at_a_falling_limit", CAR_BATTERY2, {
-    { SERVICE, "adds a step and keeps the charge", before = limit(0) - 2 * STEP, repaired = 0, after = limit(0) - STEP,
-        repairedAfter = 1 },
-    { SERVICE, "after two repairs stops at the lower limit", before = limit(2) - 1, repaired = 2, after = limit(2),
-        repairedAfter = 3 },
+    { SERVICE, "adds a step, keeps the charge and doesn't count", before = serviceLimit(0) - 2 * STEP, repaired = 0,
+        after = serviceLimit(0) - STEP, repairedAfter = 0 },
+    { SERVICE, "after two repairs stops short of the lower limit", before = serviceLimit(2) - 1, repaired = 2,
+        after = serviceLimit(2), repairedAfter = 2 },
+    { SERVICE, "at its stopping point refused", before = serviceLimit(2), repaired = 2, refused = true },
     { RECONDITION, "after two repairs restores the lower limit and empties", before = limit(2) - 2 * STEP, repaired = 2,
         after = limit(2), repairedAfter = 3, charge = 0 },
     { RECONDITION, "at the limit refused", before = limit(2), repaired = 2, refused = true },

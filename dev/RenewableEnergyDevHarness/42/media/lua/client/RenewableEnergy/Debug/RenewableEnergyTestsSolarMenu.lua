@@ -183,7 +183,7 @@ test("renewable_energy_solar_seal_module_in_place", {
     run = function(self)
         self.bank = T.bank(self, "batteryBankWood", {}, { outdoors = true })
         -- Sealed once already, so its lowered cap, not a whole seal's worth, decides how far it goes.
-        local cracked = { type = T.FACTORY_MODULE, condition = 30, repaired = 1 }
+        local cracked = { type = T.FACTORY_MODULE, condition = 60, repaired = 1 }
         self.cracked = cracked
         self.panel = self.bank and T.panel(self, Sprites.rack.wood.S, { near = self.bank, connect = true,
             modules = { { type = T.FACTORY_MODULE, condition = 100 }, cracked } })
@@ -335,7 +335,7 @@ test("renewable_energy_solar_seal_each_module_in_place", {
     instant = true,
     run = function(self)
         self.bank = T.bank(self, "batteryBankWood", {}, { outdoors = true })
-        self.conditions, self.order = { 30, 40 }, { 2, 1 }
+        self.conditions, self.order = { 70, 75 }, { 2, 1 }
         self.panel = self.bank and T.panel(self, Sprites.rack.wood.S, { near = self.bank, connect = true,
             modules = T.factoryModules(self.conditions[1], self.conditions[2]) })
         if not self.panel then return end
@@ -374,6 +374,30 @@ test("renewable_energy_solar_seal_each_module_in_place", {
             end
             sealed[self.order[round] or 0] = true
         end
+    end,
+})
+
+-- A module never sealed at the seal cap still shows cracked, so the menu offers its seal, greyed
+-- out saying it is too lightly cracked, not that it was sealed as far as sealing goes; one just
+-- below the cap is offered.
+test("renewable_energy_solar_seal_refuses_lightly_cracked_module", {
+    instant = true,
+    run = function(self)
+        local cap = ModuleRepair.SEAL_CAP
+        self.panel = T.panel(self, Sprites.rack.wood.S, { modules = T.factoryModules(cap, cap - 1) })
+        if not self.panel then return end
+        T.setRecipeSkills(self, getScriptManager():getCraftRecipe(ModuleRepair.SEAL_RECIPE))
+        T.give(self, "inputs", { { type = "Base.Screwdriver" }, { type = "Base.Epoxy" } })
+        T.step(function()
+            local options = sealOptions(self.panel.object)
+            self.atCap, self.belowCap = T.optionState(options[1]), T.optionState(options[2])
+        end)
+    end,
+    validate = function(self)
+        expect(self.atCap and self.atCap.shown and self.atCap.greyed, "a never-sealed module at the cap isn't greyed out")
+        expectEqual("its tooltip", self.atCap and self.atCap.reason, getText("Tooltip_RenewableEnergy_ModuleTooLightlyCracked"))
+        expect(self.belowCap and self.belowCap.shown and not self.belowCap.greyed,
+            "a module just below the cap isn't offered (" .. tostring(self.belowCap and self.belowCap.reason) .. ")")
     end,
 })
 

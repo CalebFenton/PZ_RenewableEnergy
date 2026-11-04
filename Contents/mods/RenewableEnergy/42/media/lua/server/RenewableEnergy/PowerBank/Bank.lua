@@ -42,8 +42,8 @@ local Bank = LibObjectSystem.Object:derive("RenewableEnergy_Bank")
 -- ObjectSystem); a field renamed here is lost from existing saves.
 Bank.SAVED_FIELDS = {
     "bankType", "name", "on", "overloaded", "indoors", "gridPowered", "charge", "nominalWh", "batteries",
-    "inverters", "chargers", "controllers", "sources", "loadW", "loadByKind", "chargeSource", "chargeWantW",
-    "generator", "day", "cycleHigh", "cycleDepth", "pendingDepths", "pendingPartWear",
+    "inverters", "chargers", "controllers", "sources", "loadW", "loadByKind", "loadElsewhere",
+    "chargeSource", "chargeWantW", "generator", "day", "cycleHigh", "cycleDepth", "pendingDepths", "pendingPartWear",
     "solarWhToday", "loadWhToday", "empty", "windWhToday", "runWhToday", "backupWhToday", "connected",
     -- The last pass's sun and watts, for a status built before the next pass.
     "now",
@@ -89,6 +89,7 @@ function Bank:initNew()
     self.sources = {}
     self.loadW = 0
     self.loadByKind = {}
+    self.loadElsewhere = false
     self.chargeSource = false
     self.generator = false
     self.cycleHigh = 0
@@ -268,6 +269,7 @@ function Bank:measure()
         or Loads.new()
     self.loadW = load.watts
     self.loadByKind = Loads.byKind(load)
+    self.loadElsewhere = Loads.elsewhere(load) or false
     return load.generators
 end
 

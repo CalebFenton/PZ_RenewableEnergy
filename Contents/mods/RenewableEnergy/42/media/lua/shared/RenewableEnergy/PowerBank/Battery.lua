@@ -28,9 +28,12 @@ local function health(item)
     return item:getCondition() / item:getConditionMax()
 end
 
--- Service Battery adds a little to a tired battery; Recondition brings it to its repair limit,
--- which falls by Wear.REPAIR_LIMIT_STEP with each repair until only a rebuild helps.
+-- Recondition brings a battery to its repair limit, which falls by Wear.REPAIR_LIMIT_STEP with each
+-- one until only a rebuild helps. Service is the cheap top-up: it adds a little, never counts as a
+-- repair, and stops SERVICE_SHORTFALL short of the limit, so only a recondition reaches the top
+-- and only a recondition costs the ceiling.
 Battery.SERVICE_REPAIR = 10
+Battery.SERVICE_SHORTFALL = 20
 Battery.REPAIR_LIMIT = 85
 
 --- The most a repair can bring a battery repaired this many times (nil is 0) to.
@@ -38,9 +41,14 @@ function Battery.repairLimit(timesRepaired)
     return Wear.repairLimit(Battery.REPAIR_LIMIT, timesRepaired)
 end
 
+--- The most Service Battery brings a battery repaired this many times (nil is 0) to.
+function Battery.serviceLimit(timesRepaired)
+    return Battery.repairLimit(timesRepaired) - Battery.SERVICE_SHORTFALL
+end
+
 --- The condition Service Battery brings a battery at `condition`, repaired `repaired` times, to.
 function Battery.serviced(condition, repaired)
-    return math.min(Battery.repairLimit(repaired), condition + Battery.SERVICE_REPAIR)
+    return math.min(Battery.serviceLimit(repaired), condition + Battery.SERVICE_REPAIR)
 end
 
 --- Watt-hours the battery holds when full, after wear.

@@ -444,9 +444,9 @@ module Base
     /**************************** Solar modules *****************************/
 
     /* Epoxy or glue over the cracks keeps the water out. The glass stays cracked, so the module
-       still shows cracked; new glass is Reglaze Module. The module recipes take one use of any
-       adhesive: rare epoxy is worth more to vanilla's Fix With Epoxy than here. The commonest is
-       listed first, since a tooltip in place and the recipe sheet name a line by its first item. */
+       still shows cracked; new glass is Reglaze Module. A seal takes one use of any adhesive. The
+       commonest is listed first, since a tooltip in place and the recipe sheet name a line by its
+       first item. */
     craftRecipe RenewableEnergy_RepairCrackedModule
     {
         timedAction = MakingElectrical,
@@ -473,9 +473,9 @@ module Base
 
     /* A new pane for a damaged module, which brings it back to new and clears its seals. A module
        on a placed mount or the trailer is reglazed in place by a job that takes these inputs, skill
-       and XP (ModuleRepair.REGLAZE), so keep the module on a line of its own. A car window serves
-       as the pane: vanilla makes panes only with a rare magazine or trait, while cars are
-       everywhere. A shattered one is broken, which inputs refuse. */
+       and XP (ModuleRepair.REGLAZE), so keep the module on a line of its own. It takes flat glass
+       (a pane, as Take Out Window Glass gives) and epoxy, which bonds glass to the frame:
+       curved car glass doesn't seat, and glue doesn't hold glass. */
     craftRecipe RenewableEnergy_ReglazeModule
     {
         timedAction = MakingElectrical,
@@ -493,8 +493,8 @@ module Base
         {
             item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],
             item 1 [RenewableEnergy.SolarModule;RenewableEnergy.HomemadeSolarModule] mode:keep,
-            item 1 [Base.GlassPanel;Base.Windshield1;Base.Windshield2;Base.Windshield3;Base.RearWindshield1;Base.RearWindshield2;Base.RearWindshield3;Base.FrontWindow1;Base.FrontWindow2;Base.FrontWindow3;Base.RearWindow1;Base.RearWindow2;Base.RearWindow3],
-            item 1 [Base.Glue;Base.Woodglue;Base.Epoxy],
+            item 1 [Base.GlassPanel],
+            item 1 [Base.Epoxy],
             item 1 [Base.ElectricWire],
         }
         outputs
@@ -502,8 +502,7 @@ module Base
         }
     }
 
-    /* Salvaged cells under a pane of glass, the self-sufficient way to a panel. A car window
-       serves as the pane, as for Reglaze Module. */
+    /* Salvaged cells under a pane of flat glass, the self-sufficient way to a panel. */
     craftRecipe RenewableEnergy_MakeHomemadeSolarModule
     {
         timedAction = MakingElectrical,
@@ -519,7 +518,7 @@ module Base
             item 1 tags[base:screwdriver] mode:keep flags[Prop1;MayDegradeLight],
             item 1 tags[base:pliers] mode:keep flags[MayDegradeLight],
             item 16 [RenewableEnergy.SolarCells],
-            item 1 [Base.GlassPanel;Base.Windshield1;Base.Windshield2;Base.Windshield3;Base.RearWindshield1;Base.RearWindshield2;Base.RearWindshield3;Base.FrontWindow1;Base.FrontWindow2;Base.FrontWindow3;Base.RearWindow1;Base.RearWindow2;Base.RearWindow3],
+            item 1 [Base.GlassPanel],
             item 1 [Base.SmallSheetMetal;4:Base.Plank],
             item 1 [Base.Glue;Base.Woodglue;Base.Epoxy],
             item 2 [Base.ElectricWire],
@@ -659,9 +658,10 @@ module Base
 
     /**************************** Battery repairs ***************************/
     /*
-        Service tops up a tired battery and leaves its charge; Recondition brings it to its repair
-        limit and leaves it empty. Each repair counts (vanilla's "Repaired: Nx") and lowers how far
-        the next can go, so a battery is repaired only so often before it must be rebuilt.
+        Service tops up a tired battery and leaves its charge, stopping 20 short of its repair limit;
+        Recondition brings it to its repair limit and leaves it empty. Only Recondition counts as a
+        repair (vanilla's "Repaired: Nx") and lowers how far the next can go, so a battery is
+        reconditioned only so often before it must be rebuilt.
     */
 
     craftRecipe RenewableEnergy_ServiceBattery
@@ -673,7 +673,7 @@ module Base
         SkillRequired = Electricity:1,
         xpAward = Electricity:5,
         Tooltip = Tooltip_RenewableEnergy_ServiceBattery,
-        OnTest = RenewableEnergy.Recipes.canRepairBattery,
+        OnTest = RenewableEnergy.Recipes.canServiceBattery,
         OnCreate = RenewableEnergy.Recipes.serviceBattery,
         inputs
         {
@@ -698,7 +698,7 @@ module Base
         SkillRequired = Electricity:3,
         xpAward = Electricity:15,
         Tooltip = Tooltip_RenewableEnergy_ReconditionBattery,
-        OnTest = RenewableEnergy.Recipes.canRepairBattery,
+        OnTest = RenewableEnergy.Recipes.canReconditionBattery,
         OnCreate = RenewableEnergy.Recipes.reconditionBattery,
         inputs
         {
@@ -839,7 +839,7 @@ module Base
         Tags = PrimitiveFurnace,
         category = Blacksmithing,
         NeedToBeLearn = true,
-        AutoLearnAny = Electricity:6,
+        AutoLearnAny = Electricity:6;Blacksmith:4,
         SkillRequired = Blacksmith:3,
         xpAward = Blacksmith:10,
         Tooltip = Tooltip_RenewableEnergy_RecastBatteryPlates,
@@ -888,7 +888,7 @@ module Base
         Tags = PrimitiveFurnace,
         category = Blacksmithing,
         NeedToBeLearn = true,
-        AutoLearnAny = Electricity:6,
+        AutoLearnAny = Electricity:6;Blacksmith:4,
         SkillRequired = Blacksmith:3,
         xpAward = Blacksmith:10,
         Tooltip = Tooltip_RenewableEnergy_CastBatteryPlatesFromLeadPipe,
@@ -1041,7 +1041,7 @@ module Base
         Tags = AnySurfaceCraft;Carpentry,
         category = Carpentry,
         NeedToBeLearn = true,
-        AutoLearnAny = Electricity:6,
+        AutoLearnAny = Electricity:6;Blacksmith:4,
         SkillRequired = Woodwork:2,
         xpAward = Woodwork:8,
         inputs
@@ -1064,7 +1064,7 @@ module Base
         Tags = HandPress,
         category = Pottery,
         NeedToBeLearn = true,
-        AutoLearnAny = Electricity:6,
+        AutoLearnAny = Electricity:6;Blacksmith:4,
         xpAward = Pottery:5,
         inputs
         {
@@ -1084,7 +1084,7 @@ module Base
         Tags = KilnSmall;KilnLarge,
         category = Pottery,
         NeedToBeLearn = true,
-        AutoLearnAny = Electricity:6,
+        AutoLearnAny = Electricity:6;Blacksmith:4,
         inputs
         {
             item 1 [RenewableEnergy.BatteryPlateMoldUnfired],

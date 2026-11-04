@@ -1,9 +1,8 @@
 # Renewable Energy: player's guide
 
-The crafting window lists every recipe, and tooltips and **Status** windows give the numbers for whatever you're looking at. This guide covers the rest: what each thing is for, how one setup leads to the next, and the rules that decide whether it pays off. Figures are rounded and assume the default sandbox settings.
-
+- [Quick start](#quick-start)
+- [Why this mod](#why-this-mod)
 - [How power works](#how-power-works)
-- [Your first setup](#your-first-setup)
 - [Moving up](#moving-up)
 - [Battery banks](#battery-banks)
 - [Batteries](#batteries)
@@ -18,6 +17,69 @@ The crafting window lists every recipe, and tooltips and **Status** windows give
 - [When something isn't working](#when-something-isnt-working)
 - [Moving things and your save](#moving-things-and-your-save)
 - [Where to look](#where-to-look)
+
+## Quick start
+
+### What matters most
+
+- **The grid shuts off.** You have weeks before it does. Until then a bank just stands by and fills up, and it takes over within minutes of the shutoff. Use the time to scavenge.
+- **A bank needs four things:** a battery box, rack or cabinet, an inverter, batteries, and a source (a solar panel, a wind charger or a treadmill).
+- **Put it inside a room**, close to where you live. Outdoors, it does nothing.
+- **It powers the neighbours too.** A bank powers everything a generator in its spot would, the lights and fridges next door included. Set up away from town, or switch off what you don't need.
+
+### What to scavenge
+
+- **Homestead Power #1**, the first magazine: electronics stores about every other time, bookstores, libraries, post offices, tool, outdoor and auto parts stores, and about one home in thirty.
+- **Car batteries**: every car has one. Take them from cars you won't drive.
+- **A Plug-in Inverter**: auto parts stores, gas stations, electronics stores, garages, glove boxes and trunks.
+- **Solar modules**: good ones are in electronics store back rooms and camping stores. Cracked ones sit on garage and shed shelves, and they still make power.
+- **Electric Wire and a screwdriver**: every part you wire in takes both.
+
+Later you'll want deep cycle batteries, a power inverter and a charge controller. [Where to look](#where-to-look) lists where everything turns up.
+
+### Skills and shortcuts
+
+Read the magazine first. It teaches the box and the panel. Without it, you learn the box at Woodwork, Metalworking or Electricity 5, and the panel at Electricity 4. Either way, making the **Wooden Battery Box** takes Woodwork 3 (the **Metal Battery Box** takes Metalworking 3), and the **Flat Solar Panel** Electricity 2. Connecting the bank takes Electricity 3, or the vanilla generator magazine. No inverter? Build a **Makeshift Plug-in Inverter** at Electricity 2 (see [Inverters](#inverters)).
+
+**No skills yet?** Two shortcuts need no crafting:
+
+- **Found banks.** Farm storerooms, barns and sheds, and now and then garages and storage units, can hold a battery box or rack already in place and connected, the first time anyone sees them. It has a few worn batteries, sometimes an inverter, and now and then a panel beside it (see [Places already set up](#places-already-set-up)).
+- **Arrow board trailers.** Road works around Muldraugh, Riverside and Rosewood, the checkpoints outside Louisville, and traffic jams and junkyards have them: two panels and a box of deep cycles on wheels. Tow one home, or strip it (see [The arrow board trailer](#the-arrow-board-trailer)).
+
+### The first evening
+
+1. Place the box in a room of the building you live in.
+2. Right-click it and **Wire In** two batteries and the inverter. That takes a screwdriver, some Electric Wire and enough light to see by.
+3. **Connect Bank**, as you would connect a generator.
+4. Build a **Flat Solar Panel** around a module and place it outdoors within 20 squares of the box, then right-click the box and **Connect Sources in Reach**.
+5. **Turn On**, and open **Status** to see what's coming in and going out.
+
+The box holds about 1.2 kWh, and the plug-in inverter carries 400 W: enough for a fridge-freezer, the TV, the radio and the lights. But two car batteries carry a fridge through only about six hours of darkness, and draining them flat every night halves their capacity in about a month. Run the fridge while the sun's up, and save up for bigger batteries and a bigger box.
+
+### How a run usually goes
+
+| When | What you're after | What it takes |
+|---|---|---|
+| The first weeks | The TV, the lights, cold food by day | A battery box, two car batteries, a plug-in inverter, one or two flat panels, or a treadmill |
+| A month or so in | The fridge through the night | A rack of deep cycles, a power inverter, a charge controller, more panels on racks and walls, a scoop rotor |
+| Months later | The washer, the stove, and a backup that needs no gasoline | Bigger batteries, an inverter/charger, a wind charger, a generator on biogas or wood gas started by a **Solar Failsafe** |
+| The long haul | The whole house, all winter | A metal cabinet, two inverter/chargers, every panel you can find, homemade wind turbines on high ground, a brick dome digester |
+
+Along the way you'll service batteries, seal cracked modules, set wind brakes before storms and clean out a gasifier's ash. Those chores come every few days, not every hour. Skip them and you'll see the cost. Keep at them, and with skill a battery can be rebuilt with new plates and last as long as you play.
+
+## Why this mod
+
+When the grid goes down, your choices are a gasoline generator or the dark. The generator is loud, it draws the dead, and the gasoline runs out.
+
+People had other answers long before 1993, and none of them is high tech. Farms in the 1930s charged radio batteries from small wind chargers. Gasifiers ran cars and trucks on wood in the Second World War. Villages have cooked with gas from manure pits for decades. Cabins and RVs ran lights off a solar panel and a few batteries. It always frustrated me that a survivor who can build a forge couldn't do any of this, so this mod adds it.
+
+- **Vanilla things get more useful.** Car batteries, treadmills, microwaves, radios, trash cans, steel drums and wood ash all find a new use, and scavenging gets more fun when the junk in a garage is a part you need.
+- **Depth, without imbalance or confusion.** Panels like some seasons, wind likes height, a digester likes warmth. We simplify for fun and we add realism for fun, and try to find the balance. Vanilla's numbers are the yardstick, and tooltips and **Status** windows tell you what's happening and why.
+- **Things can last forever, with effort and skill.** Batteries wear with every deep drain, panels crack in storms, parts wear while they run. Patching brings a thing back a little less far each time; remaking it fresh takes more skill and resets it. Power is a holdout you keep paying for in work, not a restoration.
+- **Quiet is the point.** A renewable source never beats a generator on raw power. It buys you silence: a bank draws nothing to your door.
+- **It works like the base game.** You connect a bank the way you connect a generator, and appliances draw what vanilla bills a generator for them.
+
+The crafting window lists every recipe, and tooltips and **Status** windows give the numbers for whatever you're looking at. This guide covers the rest: what each thing is for, how one setup leads to the next, and the rules that decide whether it pays off. Figures are rounded and assume the default sandbox settings.
 
 ## How power works
 
@@ -54,25 +116,7 @@ A bank bills each appliance what vanilla bills a generator for it:
 
 A fridge runs day and night, so it's what sizes your bank: 160 W around the clock is about 4 kWh a day, 2 of them overnight. A stove or a washer counts only while it's on.
 
-The inverter also loses a share of what passes through it, a tenth for a found one and more for a makeshift one, and draws a few watts while it's on. Everything in the bank's reach counts, the neighbours' lights and fridges included, so set up away from town or switch off what you don't need.
-
-## Your first setup
-
-You need a **Wooden Battery Box**, two car batteries, a **Plug-in Inverter** from an auto parts store or a car's glove box (or a **Makeshift Plug-in Inverter** you build, see [Inverters](#inverters)), and a solar module or two.
-
-**Homestead Power #1** teaches the box and the panel. Without it, you learn the box at Woodwork, Metalworking or Electricity 5, and the panel at Electricity 4. Either way, making the wooden box takes Woodwork 3 (the **Metal Battery Box** takes Metalworking 3 instead), and the panel Electricity 2. Every car has a battery. Good solar modules are rare outside electronics and camping stores, but cracked ones are common on garage and shed shelves, and they still make power (see [Where to look](#where-to-look)).
-
-**No skills yet?** Farm storerooms, barns and sheds the first time anyone sees them can hold a battery box or rack already in place and connected, with a few worn batteries, sometimes an inverter, and now and then a panel beside it (see [Places already set up](#places-already-set-up)). An arrow board trailer gives you two panels and a box of deep cycles (see [The arrow board trailer](#the-arrow-board-trailer)).
-
-1. Place the box inside a building, in a room. Outdoors, it does nothing.
-2. Right-click it and **Wire In** the batteries and the inverter. That takes a screwdriver, some Electric Wire and enough light to see by.
-3. **Connect Bank**, as you would connect a generator: Electricity 3, or the generator magazine.
-4. Build a **Flat Solar Panel** around a module, place it outdoors within 20 squares of the box, then right-click the box and **Connect Sources in Reach**.
-5. **Turn On**, and open **Status** to see what's coming in and going out.
-
-The box holds about 1.2 kWh, and the plug-in inverter carries 300 W: enough for the TV, the radio and the lights through an evening. A fridge fits too, but two car batteries carry one through only about six hours of darkness, and draining them flat every night halves their capacity in about a month. Run the fridge while the sun's up, and save up for bigger batteries and a bigger box.
-
-While the grid is still on, the bank stands by. Nothing drains it, the panels keep filling it, and it takes over within minutes of the shutoff.
+The inverter also loses a share of what passes through it, a tenth for a found one and more for a makeshift one, and draws a few watts while it's on. Everything in the bank's reach counts, the neighbours' lights and fridges included, so set up away from town or switch off what you don't need. The status window lists what draws in other buildings apart.
 
 ## Moving up
 
@@ -94,13 +138,13 @@ The inverter decides how much you can switch on at once. With two inverters, a b
 
 | Inverter | Carries | Wastes | Wire it in at | Comes from |
 |---|---|---|---|---|
-| Makeshift Plug-in Inverter | 300 W | A quarter | Electricity 0 | Crafted (Electricity 2) |
-| Plug-in Inverter | 300 W | A tenth | Electricity 0 | Common |
+| Makeshift Plug-in Inverter | 400 W | A quarter | Electricity 0 | Crafted (Electricity 2) |
+| Plug-in Inverter | 400 W | A tenth | Electricity 0 | Common |
 | Makeshift Power Inverter | 600 W | A fifth | Electricity 2 | Crafted (Electricity 4) |
 | Power Inverter | 600 W | A tenth | Electricity 2 | Uncommon |
 | Inverter/Charger | 1000 W | A tenth | Electricity 4 | Rare |
 
-The Inverter/Charger also has a 1000 W charger built in (see [Chargers and generators](#chargers-and-generators)). As a guide, 300 W runs a fridge with the TV, the radio and the lights; 600 W adds the washer or the stove; 1000 W runs a fridge-freezer, the stove and the washer at once; a pair of inverter/chargers runs the whole house.
+The Inverter/Charger also has a 1000 W charger built in (see [Chargers and generators](#chargers-and-generators)). As a guide, 400 W runs a fridge-freezer (a mini fridge counts as one) with the TV, the radio and the lights; 600 W adds the washer, the stove or the microwave; 1000 W runs a fridge-freezer, the stove and the washer at once; a pair of inverter/chargers runs the whole house.
 
 **Building one.** A makeshift inverter carries what the found one of its size does, but wastes more of your charge, idles hotter, wears a little faster and never comes up to a found one's condition: a Makeshift Plug-in Inverter tops out at 80, a Makeshift Power Inverter at 90. The better your Electricity when you build it, the closer to that it comes out. A found inverter is always an upgrade.
 
@@ -167,6 +211,8 @@ Where two banks, or a bank and a running generator, both reach an appliance, onl
 
 If more is switched on than the inverters can carry, and no other bank or generator in reach has room for the extra, the whole area goes dark. A bank powers everything or nothing; it never drops just the dryer. Switch something off and the power comes back at the next update, or turn the bank off and on to bring it back at once. Every overload costs each inverter a little condition.
 
+The status window says how much of an overload is in other buildings. Vanilla gives you no way to switch off a fridge, so for the neighbours' fridges the fix is to pick them up.
+
 At zero charge the power cuts too. It comes back by itself once some charge has built up, so a bank that barely charges doesn't flicker on and off.
 
 ### Inputs
@@ -211,8 +257,9 @@ Inverters lose condition every hour the bank powers its area, about one Scrap El
 
 **Status** walks you over to the bank and opens a window that closes once you walk more than 4 squares away. It shows:
 
-- Whether the bank is charging or draining, by how much, and how long until it's full or empty.
+- Whether the bank is charging or draining, by how much, and how long until it's full or empty. Once it's full, it says how much it has to spare: more panels would go to waste.
 - The load against the limit, and the inputs used.
+- What draws, by kind. Once something in another building draws too, the list splits into this building and other buildings, with how far away the nearest is.
 - Batteries by type: how many, their charge together, and the condition of the most worn one.
 - Sources by kind: how many, and their output together. A source short for a reason you can fix, such as a cracked module, snow or a braked charger, also gets a red row of its own with where it stands and why. Click a row to see where its sources stand.
 
@@ -239,12 +286,12 @@ Once a game day, each battery wears by that day's deepest drop from its peak. We
 
 ### Keeping batteries going
 
-Batteries never last forever, but you can bring them back a few times before they need rebuilding:
+Batteries last as long as you keep at it. You can bring them back a few times, and after that they need rebuilding:
 
-1. **Service Battery**: Electricity 1, water, and a rag, baking soda or wood ash. A small boost, and it keeps its charge.
+1. **Service Battery**: Electricity 1, water, and a rag, baking soda or wood ash. It adds 10 condition and keeps the charge, but stops 20 short of the ceiling. It doesn't count as a repair, so service as often as you like.
 2. **Recondition Battery** (Homestead Power #2, or learned at Electricity or Mechanics 5): Electricity 3, water and baking soda or wood ash bring it straight up to its ceiling, but leave it empty.
-3. **The ceiling**: each service or recondition lowers how far the next one can bring it back. After a handful, it needs a rebuild.
-4. **Rebuild.** Homestead Power #2 teaches every step; without it, you learn them at Electricity 6.
+3. **The ceiling**: it starts at 85, and each recondition lowers it by 10. After a handful, the battery needs a rebuild.
+4. **Rebuild.** No magazine teaches it; you learn every step at Electricity 6, and the mold and plate casting at Blacksmith 4 too.
    1. **Strip** the battery (Electricity 4, gloves, and containers to catch the acid) for its case, worn plates and acid.
    2. Make the mold once: **Make Wooden Battery Plate Pattern** (Woodwork 2, a hammer, a saw, a plank and nails), **Press Battery Plate Mold** from clay and the pattern at a hand press, then **Fire Battery Plate Mold** in a kiln. The pattern and the mold are kept.
    3. **Recast Battery Plates** (Blacksmith 3) at a furnace with the mold and charcoal. A third of the lead skims off as **Lead Dross**, so three worn sets make two, and a lead pipe can stand in for one set. **Cast Battery Plates from Lead Pipe** makes a set from three lead pipes.
@@ -295,7 +342,7 @@ Snow piles up on flat panels and racks, and output drops by the share covered. A
 
 ### Storms
 
-A thunderstorm with strong wind can crack a module; a gale without thunder can't. You hear the glass go, and anyone within about 30 squares sees "A solar module cracked in the storm". Each crack costs the module 20 condition, and output follows condition: a module at half makes half.
+A thunderstorm with strong wind can crack a module; a gale without thunder can't. You hear the glass go, and anyone within about 30 squares sees "A solar module cracked in the storm". Each crack costs the module 35 condition, and output follows condition: a module at half makes half.
 
 | Mount | Storm risk |
 |---|---|
@@ -312,8 +359,8 @@ The glass shows how worn a module is: whole down to 85 condition, a few fine cra
 
 Sealing is the cheap fix, reglazing the good one.
 
-- **Seal Cracked Module** (Electricity 2) takes a screwdriver and 1 use of epoxy, glue or wood glue. Seal a loose module in the crafting window, or one still on a placed panel from the panel's menu. Each seal adds 20 condition, up to 55, less 10 for each earlier seal, for either kind of module; the glass still looks cracked. Once a module is at its ceiling, the panel's menu greys its seal out: reglaze it instead.
-- **Reglaze Module** (Electricity 3) puts on a new pane of glass, with a screwdriver, a glass pane or car window, 1 use of epoxy, glue or wood glue, and electric wire. Reglaze a loose module in the crafting window, or one still on a placed panel or on the arrow board trailer from its menu. Any damaged module can be reglazed, cracked or not. It comes back as new, looks whole, and its seal count clears.
+- **Seal Cracked Module** (Electricity 2) takes a screwdriver and 1 use of epoxy, glue or wood glue. Seal a loose module in the crafting window, or one still on a placed panel from the panel's menu. Each seal adds 15 condition, up to 80, less 10 for each earlier seal, for either kind of module; the glass still looks cracked. A module at its ceiling can't be sealed, and the menu greys the seal out: reglaze it instead. A module never sealed at 80 or more is too lightly cracked for a seal to help.
+- **Reglaze Module** (Electricity 3) puts on a new pane of glass, with a screwdriver, a glass pane, 1 use of epoxy, and electric wire. Glue won't hold glass. Reglaze a loose module in the crafting window, or one still on a placed panel or on the arrow board trailer from its menu. Any damaged module can be reglazed, cracked or not. It comes back as new, looks whole, and its seal count clears.
 
 **Unmount** always gives back the same modules at the same condition, plus some of the frame.
 
@@ -325,7 +372,7 @@ A **Makeshift Solar Module** (Electricity 4) is 16 solar cells under glass, rate
 
 ### Glass
 
-Reglazing and makeshift modules each take a pane of glass, and a car window taken off in the mechanics window does as well, as long as it isn't shattered. Panes are hard to make, but houses are full of them: pick up a window with a crowbar (that takes a little carpentry), then **Take Out Window Glass** with a screwdriver or a sharp knife digs out the putty and gives you its two panes. Taking the glass out needs nothing learned, but a window can break as you pick it up, and then there is nothing to take out.
+Reglazing and makeshift modules each take a flat pane of glass. Car windows are curved and won't do. Panes are hard to make, but houses are full of them: pick up a window with a crowbar (that takes a little carpentry), then **Take Out Window Glass** with a screwdriver or a sharp knife digs out the putty and gives you its two panes. Taking the glass out needs nothing learned, but a window can break as you pick it up, and then there is nothing to take out.
 
 ## Wind chargers
 
@@ -582,16 +629,16 @@ Tow it home and it keeps charging its batteries on the way, or strip it for part
 | Read | It teaches |
 |---|---|
 | Homestead Power #1 - Here Comes the Sun | Battery boxes and racks, every panel mount, sealing, the Makeshift Plug-in Inverter |
-| Homestead Power #2 - Power Trip | Battery cabinets, the Makeshift Power Inverter, the charge controller, the failsafe, makeshift modules, reglazing, reconditioning, the whole battery rebuild |
+| Homestead Power #2 - Power Trip | Battery cabinets, the Makeshift Power Inverter, the charge controller, the failsafe, makeshift modules, reglazing, reconditioning |
 | Homestead Power #3 - Number Two Power | Digesters, the Gas Conversion Kit, the Gas Heater, Weld Metal Drum |
 | Homestead Power #4 - Breaking Wind | Every wind charger, their blade sets, the homemade alternator, Weld Metal Drum |
 | FEMA Wood Gas Generator Plans | The three gasifiers, the Gas Conversion Kit, the wood vinegar sprays, Weld Metal Drum |
 
 ### Other ways to learn
 
-- **Skills.** Every recipe is also learned by reaching a skill level, usually above what crafting it needs, so a magazine gets you there sooner.
+- **Skills.** Every recipe is also learned by reaching a skill level, usually above what crafting it needs, so a magazine gets you there sooner. The battery rebuild is learned only this way.
   - Battery boxes, racks and cabinets, wall panels and solar racks come from any one of Woodwork, Metalworking or Electricity; the flat panel from Electricity alone.
-  - Battery work, inverters, the controller, the failsafe and makeshift modules come from Electricity; reconditioning from Mechanics too, and reducing dross from Blacksmith too. Reglazing takes Electricity and Glassmaking together.
+  - Battery work, inverters, the controller, the failsafe and makeshift modules come from Electricity; reconditioning from Mechanics too, and making the plate mold, casting plates and reducing dross from Blacksmith too. Reglazing takes Electricity and Glassmaking together.
   - The barrel digester comes from Farming or Mechanics, the insulated digester from Woodwork and Farming together, the dome from Masonry and Farming together. The Gas Conversion Kit comes from Mechanics, the Gas Heater from Metalworking and Mechanics together.
   - The primitive gasifier comes from Mechanics, the bigger two from Metalworking and Mechanics together, and the advanced one takes Blacksmith as well.
   - Wind chargers take Metalworking and Electricity together, and the car alternator wind charger Mechanics too; the homemade alternator takes Electricity and Mechanics. Wooden and pipe blades come from Carving, steel ones from Blacksmith.
@@ -634,8 +681,8 @@ Found inverters, the maintainer, the solar battery charger, garden lights, facto
 
 - **Turn On is greyed out**: the bank has no working inverter or no battery.
 - **The bank does nothing**: it's outdoors, or not connected (**Connect Bank**).
-- **The bank drains with everything off**: the inverter draws a few watts while the bank is on, and everything switched on in its reach counts, the neighbours' lights and fridges included.
-- **The power keeps cutting out**: more is switched on than the inverters carry, including the neighbours' fridges. Switch something off.
+- **The bank drains with everything off**: the inverter draws a few watts while the bank is on, and everything switched on in its reach counts, the neighbours' lights and fridges included. The status window lists what draws in other buildings.
+- **The power keeps cutting out**: more is switched on than the inverters carry, including the neighbours' fridges. The status window says how much is in other buildings. Switch something off, or pick up their fridges.
 - **Connect Sources in Reach finds nothing**: the bank isn't connected yet (**Connect Bank**), the source is indoors or under a roof, it's out of reach, or it's already connected to another bank (move it with **Connect to**).
 - **A treadmill run banked nothing**: the bank had no free input.
 - **A recipe is greyed out with everything in hand**: your skill is too low, or you need more light, a table, or the station it names.

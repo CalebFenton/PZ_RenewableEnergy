@@ -78,7 +78,8 @@ function Bank:buildStatus()
         gridPowered = self.gridPowered,
         loadWhToday = self.loadWhToday, backupWhToday = self.backupWhToday or 0,
         loadW = self.loadW, drawW = drawW, limitW = self:limitW(), overloaded = self.overloaded,
-        loadByKind = self.loadByKind,
+        -- What the bank pays for in this building (and outdoors), and in other buildings (Loads.elsewhere).
+        loadByKind = self.loadByKind, loadElsewhere = self.loadElsewhere or nil,
         storedWh = stored, capacityWh = capacity, charge = self.charge,
         charging = chargingStatus(inW - drawW, stored, capacity),
         cycleDepth = self.cycleDepth,

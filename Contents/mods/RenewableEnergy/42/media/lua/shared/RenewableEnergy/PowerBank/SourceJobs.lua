@@ -58,11 +58,20 @@ function SourceJobs.bladesFor(character, source)
     return blades, names
 end
 
--- The module record in `slot` of the placed panel `panel` if `allowed(type, condition, repaired)`
--- holds for it, else nil; second, the panel's whole list of module records it was read from.
-local function moduleIf(allowed, panel, slot)
+-- The module record in `slot` of the placed panel `panel`, or nil; second, the panel's whole list
+-- of module records it was read from.
+local function moduleAt(panel, slot)
     local modules = Panel.placedModules(panel)
     local module = modules and type(slot) == "number" and modules[slot]
+    if module then
+        return module, modules
+    end
+    return nil
+end
+
+-- As moduleAt, if `allowed(type, condition, repaired)` holds for the module.
+local function moduleIf(allowed, panel, slot)
+    local module, modules = moduleAt(panel, slot)
     if module and allowed(module.type, module.condition, module.repaired) then
         return module, modules
     end
@@ -73,6 +82,16 @@ end
 --- second, the panel's whole list of module records it was read from.
 function SourceJobs.sealableModule(panel, slot)
     return moduleIf(ModuleRepair.sealable, panel, slot)
+end
+
+--- Why Seal Cracked Module can't seal the module in `slot` of `panel`, or nil when it can.
+function SourceJobs.sealRefusal(panel, slot)
+    local module = moduleAt(panel, slot)
+    if not module then
+        return "Tooltip_RenewableEnergy_ModuleSealedFully"
+    end
+    return ModuleRepair.sealRefusal(module.type, module.condition, module.repaired,
+        "Tooltip_RenewableEnergy_ModuleSealedFully")
 end
 
 --- As SourceJobs.sealableModule, for a module Reglaze Module takes.
@@ -136,10 +155,10 @@ SourceJobs.JOBS = {
     },
     -- Seal Cracked Module's and Reglaze Module's twins for a module on a placed panel, as long as
     -- the crafting window takes for each.
-    [SourceJobs.SEAL_MODULE] = ModuleRepair.jobRow(ModuleRepair.SEAL, SourceJobs.sealableModule,
-        "Tooltip_RenewableEnergy_ModuleSealedFully"),
-    [SourceJobs.REGLAZE_MODULE] = ModuleRepair.jobRow(ModuleRepair.REGLAZE, SourceJobs.reglazableModule,
-        "Tooltip_RenewableEnergy_NotDamaged"),
+    [SourceJobs.SEAL_MODULE] = ModuleRepair.jobRow(ModuleRepair.SEAL, SourceJobs.sealRefusal),
+    [SourceJobs.REGLAZE_MODULE] = ModuleRepair.jobRow(ModuleRepair.REGLAZE, function(panel, slot)
+        return not SourceJobs.reglazableModule(panel, slot) and "Tooltip_RenewableEnergy_NotDamaged" or nil
+    end),
     [SourceJobs.BRAKE] = brakeJob(true),
     [SourceJobs.RELEASE_BRAKE] = brakeJob(false),
     -- Lowering the head, unbolting the broken blades and bolting new ones on.

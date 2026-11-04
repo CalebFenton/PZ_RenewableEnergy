@@ -11,8 +11,8 @@ local ModuleRepair = {}
 -- Seal Cracked Module: condition it adds, and the most a first seal brings a module to. The cap
 -- stays below Specs.crackLooks.lightBelow of a module's ConditionMax, and a first seal's at or
 -- above heavyBelow: sealed glass is still cracked glass, and at best shows light cracks.
-ModuleRepair.SEAL_ADDS = 20
-ModuleRepair.SEAL_CAP = 55
+ModuleRepair.SEAL_ADDS = 15
+ModuleRepair.SEAL_CAP = 80
 
 --- How the glass of a module of `fullType` at `condition` looks (Specs.crackLooks): nil whole,
 --- "light" or "heavy" cracks. Every look of a module, a mount's tile or the arrow board's, asks
@@ -53,6 +53,16 @@ function ModuleRepair.sealed(fullType, condition, repaired)
     return math.min(sealCap(fullType, repaired), condition + ModuleRepair.SEAL_ADDS), (repaired or 0) + 1
 end
 
+--- Why a seal can't help a module of `fullType` at `condition`, sealed `repaired` times, or nil
+--- when it can: one never sealed is too lightly cracked for it, else it is `sealedFully`.
+function ModuleRepair.sealRefusal(fullType, condition, repaired, sealedFully)
+    if ModuleRepair.sealable(fullType, condition, repaired) then
+        return nil
+    end
+    return (repaired or 0) == 0 and Specs.modules[fullType] and "Tooltip_RenewableEnergy_ModuleTooLightlyCracked"
+        or sealedFully
+end
+
 -- Seal Cracked Module, whose skill, time and XP the jobs in place take, and Reglaze Module.
 ModuleRepair.SEAL_RECIPE = "RenewableEnergy_RepairCrackedModule"
 ModuleRepair.REGLAZE_RECIPE = "RenewableEnergy_ReglazeModule"
@@ -68,18 +78,18 @@ ModuleRepair.SEAL = { craft = ModuleRepair.SEAL_RECIPE, except = isModuleInput }
 ModuleRepair.REGLAZE = { craft = ModuleRepair.REGLAZE_RECIPE, except = isModuleInput }
 
 --- The job row (cf_commonlib's Jobs) of mending a module in place with the craft `material`
---- (ModuleRepair.SEAL or REGLAZE): `allowed(subject, with)` says whether the module the job means
---- can take it, else `refusal` refuses it; `extra` adds the place's own fields, such as where a
+--- (ModuleRepair.SEAL or REGLAZE): `refusal(subject, with)` says why the module the job means
+--- can't take it, or nil when it can; `extra` adds the place's own fields, such as where a
 --- character stands. It takes as long as the crafting window takes for the craft
 --- (ISHandcraftAction).
-function ModuleRepair.jobRow(material, allowed, refusal, extra)
+function ModuleRepair.jobRow(material, refusal, extra)
     local row = {
         units = function(subject, with, character)
             return getScriptManager():getCraftRecipe(material.craft):getTime(character) * 5
         end,
         light = true, sound = "GeneratorRepair",
         materials = { material },
-        blocker = function(character, subject, with) return not allowed(subject, with) and refusal or nil end,
+        blocker = function(character, subject, with) return refusal(subject, with) end,
     }
     for key, value in pairs(extra or {}) do
         row[key] = value

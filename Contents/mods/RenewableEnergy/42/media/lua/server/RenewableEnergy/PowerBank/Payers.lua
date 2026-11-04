@@ -297,7 +297,7 @@ function Payers.scan(payer, payers, gridGone)
     local sharing = sharingOf(sharingGroup(payer, payers))
     local owner = sharing.tripped[payer.key] or sharing.owner
     local vanilla = payer.generator ~= nil
-    local load = Loads.new()
+    local load = Loads.new(payer)
     load.generators = sharing.found[payer.key]
     for _, draw in ipairs(sharing.draws) do
         if reaches(payer, draw.x, draw.y, draw.z) and Loads.counts(draw, gridGone, vanilla) then
@@ -427,7 +427,7 @@ local function bill(generator, payers, consumption)
         return
     end
     load = load or Payers.scan(payer, payers)
-    local treadmillW = load.kinds.treadmill and load.kinds.treadmill.watts or 0
+    local treadmillW = Loads.kindW(load, "treadmill")
     local entry = billed[payer.key] or {}
     billed[payer.key] = entry
     -- A chunk reload puts a new generator object at the same key.

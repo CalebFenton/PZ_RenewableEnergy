@@ -383,11 +383,20 @@ function ArrowBoard.panelWatts(vehicle)
     return watts
 end
 
+-- The trailer's panel `partId` and the module it holds, or nil.
+local function panelAt(vehicle, partId)
+    local part = ArrowBoard.isTrailer(vehicle) and vehicle:getPartById(partId)
+    local item = part and isPanel(part) and part:getInventoryItem()
+    if item then
+        return part, item
+    end
+    return nil
+end
+
 -- The trailer's panel `partId` if it holds a module for which `allowed(type, condition, repaired)`
 -- holds, else nil.
 local function panelIf(allowed, vehicle, partId)
-    local part = ArrowBoard.isTrailer(vehicle) and vehicle:getPartById(partId)
-    local item = part and isPanel(part) and part:getInventoryItem()
+    local part, item = panelAt(vehicle, partId)
     if item and allowed(item:getFullType(), part:getCondition(), item:getHaveBeenRepaired()) then
         return part
     end
@@ -397,6 +406,16 @@ end
 --- The trailer's panel `partId` if it holds a module that Seal Cracked Panel can seal, else nil.
 function ArrowBoard.sealablePanel(vehicle, partId)
     return panelIf(ModuleRepair.sealable, vehicle, partId)
+end
+
+--- Why Seal Cracked Panel can't seal the trailer's panel `partId`, or nil when it can.
+function ArrowBoard.sealRefusal(vehicle, partId)
+    local part, item = panelAt(vehicle, partId)
+    if not item then
+        return "Tooltip_RenewableEnergy_PanelSealedFully"
+    end
+    return ModuleRepair.sealRefusal(item:getFullType(), part:getCondition(), item:getHaveBeenRepaired(),
+        "Tooltip_RenewableEnergy_PanelSealedFully")
 end
 
 --- The trailer's panel `partId` if it holds a module that Reglaze Panel takes, else nil.
@@ -445,12 +464,6 @@ ArrowBoard.FRAME = {
 --- Part `init` of the frame parts and the lamp board: runs on every side each time the trailer
 --- loads.
 function ArrowBoard.initFrame(vehicle, part)
-    -- A part added to the script after a trailer spawned is never created on it, so a trailer
-    -- from an older save gets its frame here.
-    if not isClient() and not part:getInventoryItem() then
-        VehicleUtils.createPartInventoryItem(part)
-        vehicle:transmitPartItem(part)
-    end
     -- The colour is rolled at spawn, so a trailer spawned before the script forced it keeps a
     -- random one, which would tint its dents.
     local script = vehicle:getScript()

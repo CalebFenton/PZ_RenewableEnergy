@@ -202,16 +202,14 @@ handler("arrowBoardOldPanels", function(_, args)
     return { first = first, second = vehicleState(vehicle) }
 end)
 
--- The trailer loads as one from a save made before its frame was parts: frame parts empty and the
--- random colour of `args.hsv`, then the frame's init. Answers its state and its script's forced
+-- The trailer loads as one from a save made before the script forced its colour: the random colour
+-- of `args.hsv`, then the frame's init. Answers its state and its script's forced
 -- colour.
 handler("arrowBoardOldFrame", function(_, args)
     local vehicle = PZHarness.vehicleAt(args)
     vehicle:setColorHSV(args.hsv[1], args.hsv[2], args.hsv[3])
     for _, frame in ipairs(ArrowBoard.FRAME) do
-        local part = vehicle:getPartById(frame.id)
-        part:setInventoryItem(nil)
-        ArrowBoard.initFrame(vehicle, part)
+        ArrowBoard.initFrame(vehicle, vehicle:getPartById(frame.id))
     end
     local script = vehicle:getScript()
     return { state = vehicleState(vehicle), forcedSat = script:getForcedSat(), forcedVal = script:getForcedVal() }

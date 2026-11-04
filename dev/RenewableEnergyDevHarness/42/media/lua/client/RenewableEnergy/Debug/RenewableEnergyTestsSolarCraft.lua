@@ -17,18 +17,16 @@ local MODULES_KEY = Panel.MODULES_KEY
 
 -- What a flat panel shows of a module through its life (Sprites.crackOverlays): whole when new,
 -- light cracks from the first storm crack until under half its ConditionMax, heavy cracks below,
--- light once sealed (where Seal Cracked Module takes it) and whole once reglazed; a homemade
--- module the same. Each row: the module, how many storm cracks it took from new, and what it
--- shows then.
+-- still cracked once sealed (where Seal Cracked Module takes it) and whole once reglazed; a
+-- homemade module the same. Each row: the module, how many storm cracks it took from new, and
+-- what it shows then.
 local LIFE_LOOKS = {
     { T.FACTORY_MODULE, 0, nil },
     { T.FACTORY_MODULE, 1, "light" },
-    { T.FACTORY_MODULE, 2, "light" },
-    { T.FACTORY_MODULE, 3, "heavy" },
+    { T.FACTORY_MODULE, 2, "heavy" },
     { T.HOMEMADE_MODULE, 0, nil },
     { T.HOMEMADE_MODULE, 1, "light" },
-    { T.HOMEMADE_MODULE, 2, "light" },
-    { T.HOMEMADE_MODULE, 3, "heavy" },
+    { T.HOMEMADE_MODULE, 2, "heavy" },
 }
 test("renewable_energy_solar_crack_looks_follow_the_module", {
     run = function(self)
@@ -47,7 +45,8 @@ test("renewable_energy_solar_crack_looks_follow_the_module", {
             if ModuleRepair.sealable(record.type, record.condition, record.repaired) then
                 local copy = { type = module }
                 copy.condition, copy.repaired = ModuleRepair.sealed(module, condition, 0)
-                sealed, sealedReglazed = shows(copy), reglazed(copy)
+                sealed, sealedReglazed = { look = ModuleRepair.crackLookOf(module, copy.condition), shows = shows(copy) },
+                    reglazed(copy)
             end
             table.insert(self.rows, { row = row, condition = condition, cracked = shows(record), sealed = sealed,
                 reglazed = reglazed(record), sealedReglazed = sealedReglazed })
@@ -60,7 +59,10 @@ test("renewable_energy_solar_crack_looks_follow_the_module", {
             local expected = look and Sprites.cracks[look].flat[1] or ""
             expectEqual(what .. ": its look", result.cracked, expected)
             if result.sealed then
-                expectEqual(what .. ", sealed once: its look", result.sealed, Sprites.cracks.light.flat[1])
+                local look = result.sealed.look
+                if expect(look ~= nil, what .. ", sealed once: shows whole") then
+                    expectEqual(what .. ", sealed once: its look", result.sealed.shows, Sprites.cracks[look].flat[1])
+                end
             end
             expectEqual(what .. ", reglazed: its look", result.reglazed, "")
             if result.sealedReglazed then
@@ -243,6 +245,7 @@ local function share(part) return math.floor(Items.conditionMaxOf(T.FACTORY_MODU
 local HEAVY, NEW = share(Specs.crackLooks.heavyBelow) - 1, share(1)
 T.conditionCraftsTest("renewable_energy_solar_craft_module_by_condition_and_seals", T.FACTORY_MODULE, {
     { SEAL, "adds a step", before = CAP - ModuleRepair.SEAL_ADDS - 1, repaired = 0, after = CAP - 1, repairedAfter = 1 },
+    { SEAL, "just below the cap stops at it", before = CAP - 1, repaired = 0, after = CAP, repairedAfter = 1 },
     { SEAL, "after two seals stops at the lower cap", before = sealCap(2) - 1, repaired = 2, after = sealCap(2), repairedAfter = 3 },
     { SEAL, "at the cap refused", before = CAP, repaired = 0, refused = true },
     { REGLAZE, "heavy cracks and seals come back as new", before = HEAVY, repaired = 3, after = NEW, repairedAfter = 0 },

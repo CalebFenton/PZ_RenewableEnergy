@@ -35,15 +35,17 @@ Specs.batteries = {
 -- carries a meaningfully larger set of appliances. A `homemade` one is crafted, never found, and
 -- its `wear` scales its share of Specs.partWear. The homemade pair carry what their found twins do
 -- but waste more, idle hotter and wear sooner, and the makeshift one worst of all, so a found
--- inverter or the next recipe is always worth having.
+-- inverter or the next recipe is always worth having. The plug-in pair carry more than a real
+-- cigarette-lighter inverter (150-300 W), since play wins: the first night has the fridge-freezer,
+-- TV, radio and lights on, and a microwave or range is the next tier's.
 Specs.inverters = {
-    ["RenewableEnergy.PlugInInverter"] = { watts = 300, idle = 4, efficiency = 0.9, chargerWatts = 0,
+    ["RenewableEnergy.PlugInInverter"] = { watts = 400, idle = 4, efficiency = 0.9, chargerWatts = 0,
         wiring = { skill = 0, xp = 10 } },
     ["RenewableEnergy.PowerInverter"] = { watts = 600, idle = 8, efficiency = 0.9, chargerWatts = 0,
         wiring = { skill = 2, xp = 15 } },
     ["RenewableEnergy.InverterCharger"] = { watts = 1000, idle = 15, efficiency = 0.9, chargerWatts = 1000,
         wiring = { skill = 4, xp = 25 } },
-    ["RenewableEnergy.MakeshiftInverter"] = { watts = 300, idle = 8, efficiency = 0.75, chargerWatts = 0,
+    ["RenewableEnergy.MakeshiftInverter"] = { watts = 400, idle = 8, efficiency = 0.75, chargerWatts = 0,
         wiring = { skill = 0, xp = 10 }, homemade = true, wear = 1.2 },
     ["RenewableEnergy.HomemadeInverter"] = { watts = 600, idle = 16, efficiency = 0.8, chargerWatts = 0,
         wiring = { skill = 2, xp = 15 }, homemade = true, wear = 1.2 },
@@ -113,7 +115,7 @@ Specs.materials = {
 -- (WeatherPeriod.createWeatherPattern), under worstChance too. A crack, a storm's or a trailer
 -- crash's (ArrowBoard), costs `crack` condition.
 Specs.storm = { fullKph = 120, worstHours = 48, worstChance = 0.15, panelKph = 45, panelPerHour = 0.0035,
-    crack = 20, crackSound = "BreakGlassItem" }
+    crack = 35, crackSound = "BreakGlassItem" }
 -- How a module's glass looks, on a mount or the arrow board, by its condition as a share of its
 -- own ConditionMax (ModuleRepair.crackLookOf): whole down to `lightBelow`, lightly cracked
 -- below that, heavily cracked below `heavyBelow`. The first crack of a new module shows:
