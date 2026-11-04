@@ -5,15 +5,16 @@ from palette import M
 MAGAZINE = (0.21, 0.275, 0.004)
 
 
-# Each issue's cover colour, whether its title is printed dark, and the line under its picture.
-MAGAZINE_ISSUES = {1: ("magazine1", True, "SUN & BATTERIES"), 2: ("magazine2", False, "INVERTERS & CONTROL"),
-                   3: ("magazine3", False, "BIOGAS FROM MANURE"), 4: ("magazine4", False, "WIND & TREADMILL POWER")}
+# Each issue's cover colour, whether its title is printed dark, and the headline under its picture,
+# the pun its item name ends with, as vanilla's recipe magazines go ("Zapper!", "Thyme Time").
+MAGAZINE_ISSUES = {1: ("magazine1", True, "HERE COMES THE SUN"), 2: ("magazine2", False, "POWER TRIP"),
+                   3: ("magazine3", False, "NUMBER TWO POWER"), 4: ("magazine4", False, "BREAKING WIND")}
 
 
 def magazine(col, issue):
     """Homestead Power, a fictional 1990s homesteading magazine: issue 1 on sun and batteries,
     issue 2 on inverters and control, issue 3 on biogas from the farm's manure, issue 4 on wind
-    chargers and the treadmill."""
+    chargers."""
     width, depth, height = MAGAZINE
     cover, dark_title, line = MAGAZINE_ISSUES[issue]
     title = M("ink" if dark_title else "white")

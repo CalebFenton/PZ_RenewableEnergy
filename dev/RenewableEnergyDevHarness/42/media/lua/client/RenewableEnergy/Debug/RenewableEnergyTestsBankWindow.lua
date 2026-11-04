@@ -3,7 +3,7 @@ local Specs = require "RenewableEnergy/Specs"
 local BankJobs = require "RenewableEnergy/PowerBank/BankJobs"
 local Format = require "RenewableEnergy/UI/Format"
 local StatusRows = require "RenewableEnergy/UI/StatusRows"
-local Battery = require "RenewableEnergy/PowerBank/Battery"
+local Items = require "cf_commonlib/Items"
 local Sprites = require "RenewableEnergy/Sprites"
 local Yardsticks = require "RenewableEnergy/Debug/RenewableEnergyYardsticks"
 
@@ -112,8 +112,9 @@ local function waitForLoad(self, bank)
 end
 
 -- The window's lines follow the bank: the overload with its load and limit, the panel slots with
--- the controller count, what draws by kind, a broken part, each battery's repair (a rebuild once
--- its repairs have brought its limit down to its condition), and a panel left without a slot when
+-- the controller count, what draws by kind, a broken part, batteries of a type on one row with
+-- their charge together and the most worn one's condition, and same-kind panels on one row with
+-- their watts together, followed by a red row of its own for the panel left without a slot when
 -- its controller goes.
 test("renewable_energy_bank_window_reflects_status", {
     run = function(self)
@@ -124,16 +125,15 @@ test("renewable_energy_bank_window_reflects_status", {
             { charge = 0.5 })
         if not bank then return end
         self.bank = bank
-        -- Further below its repair limit than a Service reaches.
-        self.reconditionAt = Battery.repairLimit(0) - Battery.SERVICE_REPAIR - 1
-        self.rebuildAt = Battery.repairLimit(2)
+        self.wornAt = math.floor(Items.conditionMaxOf(T.CAR_BATTERY) / 2)
+        self.jarAt = math.floor(Items.conditionMaxOf(T.JAR_BATTERY) / 3)
         self.panelCount = Specs.freeSlots + 1
         self.load = loadUpTo({ "light", "light" }, "television", Specs.inverters[T.PLUG_IN_INVERTER].watts, true)
         T.watch(self, bank)
         T.batch(function()
             T.bankPart(self, bank, Specs.charger, { condition = 0 })
-            T.bankPart(self, bank, T.CAR_BATTERY, { condition = self.reconditionAt })
-            T.bankPart(self, bank, T.JAR_BATTERY, { condition = self.rebuildAt, repaired = 2 })
+            T.bankPart(self, bank, T.CAR_BATTERY, { condition = self.wornAt })
+            T.bankPart(self, bank, T.JAR_BATTERY, { condition = self.jarAt })
             for _ = 1, self.panelCount do
                 if not T.panel(self, Sprites.rack.metal.S, { near = bank, connect = true }) then return end
             end
@@ -163,39 +163,41 @@ test("renewable_energy_bank_window_reflects_status", {
         expect(T.hasLine(summary, getText("IGUI_RenewableEnergy_InputSlots", inputs, Specs.freeSlots)),
             "without its controller the slots line doesn't read " .. inputs .. " inputs of " .. Specs.freeSlots)
         local left, right = StatusRows.rows(status, self.bank)
-        local lights = T.rowLabelled(left, getText("IGUI_RenewableEnergy_LoadCount", getText("IGUI_RenewableEnergy_LoadLight"), 2))
+        local lights = T.rowLabelled(left, getText("IGUI_RenewableEnergy_Count", getText("IGUI_RenewableEnergy_LoadLight"), 2))
         expectEqual("the row of 2 lights", lights and lights.value, Format.watts(2 * Yardsticks.applianceWatts("light")))
         local charger = T.rowLabelled(left, getItemNameFromFullType(Specs.charger))
         expectEqual("the colour of a broken charger's row", charger and charger.color, "bad")
         expectEqual("a broken charger's row", charger and charger.value, getText("IGUI_RenewableEnergy_PartBroken", "0%"))
-        local function repairValue(fullType, condition, repair)
-            return getText("IGUI_RenewableEnergy_BatteryValueRepair", Format.percent(status.charge),
-                Format.condition(fullType, condition), getText(repair))
+        local function batteryValue(fullType, condition)
+            return getText("IGUI_RenewableEnergy_BatteryValue", Format.percent(status.charge),
+                Format.condition(fullType, condition))
         end
-        local batteryName = getItemNameFromFullType(T.CAR_BATTERY)
-        local recondition = repairValue(T.CAR_BATTERY, self.reconditionAt, "IGUI_RenewableEnergy_RepairRecondition")
-        local repairs, found, panels = {}, false, {}
+        local cars = T.rowLabelled(right, getText("IGUI_RenewableEnergy_Count", getItemNameFromFullType(T.CAR_BATTERY), 2))
+        expectEqual("the row of 2 car batteries, one worn", cars and cars.value, batteryValue(T.CAR_BATTERY, self.wornAt))
+        local jar = T.rowLabelled(right, getItemNameFromFullType(T.JAR_BATTERY))
+        expectEqual("the row of one jar battery", jar and jar.value, batteryValue(T.JAR_BATTERY, self.jarAt))
+        local rackName = getText("IGUI_RenewableEnergy_MountRackMetal")
+        local group = T.rowLabelled(right, getText("IGUI_RenewableEnergy_Count", rackName, self.panelCount))
+        if not expect(group ~= nil, "no row of " .. self.panelCount .. " metal racks") then return end
+        local watts = 0
+        for _, source in ipairs(status.sources) do
+            watts = watts + source.watts
+        end
+        expect(watts > 0, "the panels within the slots make nothing")
+        expectEqual("the metal racks' watts", group.value, Format.watts(watts))
+        expectEqual("the sources the metal racks' row highlights", #group.sources, self.panelCount)
+        local sourceRows = {}
         for _, r in ipairs(right) do
-            if r.label == batteryName then
-                table.insert(repairs, r.value)
-                found = found or r.value == recondition
-            elseif r.source then
-                table.insert(panels, r)
+            if r.sources then
+                table.insert(sourceRows, r)
             end
         end
-        expect(found, "a battery further below its repair limit than a Service reaches doesn't suggest Recondition ("
-            .. table.concat(repairs, "; ") .. ")")
-        local jar = T.rowLabelled(right, getItemNameFromFullType(T.JAR_BATTERY))
-        local rebuild = repairValue(T.JAR_BATTERY, self.rebuildAt, "IGUI_RenewableEnergy_RepairRebuild")
-        expectEqual("the row of a battery at its twice-repaired limit", jar and jar.value, rebuild)
-        if not expectEqual("panel rows", #panels, self.panelCount) then return end
-        local noSlot = getText("IGUI_RenewableEnergy_ReasonNoController")
-        local last = panels[#panels]
-        expect(last.value:find(noSlot, 1, true) ~= nil and last.color == "bad", "the panel past the slots reads " .. last.value)
-        expect(panels[1].value:find(noSlot, 1, true) == nil and status.sources[1].watts > 0,
-            "a panel within the slots reads " .. panels[1].value)
-        expect(panels[1].label:find(getText("IGUI_RenewableEnergy_MountRackMetal"), 1, true) ~= nil,
-            "a metal rack's row reads " .. panels[1].label)
+        if not expectEqual("source rows", #sourceRows, 2) then return end
+        local noSlot, own = getText("IGUI_RenewableEnergy_ReasonNoController"), sourceRows[2]
+        expect(sourceRows[1] == group, "the metal racks' row isn't first")
+        expect(own.label:find(rackName, 1, true) ~= nil and own.value:find(noSlot, 1, true) ~= nil
+            and own.color == "bad", "the panel past the slots reads " .. own.label .. ": " .. own.value)
+        expectEqual("the sources the slotless panel's row highlights", #own.sources, 1)
     end,
 })
 

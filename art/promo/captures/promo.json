@@ -53,17 +53,17 @@
     {
       "fullType": "RenewableEnergy.BrokenPipeBlades",
       "icon": "icon_RenewableEnergy_BrokenPipeBlades",
-      "name": "Broken Pipe Blades"
+      "name": "Broken Pipe Blade Set"
     },
     {
       "fullType": "RenewableEnergy.BrokenSteelBlades",
       "icon": "icon_RenewableEnergy_BrokenSteelBlades",
-      "name": "Broken Steel Blades"
+      "name": "Broken Steel Blade Set"
     },
     {
       "fullType": "RenewableEnergy.BrokenWoodenBlades",
       "icon": "icon_RenewableEnergy_BrokenWoodenBlades",
-      "name": "Broken Wooden Blades"
+      "name": "Broken Wooden Blade Set"
     },
     {
       "fullType": "RenewableEnergy.CarAlternator",
@@ -128,22 +128,22 @@
     {
       "fullType": "RenewableEnergy.HomesteadPowerMag1",
       "icon": "icon_RenewableEnergy_HomesteadPowerMag1",
-      "name": "Homestead Power #1: Sun & Batteries"
+      "name": "Magazine: Homestead Power #1 - Here Comes the Sun"
     },
     {
       "fullType": "RenewableEnergy.HomesteadPowerMag2",
       "icon": "icon_RenewableEnergy_HomesteadPowerMag2",
-      "name": "Homestead Power #2: Inverters & Control"
+      "name": "Magazine: Homestead Power #2 - Power Trip"
     },
     {
       "fullType": "RenewableEnergy.HomesteadPowerMag3",
       "icon": "icon_RenewableEnergy_HomesteadPowerMag3",
-      "name": "Homestead Power #3"
+      "name": "Magazine: Homestead Power #3 - Number Two Power"
     },
     {
       "fullType": "RenewableEnergy.HomesteadPowerMag4",
       "icon": "icon_RenewableEnergy_HomesteadPowerMag4",
-      "name": "Homestead Power #4"
+      "name": "Magazine: Homestead Power #4 - Breaking Wind"
     },
     {
       "fullType": "RenewableEnergy.InverterCharger",
@@ -188,7 +188,7 @@
     {
       "fullType": "RenewableEnergy.PipeBlades",
       "icon": "icon_RenewableEnergy_PipeBlades",
-      "name": "Plastic Pipe Blades"
+      "name": "Pipe Blade Set"
     },
     {
       "fullType": "RenewableEnergy.PlugInInverter",
@@ -263,7 +263,7 @@
     {
       "fullType": "RenewableEnergy.SteelBlades",
       "icon": "icon_RenewableEnergy_SteelBlades",
-      "name": "Forged Steel Blades"
+      "name": "Steel Blade Set"
     },
     {
       "fullType": "RenewableEnergy.TarpGasBag",
@@ -293,7 +293,7 @@
     {
       "fullType": "RenewableEnergy.WoodenBlades",
       "icon": "icon_RenewableEnergy_WoodenBlades",
-      "name": "Carved Wooden Blades"
+      "name": "Wooden Blade Set"
     },
     {
       "fullType": "RenewableEnergy.WornBatteryPlates",
@@ -310,10 +310,10 @@
     {
       "name": "model_RenewableEnergy_BatteryBankMetal",
       "box": [
-        106,
-        106,
+        105,
+        105,
         316,
-        406
+        407
       ]
     },
     {
@@ -349,7 +349,7 @@
         30,
         30,
         62,
-        117
+        116
       ]
     },
     {
@@ -385,7 +385,7 @@
         105,
         105,
         407,
-        402
+        401
       ]
     },
     {
@@ -400,10 +400,10 @@
     {
       "name": "model_RenewableEnergy_BrokenPipeBlades",
       "box": [
-        78,
-        78,
-        300,
-        151
+        77,
+        77,
+        298,
+        150
       ]
     },
     {
@@ -439,7 +439,7 @@
         38,
         38,
         146,
-        146
+        145
       ]
     },
     {
@@ -448,7 +448,7 @@
         24,
         24,
         92,
-        68
+        67
       ]
     },
     {
@@ -457,7 +457,7 @@
         46,
         46,
         178,
-        167
+        166
       ]
     },
     {
@@ -466,7 +466,7 @@
         47,
         47,
         182,
-        165
+        164
       ]
     },
     {
@@ -547,7 +547,7 @@
         26,
         26,
         100,
-        76
+        75
       ]
     },
     {
@@ -556,7 +556,7 @@
         26,
         26,
         100,
-        76
+        75
       ]
     },
     {
@@ -565,7 +565,7 @@
         26,
         26,
         100,
-        76
+        75
       ]
     },
     {
@@ -574,7 +574,7 @@
         76,
         76,
         294,
-        196
+        197
       ]
     },
     {
@@ -592,7 +592,7 @@
         52,
         52,
         200,
-        164
+        165
       ]
     },
     {
@@ -628,7 +628,7 @@
         27,
         27,
         103,
-        82
+        81
       ]
     },
     {
@@ -700,7 +700,7 @@
         105,
         105,
         407,
-        185
+        184
       ]
     },
     {
@@ -744,7 +744,7 @@
       "box": [
         105,
         105,
-        377,
+        376,
         407
       ]
     },
@@ -832,9 +832,9 @@
     {
       "name": "model_RenewableEnergy_WoodenBlades",
       "box": [
-        106,
-        106,
-        406,
+        105,
+        105,
+        407,
         173
       ]
     },
@@ -941,7 +941,7 @@
         ],
         "autoAll": [],
         "magazines": [
-          "Homestead Power #2: Inverters & Control"
+          "Magazine: Homestead Power #2 - Power Trip"
         ],
         "needed": true,
         "research": [
@@ -1070,7 +1070,7 @@
         ],
         "autoAll": [],
         "magazines": [
-          "Homestead Power #2: Inverters & Control"
+          "Magazine: Homestead Power #2 - Power Trip"
         ],
         "needed": true,
         "research": [
@@ -1149,7 +1149,7 @@
         ],
         "autoAll": [],
         "magazines": [
-          "Homestead Power #2: Inverters & Control"
+          "Magazine: Homestead Power #2 - Power Trip"
         ],
         "needed": true,
         "research": [
@@ -1361,7 +1361,7 @@
           }
         ],
         "magazines": [
-          "Homestead Power #4"
+          "Magazine: Homestead Power #4 - Breaking Wind"
         ],
         "needed": true,
         "research": [
@@ -1429,7 +1429,7 @@
         ],
         "autoAll": [],
         "magazines": [
-          "Homestead Power #2: Inverters & Control"
+          "Magazine: Homestead Power #2 - Power Trip"
         ],
         "needed": true,
         "research": [
@@ -1571,7 +1571,7 @@
         "autoAll": [],
         "magazines": [
           "FEMA Wood Gas Generator Plans",
-          "Homestead Power #3"
+          "Magazine: Homestead Power #3 - Number Two Power"
         ],
         "needed": true,
         "research": [
@@ -1731,7 +1731,7 @@
         ],
         "autoAll": [],
         "magazines": [
-          "Homestead Power #1: Sun & Batteries"
+          "Magazine: Homestead Power #1 - Here Comes the Sun"
         ],
         "needed": true,
         "research": [
@@ -1868,7 +1868,7 @@
         ],
         "autoAll": [],
         "magazines": [
-          "Homestead Power #2: Inverters & Control"
+          "Magazine: Homestead Power #2 - Power Trip"
         ],
         "needed": true,
         "research": [
@@ -1973,7 +1973,7 @@
         ],
         "autoAll": [],
         "magazines": [
-          "Homestead Power #1: Sun & Batteries"
+          "Magazine: Homestead Power #1 - Here Comes the Sun"
         ],
         "needed": true,
         "research": [
@@ -2128,7 +2128,7 @@
         ],
         "autoAll": [],
         "magazines": [
-          "Homestead Power #2: Inverters & Control"
+          "Magazine: Homestead Power #2 - Power Trip"
         ],
         "needed": true,
         "research": [
@@ -2458,7 +2458,7 @@
         ],
         "autoAll": [],
         "magazines": [
-          "Homestead Power #1: Sun & Batteries"
+          "Magazine: Homestead Power #1 - Here Comes the Sun"
         ],
         "needed": true,
         "research": [
@@ -2633,7 +2633,7 @@
         ],
         "autoAll": [],
         "magazines": [
-          "Homestead Power #2: Inverters & Control"
+          "Magazine: Homestead Power #2 - Power Trip"
         ],
         "needed": true,
         "research": [
@@ -3127,7 +3127,7 @@
         ],
         "autoAll": [],
         "magazines": [
-          "Homestead Power #2: Inverters & Control"
+          "Magazine: Homestead Power #2 - Power Trip"
         ],
         "needed": true,
         "research": []
@@ -3349,7 +3349,7 @@
         ],
         "autoAll": [],
         "magazines": [
-          "Homestead Power #2: Inverters & Control"
+          "Magazine: Homestead Power #2 - Power Trip"
         ],
         "needed": true,
         "research": [
@@ -3487,7 +3487,7 @@
         ],
         "autoAll": [],
         "magazines": [
-          "Homestead Power #2: Inverters & Control"
+          "Magazine: Homestead Power #2 - Power Trip"
         ],
         "needed": true,
         "research": [
@@ -3576,7 +3576,7 @@
         ],
         "autoAll": [],
         "magazines": [
-          "Homestead Power #2: Inverters & Control"
+          "Magazine: Homestead Power #2 - Power Trip"
         ],
         "needed": true,
         "research": [
@@ -3669,8 +3669,8 @@
         ],
         "magazines": [
           "FEMA Wood Gas Generator Plans",
-          "Homestead Power #3",
-          "Homestead Power #4"
+          "Magazine: Homestead Power #3 - Number Two Power",
+          "Magazine: Homestead Power #4 - Breaking Wind"
         ],
         "needed": true,
         "research": [
@@ -3899,7 +3899,7 @@
         ],
         "autoAll": [],
         "magazines": [
-          "Homestead Power #2: Inverters & Control"
+          "Magazine: Homestead Power #2 - Power Trip"
         ],
         "needed": true,
         "research": [
@@ -4070,7 +4070,7 @@
         ],
         "autoAll": [],
         "magazines": [
-          "Homestead Power #2: Inverters & Control"
+          "Magazine: Homestead Power #2 - Power Trip"
         ],
         "needed": true,
         "research": [
@@ -4301,7 +4301,7 @@
         ],
         "autoAll": [],
         "magazines": [
-          "Homestead Power #2: Inverters & Control"
+          "Magazine: Homestead Power #2 - Power Trip"
         ],
         "needed": true,
         "research": [
@@ -4474,7 +4474,7 @@
         ],
         "autoAll": [],
         "magazines": [
-          "Homestead Power #2: Inverters & Control"
+          "Magazine: Homestead Power #2 - Power Trip"
         ],
         "needed": true,
         "research": [
@@ -4656,7 +4656,7 @@
         ],
         "autoAll": [],
         "magazines": [
-          "Homestead Power #2: Inverters & Control"
+          "Magazine: Homestead Power #2 - Power Trip"
         ],
         "needed": true,
         "research": [
@@ -4772,7 +4772,7 @@
           }
         ],
         "magazines": [
-          "Homestead Power #3"
+          "Magazine: Homestead Power #3 - Number Two Power"
         ],
         "needed": true,
         "research": [
@@ -4874,7 +4874,7 @@
         ],
         "autoAll": [],
         "magazines": [
-          "Homestead Power #2: Inverters & Control"
+          "Magazine: Homestead Power #2 - Power Trip"
         ],
         "needed": true,
         "research": [
@@ -5009,7 +5009,7 @@
         ],
         "autoAll": [],
         "magazines": [
-          "Homestead Power #1: Sun & Batteries"
+          "Magazine: Homestead Power #1 - Here Comes the Sun"
         ],
         "needed": true,
         "research": [
@@ -5088,20 +5088,20 @@
           }
         ],
         "magazines": [
-          "Homestead Power #4"
+          "Magazine: Homestead Power #4 - Breaking Wind"
         ],
         "needed": true,
         "research": [
-          "Carved Wooden Blades"
+          "Wooden Blade Set"
         ]
       },
-      "name": "Carve Wooden Blades",
+      "name": "Carve Wooden Blade Set",
       "outputs": [
         {
           "count": 1,
           "fullType": "RenewableEnergy.WoodenBlades",
           "icon": "icon_RenewableEnergy_WoodenBlades",
-          "name": "Carved Wooden Blades"
+          "name": "Wooden Blade Set"
         }
       ],
       "skills": [
@@ -5180,20 +5180,20 @@
           }
         ],
         "magazines": [
-          "Homestead Power #4"
+          "Magazine: Homestead Power #4 - Breaking Wind"
         ],
         "needed": true,
         "research": [
-          "Forged Steel Blades"
+          "Steel Blade Set"
         ]
       },
-      "name": "Forge Steel Blades",
+      "name": "Forge Steel Blade Set",
       "outputs": [
         {
           "count": 1,
           "fullType": "RenewableEnergy.SteelBlades",
           "icon": "icon_RenewableEnergy_SteelBlades",
-          "name": "Forged Steel Blades"
+          "name": "Steel Blade Set"
         }
       ],
       "skills": [
@@ -5294,7 +5294,7 @@
         ],
         "autoAll": [],
         "magazines": [
-          "Homestead Power #2: Inverters & Control"
+          "Magazine: Homestead Power #2 - Power Trip"
         ],
         "needed": true,
         "research": []
@@ -5535,7 +5535,7 @@
         ],
         "autoAll": [],
         "magazines": [
-          "Homestead Power #1: Sun & Batteries"
+          "Magazine: Homestead Power #1 - Here Comes the Sun"
         ],
         "needed": true,
         "research": [
@@ -5682,7 +5682,7 @@
         ],
         "autoAll": [],
         "magazines": [
-          "Homestead Power #1: Sun & Batteries"
+          "Magazine: Homestead Power #1 - Here Comes the Sun"
         ],
         "needed": true,
         "research": [
@@ -5765,7 +5765,7 @@
         ],
         "autoAll": [],
         "magazines": [
-          "Homestead Power #2: Inverters & Control"
+          "Magazine: Homestead Power #2 - Power Trip"
         ],
         "needed": true,
         "research": [
@@ -5899,7 +5899,7 @@
         ],
         "autoAll": [],
         "magazines": [
-          "Homestead Power #1: Sun & Batteries"
+          "Magazine: Homestead Power #1 - Here Comes the Sun"
         ],
         "needed": true,
         "research": [
@@ -6149,7 +6149,7 @@
         ],
         "autoAll": [],
         "magazines": [
-          "Homestead Power #2: Inverters & Control"
+          "Magazine: Homestead Power #2 - Power Trip"
         ],
         "needed": true,
         "research": [
@@ -6283,7 +6283,7 @@
         ],
         "autoAll": [],
         "magazines": [
-          "Homestead Power #1: Sun & Batteries"
+          "Magazine: Homestead Power #1 - Here Comes the Sun"
         ],
         "needed": true,
         "research": [
@@ -6402,7 +6402,7 @@
         ],
         "autoAll": [],
         "magazines": [
-          "Homestead Power #1: Sun & Batteries"
+          "Magazine: Homestead Power #1 - Here Comes the Sun"
         ],
         "needed": true,
         "research": [
@@ -6557,7 +6557,7 @@
         ],
         "autoAll": [],
         "magazines": [
-          "Homestead Power #1: Sun & Batteries"
+          "Magazine: Homestead Power #1 - Here Comes the Sun"
         ],
         "needed": true,
         "research": [
@@ -6636,20 +6636,20 @@
           }
         ],
         "magazines": [
-          "Homestead Power #4"
+          "Magazine: Homestead Power #4 - Breaking Wind"
         ],
         "needed": true,
         "research": [
-          "Plastic Pipe Blades"
+          "Pipe Blade Set"
         ]
       },
-      "name": "Cut Pipe Blades",
+      "name": "Cut Pipe Blade Set",
       "outputs": [
         {
           "count": 1,
           "fullType": "RenewableEnergy.PipeBlades",
           "icon": "icon_RenewableEnergy_PipeBlades",
-          "name": "Plastic Pipe Blades"
+          "name": "Pipe Blade Set"
         }
       ],
       "skills": []
@@ -6831,7 +6831,7 @@
           }
         ],
         "magazines": [
-          "Homestead Power #2: Inverters & Control"
+          "Magazine: Homestead Power #2 - Power Trip"
         ],
         "needed": true,
         "research": []
@@ -7029,7 +7029,7 @@
         ],
         "autoAll": [],
         "magazines": [
-          "Homestead Power #2: Inverters & Control"
+          "Magazine: Homestead Power #2 - Power Trip"
         ],
         "needed": true,
         "research": [
@@ -7141,7 +7141,7 @@
         ],
         "autoAll": [],
         "magazines": [
-          "Homestead Power #1: Sun & Batteries"
+          "Magazine: Homestead Power #1 - Here Comes the Sun"
         ],
         "needed": true,
         "research": [
@@ -7221,19 +7221,19 @@
               "count": 1,
               "fullType": "RenewableEnergy.WoodenBlades",
               "icon": "icon_RenewableEnergy_WoodenBlades",
-              "name": "Carved Wooden Blades"
+              "name": "Wooden Blade Set"
             },
             {
               "count": 1,
               "fullType": "RenewableEnergy.PipeBlades",
               "icon": "icon_RenewableEnergy_PipeBlades",
-              "name": "Plastic Pipe Blades"
+              "name": "Pipe Blade Set"
             },
             {
               "count": 1,
               "fullType": "RenewableEnergy.SteelBlades",
               "icon": "icon_RenewableEnergy_SteelBlades",
-              "name": "Forged Steel Blades"
+              "name": "Steel Blade Set"
             }
           ],
           "keep": false,
@@ -7336,7 +7336,7 @@
           }
         ],
         "magazines": [
-          "Homestead Power #4"
+          "Magazine: Homestead Power #4 - Breaking Wind"
         ],
         "needed": true,
         "research": []
@@ -7483,7 +7483,7 @@
           }
         ],
         "magazines": [
-          "Homestead Power #3"
+          "Magazine: Homestead Power #3 - Number Two Power"
         ],
         "needed": true,
         "research": []
@@ -7557,19 +7557,19 @@
               "count": 1,
               "fullType": "RenewableEnergy.WoodenBlades",
               "icon": "icon_RenewableEnergy_WoodenBlades",
-              "name": "Carved Wooden Blades"
+              "name": "Wooden Blade Set"
             },
             {
               "count": 1,
               "fullType": "RenewableEnergy.PipeBlades",
               "icon": "icon_RenewableEnergy_PipeBlades",
-              "name": "Plastic Pipe Blades"
+              "name": "Pipe Blade Set"
             },
             {
               "count": 1,
               "fullType": "RenewableEnergy.SteelBlades",
               "icon": "icon_RenewableEnergy_SteelBlades",
-              "name": "Forged Steel Blades"
+              "name": "Steel Blade Set"
             }
           ],
           "keep": false,
@@ -7700,7 +7700,7 @@
           }
         ],
         "magazines": [
-          "Homestead Power #4"
+          "Magazine: Homestead Power #4 - Breaking Wind"
         ],
         "needed": true,
         "research": []
@@ -7857,7 +7857,7 @@
           }
         ],
         "magazines": [
-          "Homestead Power #3"
+          "Magazine: Homestead Power #3 - Number Two Power"
         ],
         "needed": true,
         "research": []
@@ -8020,7 +8020,7 @@
           }
         ],
         "magazines": [
-          "Homestead Power #4"
+          "Magazine: Homestead Power #4 - Breaking Wind"
         ],
         "needed": true,
         "research": []
@@ -8094,19 +8094,19 @@
               "count": 1,
               "fullType": "RenewableEnergy.WoodenBlades",
               "icon": "icon_RenewableEnergy_WoodenBlades",
-              "name": "Carved Wooden Blades"
+              "name": "Wooden Blade Set"
             },
             {
               "count": 1,
               "fullType": "RenewableEnergy.PipeBlades",
               "icon": "icon_RenewableEnergy_PipeBlades",
-              "name": "Plastic Pipe Blades"
+              "name": "Pipe Blade Set"
             },
             {
               "count": 1,
               "fullType": "RenewableEnergy.SteelBlades",
               "icon": "icon_RenewableEnergy_SteelBlades",
-              "name": "Forged Steel Blades"
+              "name": "Steel Blade Set"
             }
           ],
           "keep": false,
@@ -8241,7 +8241,7 @@
           }
         ],
         "magazines": [
-          "Homestead Power #4"
+          "Magazine: Homestead Power #4 - Breaking Wind"
         ],
         "needed": true,
         "research": []
@@ -8579,7 +8579,7 @@
         ],
         "autoAll": [],
         "magazines": [
-          "Homestead Power #3"
+          "Magazine: Homestead Power #3 - Number Two Power"
         ],
         "needed": true,
         "research": []

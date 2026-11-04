@@ -7,7 +7,7 @@
 -- is drawn and returns false when there is nothing left to show.
 --
 -- The windows draw their rows alike: a row is { header = text }, { label = text, value = text,
--- color = name, source = entry }, { bar = 0..1 } or { gap = true }, measured by
+-- color = name, sources = { entry, ... } }, { bar = 0..1 } or { gap = true }, measured by
 -- ObjectWindow.measure and drawn by ObjectWindow:drawRows.
 
 require "ISUI/ISCollapsableWindow"

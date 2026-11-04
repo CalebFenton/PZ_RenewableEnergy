@@ -1,7 +1,6 @@
 -- What the battery bank's status window (StatusWindow) shows of a Bank status snapshot: the
 -- summary lines across the top and the rows of its two columns.
 
-local Battery = require "RenewableEnergy/PowerBank/Battery"
 local Sun = require "RenewableEnergy/Sun"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local Sources = require "RenewableEnergy/PowerBank/Sources"
@@ -165,15 +164,35 @@ local LOAD_KINDS = {
     other = "IGUI_RenewableEnergy_LoadOther",
 }
 
--- "TV" or "Lights (3)": a kind of load from Bank status `loadByKind`. Another mod's kind is its own
+-- "Lights ×3": the name of `count` things of a kind, plain for one.
+local function counted(name, count)
+    if count > 1 then
+        return getText("IGUI_RenewableEnergy_Count", name, count)
+    end
+    return name
+end
+
+-- "TV" or "Lights ×3": a kind of load from Bank status `loadByKind`. Another mod's kind is its own
 -- translation key (GeneratorReach.addDraw).
 local function loadLabel(entry)
     local key = LOAD_KINDS[entry.kind] or (entry.kind:find("^IGUI_") and entry.kind) or LOAD_KINDS.other
-    local name = getText(key)
-    if entry.count > 1 then
-        return getText("IGUI_RenewableEnergy_LoadCount", name, entry.count)
+    return counted(getText(key), entry.count)
+end
+
+-- `list` split by `nameOf(entry)`, as { name, entries } in the order each name first appears.
+local function groupBy(list, nameOf)
+    local groups, byName = {}, {}
+    for _, entry in ipairs(list) do
+        local name = nameOf(entry)
+        local group = byName[name]
+        if not group then
+            group = { name = name, entries = {} }
+            byName[name] = group
+            table.insert(groups, group)
+        end
+        table.insert(group.entries, entry)
     end
-    return name
+    return groups
 end
 
 local function loadRows(rows, status)
@@ -230,20 +249,26 @@ local function partRows(rows, status)
     end
 end
 
--- "64% charged, 72% condition (recondition)": a battery from Bank status `batteries`.
-local function batteryValue(battery)
-    local charge, condition = Format.percent(battery.charge), Format.condition(battery.type, battery.condition)
-    local repair = Battery.bestRepair(battery.condition, battery.repaired)
-    if repair then
-        return getText("IGUI_RenewableEnergy_BatteryValueRepair", charge, condition, getText(repair))
+-- "64% charged, 72% condition": batteries of one type from Bank status `batteries`, by what they
+-- hold together and the most worn of them, and its color.
+local function batteryValue(batteries)
+    local storedWh, capacityWh, condition = 0, 0, math.huge
+    for _, battery in ipairs(batteries) do
+        storedWh = storedWh + battery.charge * battery.nominalWh
+        capacityWh = capacityWh + battery.nominalWh
+        condition = math.min(condition, battery.condition)
     end
-    return getText("IGUI_RenewableEnergy_BatteryValue", charge, condition)
+    local charge = capacityWh > 0 and storedWh / capacityWh or 0
+    local value = getText("IGUI_RenewableEnergy_BatteryValue", Format.percent(charge),
+        Format.condition(batteries[1].type, condition))
+    return value, condition <= 0 and "bad" or nil
 end
 
 local function batteryRows(rows, status)
     header(rows, "IGUI_RenewableEnergy_Batteries", #status.batteries)
-    for _, battery in ipairs(status.batteries) do
-        row(rows, getItemNameFromFullType(battery.type), batteryValue(battery), battery.condition <= 0 and "bad" or nil)
+    local groups = groupBy(status.batteries, function(battery) return getItemNameFromFullType(battery.type) end)
+    for _, group in ipairs(groups) do
+        row(rows, counted(group.name, #group.entries), batteryValue(group.entries))
     end
 end
 
@@ -281,11 +306,14 @@ local REASONS = {
     idle = { key = "IGUI_RenewableEnergy_ReasonIdle" },
 }
 
+local function sourceName(source)
+    return getText(SOURCE_NAMES[source.kind .. (source.material or "")])
+end
+
 -- "Wooden rack, 6 tiles north-east": a source from Bank status `sources`, from the bank at
 -- `bankPosition`.
 local function sourceLabel(source, bankPosition)
-    local name = SOURCE_NAMES[source.kind .. (source.material or "")]
-    return getText("IGUI_RenewableEnergy_SourceWhere", getText(name), Format.away(bankPosition, source))
+    return getText("IGUI_RenewableEnergy_SourceWhere", sourceName(source), Format.away(bankPosition, source))
 end
 
 -- A source's output, by family: a panel's with its share of full sun, a wind charger's with the
@@ -298,22 +326,32 @@ local OUTPUTS = {
     treadmill = function(source) return Format.watts(source.watts) end,
 }
 
--- "45 W, 64% sun, cloudy", "30 W, 25 km/h" or "75 W" for a source of the bank `status`, and its
--- color.
-local function sourceValue(source, status)
+-- "45 W, 64% sun, snow", "0 W, 25 km/h, braked" or "0 W, broken" for a source of the bank
+-- `status` with its `reason` (REASONS).
+local function sourceValue(source, status, reason)
     local value = OUTPUTS[Sources.familyOf(source.kind)](source, status)
-    local reason = REASONS[source.reason]
-    if not reason then
-        return value, nil
-    end
-    return getText("IGUI_RenewableEnergy_SourceOutputReason", value, getText(reason.key)), reason.fixable and "bad" or "dim"
+    return getText("IGUI_RenewableEnergy_SourceOutputReason", value, getText(reason.key))
 end
 
+-- One row per kind of source with their watts together, and after it a red row of its own for each
+-- source short for a reason the player can fix, so a cracked module or braked charger stands out
+-- of a long list. Each row's `sources` are what clicking it highlights.
 local function sourceRows(rows, status, bankPosition)
     header(rows, "IGUI_RenewableEnergy_Sources", #status.sources)
-    for _, source in ipairs(status.sources) do
-        local value, colorName = sourceValue(source, status)
-        table.insert(rows, { label = sourceLabel(source, bankPosition), value = value, color = colorName, source = source })
+    for _, group in ipairs(groupBy(status.sources, sourceName)) do
+        local watts = 0
+        for _, source in ipairs(group.entries) do
+            watts = watts + source.watts
+        end
+        table.insert(rows, { label = counted(group.name, #group.entries), value = Format.watts(watts),
+            sources = group.entries })
+        for _, source in ipairs(group.entries) do
+            local reason = REASONS[source.reason]
+            if reason and reason.fixable then
+                table.insert(rows, { label = sourceLabel(source, bankPosition), value = sourceValue(source, status, reason),
+                    color = "bad", sources = { source } })
+            end
+        end
     end
 end
 

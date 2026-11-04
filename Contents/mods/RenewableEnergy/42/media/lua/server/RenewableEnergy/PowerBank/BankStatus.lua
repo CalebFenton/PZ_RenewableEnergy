@@ -58,7 +58,7 @@ function Bank:buildStatus()
     end
     local drawW = now.drawW or 0
     local batteries = partStatus(self.batteries, function(entry, part)
-        entry.nominalWh, entry.charge, entry.repaired = part.nominalWh, self.charge, part.repaired
+        entry.nominalWh, entry.charge = part.nominalWh, self.charge
     end)
     -- The window names what the chargers charge from, not where the generator stands.
     local chargeSource = self.chargeSource == "grid" and "grid" or (self.chargeSource and "generator") or nil

@@ -43,20 +43,6 @@ function Battery.serviced(condition, repaired)
     return math.min(Battery.repairLimit(repaired), condition + Battery.SERVICE_REPAIR)
 end
 
---- The repair that makes the most of one of a battery's limited repairs, as the translation key
---- that names it, or nil for one in perfect shape: Service where it reaches the repair limit
---- anyway (it keeps the charge), Recondition further below it, and past the limit only a rebuild.
-function Battery.bestRepair(condition, repaired)
-    local limit = Battery.repairLimit(repaired)
-    if condition < limit then
-        return Battery.serviced(condition, repaired) == limit and "IGUI_RenewableEnergy_RepairService"
-            or "IGUI_RenewableEnergy_RepairRecondition"
-    elseif condition < 100 then
-        return "IGUI_RenewableEnergy_RepairRebuild"
-    end
-    return nil
-end
-
 --- Watt-hours the battery holds when full, after wear.
 function Battery.nominalWh(item)
     local spec = Battery.spec(item)

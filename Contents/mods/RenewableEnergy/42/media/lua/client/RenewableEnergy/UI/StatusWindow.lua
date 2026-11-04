@@ -124,25 +124,36 @@ end
 function StatusWindow:clearHighlight()
     local highlight = self.highlight
     if highlight then
-        highlight.object:setHighlighted(self.playerNum, false)
+        for _, object in ipairs(highlight.objects) do
+            object:setHighlighted(self.playerNum, false)
+        end
         self.highlight = nil
     end
 end
 
---- Highlights the source of a Bank status `sources` entry in the world for a few seconds, the
---- way vanilla shows the object a moveable action works on. Returns the source, or nil if its
---- square isn't loaded.
-function StatusWindow:highlightSource(source)
+local function positionKey(p)
+    return p.x .. "," .. p.y .. "," .. p.z
+end
+
+--- Highlights the sources of a row's Bank status `sources` entries in the world for a few
+--- seconds, the way vanilla shows the object a moveable action works on. Sources on squares that
+--- aren't loaded are left out. Returns how many were highlighted.
+function StatusWindow:highlightSources(sources)
     self:clearHighlight()
-    local object = Sources.findOn(getSquare(source.x, source.y, source.z))
-    if not object then
-        return nil
-    end
+    local objects, positions = {}, {}
     local c = COLORS.highlight
-    object:setHighlightColor(self.playerNum, c.r, c.g, c.b, c.a)
-    object:setHighlighted(self.playerNum, true, false)
-    self.highlight = { object = object, source = source, untilMs = getTimestampMs() + HIGHLIGHT_MS }
-    return object
+    for _, source in ipairs(sources) do
+        local object = Sources.findOn(getSquare(source.x, source.y, source.z))
+        if object then
+            object:setHighlightColor(self.playerNum, c.r, c.g, c.b, c.a)
+            object:setHighlighted(self.playerNum, true, false)
+            table.insert(objects, object)
+        end
+        positions[positionKey(source)] = true
+    end
+    self.highlight = { objects = objects, positions = positions, count = #sources,
+        untilMs = getTimestampMs() + HIGHLIGHT_MS }
+    return #objects
 end
 
 -- The source row under a point in the window, if any.
@@ -152,7 +163,7 @@ function StatusWindow:sourceRowAt(x, y)
         return nil
     end
     for _, r in ipairs(self.right or {}) do
-        if r.source and r.top and y >= r.top and y < r.top + r.height then
+        if r.sources and r.top and y >= r.top and y < r.top + r.height then
             return r
         end
     end
@@ -161,7 +172,7 @@ end
 function StatusWindow:onMouseDown(x, y)
     local r = not self.isCollapsed and self:sourceRowAt(x, y)
     if r then
-        self:highlightSource(r.source)
+        self:highlightSources(r.sources)
         return true
     end
     return ISCollapsableWindow.onMouseDown(self, x, y)
@@ -178,8 +189,19 @@ function StatusWindow:refresh()
     end
 end
 
+-- The clicked row stays highlighted across new snapshots: the row of the same sources, so a kind's
+-- row and the red row of one of its sources light up apart.
 function StatusWindow:isRowHighlighted(r)
-    return self.highlight ~= nil and Squares.samePosition(r.source, self.highlight.source)
+    local highlight = self.highlight
+    if not (highlight and r.sources and #r.sources == highlight.count) then
+        return false
+    end
+    for _, source in ipairs(r.sources) do
+        if not highlight.positions[positionKey(source)] then
+            return false
+        end
+    end
+    return true
 end
 
 function StatusWindow:drawSummary(x, y)

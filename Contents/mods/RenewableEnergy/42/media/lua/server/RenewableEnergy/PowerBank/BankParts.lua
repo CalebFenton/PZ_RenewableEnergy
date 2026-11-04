@@ -32,8 +32,6 @@ function Bank:recount()
             local entry = partEntry(item)
             if Battery.isBattery(item) then
                 entry.nominalWh = Battery.nominalWh(item)
-                -- The status window's repair hint depends on the repair limit.
-                entry.repaired = item:getHaveBeenRepaired()
             end
             table.insert(parts[kind], entry)
         end

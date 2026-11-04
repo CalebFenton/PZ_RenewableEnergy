@@ -13,7 +13,7 @@ Keep the lights on after the grid and the gas are gone, with what a Kentucky far
 - **Can I add it to my save?** Yes. Loot turns up where you haven't been yet; solar sites and garden lights anywhere.
 - **Can I remove it?** Not cleanly: what it built into your world goes with it.
 - **Can I make it easier, or harder?** Yes, on the **Renewable Energy** sandbox page; each option says what it changes. Start with **Sunlight Multiplier**, **Battery Wear** and **Storm Damage**.
-- **Why isn't my panel making power?** Open **Status** on its bank: every source says why it falls short, in red if you can fix it.
+- **Why isn't my panel making power?** Open **Status** on its bank: a source short for a reason you can fix gets a red row saying why.
 - **Does it work before the power goes out?** The bank stands by while the grid is on, filling its batteries, and takes over within minutes of the shutoff.
 
 ## How it plays
@@ -47,7 +47,7 @@ Keep the lights on after the grid and the gas are gone, with what a Kentucky far
 2. Right-click it and **Wire In** batteries and an inverter.
 3. **Connect Bank**, like a generator: Electricity 3, or the generator magazine.
 4. Put up a panel outside, then **Connect Sources in Reach**.
-5. **Turn On**. **Status** shows what it's doing, and why each source isn't at full output.
+5. **Turn On**. **Status** shows what it's doing, and which sources need fixing.
 
 The bank powers everything a generator in its spot would, the neighbours' lights included, so set up away from town.
 

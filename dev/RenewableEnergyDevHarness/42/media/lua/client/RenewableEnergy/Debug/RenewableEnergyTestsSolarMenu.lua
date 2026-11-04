@@ -488,7 +488,7 @@ test("renewable_energy_solar_window_highlights_panel", {
         local window, panel = self.window, self.panel.object
         local row
         for _, r in ipairs(window.right or {}) do
-            row = row or (r.source and r)
+            row = row or (r.sources and r)
         end
         if not expect(row ~= nil and row.top ~= nil, "the window drew no panel row") then return end
         window:onMouseDown(window.rightLayout.x + 4, row.top + 2)

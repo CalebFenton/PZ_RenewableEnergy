@@ -191,8 +191,8 @@ Inverters lose condition every hour the bank powers its area, about one Scrap El
 
 - Whether the bank is charging or draining, by how much, and how long until it's full or empty.
 - The load against the limit, and the inputs used.
-- Each battery's charge, condition and a repair hint.
-- Each source's output, and the biggest reason it falls short. Reasons you can fix are in red. Click a source to see where it stands.
+- Batteries by type: how many, their charge together, and the condition of the most worn one.
+- Sources by kind: how many, and their output together. A source short for a reason you can fix, such as a cracked module, snow or a braked charger, also gets a red row of its own with where it stands and why. Click a row to see where its sources stand.
 
 While grid power reaches the bank, the window says so, and whether the chargers are filling from it. **Rename** gives a bank a name of your own, which helps once you have several.
 
@@ -360,11 +360,11 @@ Blades break in gales. **Set the Brake** before one and **Release the Brake** af
 
 A charger warns you when the wind gets strong enough to break its blades. Wooden blades creak and pipe or steel blades rattle every few seconds, and the status window says "gale, set the brake". The stronger the wind, the likelier they break. When they go, there's a loud crack, and anyone within about 30 squares sees "A wind charger's blades broke in the gale".
 
-| Blades | On the treadmill and car alternator chargers | On the turbine |
+| Blade set | On the treadmill and car alternator chargers | On the turbine |
 |---|---|---|
-| Plastic Pipe Blades | At risk above 60 km/h: strong thunderstorms | Above 80 km/h |
-| Carved Wooden Blades | Above 70 km/h: the worst thunderstorms | Above 90 km/h: safe in every thunderstorm |
-| Forged Steel Blades | Above 90 km/h: only blizzards and tropical storms | Above 110 km/h: all but the worst blizzards |
+| Pipe Blade Set | At risk above 60 km/h: strong thunderstorms | Above 80 km/h |
+| Wooden Blade Set | Above 70 km/h: the worst thunderstorms | Above 90 km/h: safe in every thunderstorm |
+| Steel Blade Set | Above 90 km/h: only blizzards and tropical storms | Above 110 km/h: all but the worst blizzards |
 
 Once at risk, steel blades break a quarter as often as pipe, and wood half as often. Thunderstorms top out around 84 km/h. Blizzards blow 90 to 120 km/h for a day or two and are the real danger, though even the longest breaks unbraked pipe blades at most about one time in seven at the default Storm Damage Rate. Blades never change the power, only how much wind they stand.
 
@@ -555,10 +555,10 @@ Tow it home and it keeps charging its batteries on the way, or strip it for part
 
 | Read | It teaches |
 |---|---|
-| Homestead Power #1: Sun & Batteries | Battery boxes and racks, every panel mount, sealing, the Makeshift Plug-in Inverter |
-| Homestead Power #2: Inverters & Control | Battery cabinets, the Makeshift Power Inverter, the charge controller, the failsafe, makeshift modules, reglazing, reconditioning, the whole battery rebuild |
-| Homestead Power #3 | Digesters, the Gas Conversion Kit, the Gas Heater, Weld Metal Drum |
-| Homestead Power #4 | Every wind charger, their blades, the homemade alternator, Weld Metal Drum |
+| Homestead Power #1 - Here Comes the Sun | Battery boxes and racks, every panel mount, sealing, the Makeshift Plug-in Inverter |
+| Homestead Power #2 - Power Trip | Battery cabinets, the Makeshift Power Inverter, the charge controller, the failsafe, makeshift modules, reglazing, reconditioning, the whole battery rebuild |
+| Homestead Power #3 - Number Two Power | Digesters, the Gas Conversion Kit, the Gas Heater, Weld Metal Drum |
+| Homestead Power #4 - Breaking Wind | Every wind charger, their blade sets, the homemade alternator, Weld Metal Drum |
 | FEMA Wood Gas Generator Plans | The three gasifiers, the Gas Conversion Kit, the wood vinegar sprays, Weld Metal Drum |
 
 ### Other ways to learn
@@ -574,7 +574,7 @@ Light is also needed for wiring and fittings: wiring parts in and out, connectin
 
 ### Blades
 
-**Carve Wooden Blades** (Carving) and **Cut Pipe Blades** are in the crafting window. **Forge Steel Blades** (Blacksmith 3) is only in a Forge's or an Advanced Forge's own crafting window, not the primitive forge's. Whole steel blades melt down at a smelting or blast furnace; broken ones, like a broken sword blade, only at a blast furnace.
+A blade set is all three blades of a charger, so a charger takes one. **Carve Wooden Blade Set** (Carving) and **Cut Pipe Blade Set** are in the crafting window. **Forge Steel Blade Set** (Blacksmith 3) is only in a Forge's or an Advanced Forge's own crafting window, not the primitive forge's. Whole steel sets melt down at a smelting or blast furnace; broken ones, like a broken sword blade, only at a blast furnace.
 
 ### What you can't craft
 

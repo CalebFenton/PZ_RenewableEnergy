@@ -27,7 +27,7 @@ Owners after the restructure (paths under RE `media/lua/`):
 | Generator demand, charger allocation under a gas cap | `server/.../PowerBank/Payers` (Loads <- Payers <- Bank, GasLines, Fumes; no cycles) |
 | Bank lifecycle | `Bank` on cf_commonlib's `Object` (`catchUp/advance/afterChange`); `BankSystem.jobSite` |
 | Source and treadmill jobs | `PowerBank/SourceSite` (JobSites.lua is gone) |
-| Wiring, panel module records, battery repair advice | `PowerBank/Wiring`, `Panel`, `Battery.bestRepair` |
+| Wiring, panel module records | `PowerBank/Wiring`, `Panel` |
 | Storm clock | `PowerBank/PanelStorms` (one ledger; the bank record and the loose object hand a mark over) |
 | Generator start/stop and building fumes | `Fumes.setRunning` / `setBankRunning` |
 | Found-item wear, charge and rarity | `server/.../Items/Finds` |

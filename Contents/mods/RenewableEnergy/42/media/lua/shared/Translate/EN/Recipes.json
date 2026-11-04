@@ -63,8 +63,8 @@
     "RenewableEnergy_PropellerWood": "Treadmill Wind Charger",
     "RenewableEnergy_CarAlternatorWood": "Car Alternator Wind Charger",
     "RenewableEnergy_TurbineWood": "Homemade Wind Turbine",
-    "RenewableEnergy_CarveWoodenBlades": "Carve Wooden Blades",
-    "RenewableEnergy_CutPipeBlades": "Cut Pipe Blades",
-    "RenewableEnergy_ForgeSteelBlades": "Forge Steel Blades",
+    "RenewableEnergy_CarveWoodenBlades": "Carve Wooden Blade Set",
+    "RenewableEnergy_CutPipeBlades": "Cut Pipe Blade Set",
+    "RenewableEnergy_ForgeSteelBlades": "Forge Steel Blade Set",
     "RenewableEnergy_MakeHomemadeAlternator": "Make Homemade Alternator"
 }
