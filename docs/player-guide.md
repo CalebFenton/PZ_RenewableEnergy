@@ -376,7 +376,7 @@ Reglazing and makeshift modules each take a flat pane of glass. Car windows are 
 
 ## Wind chargers
 
-Wind blows day and night, and hardest in winter, just when the panels give the least. Wind chargers are built on the **Welding** page of the build menu, and each needs a generator: a treadmill's motor, a car's alternator, or an alternator you make yourself. Every charger but the scoop rotor also takes a set of blades, wooden, plastic pipe or steel, and stands with whichever set the build used. Those bladed chargers take 3 inputs, so their bank needs a charge controller.
+Wind blows day and night, and hardest in winter, just when the panels give the least. Wind chargers are built on the **Welding** page of the build menu, and each needs a generator: a treadmill's motor, a car's alternator, or an alternator you make yourself. The treadmill and car alternator chargers can instead stand on a timber mast from the **Carpentry** page, at the same skill levels with Woodwork for Metalworking: 3 logs, 2 rope or sheet rope, planks, nails and a metal pipe, with a hammer, a saw and a hand drill, take the place of the welding and metal. Every charger but the scoop rotor also takes a set of blades, wooden, plastic pipe or steel, and stands with whichever set the build used. Those bladed chargers take 3 inputs, so their bank needs a charge controller.
 
 ### The four kinds
 
@@ -392,6 +392,7 @@ The figures here are at the default **Wind Multiplier** of 2, which scales them 
 - **Scoop rotor**: two half-drum scoops on a short pole. It never needs the brake and never breaks, but it makes little. It's the one charger that needs no controller.
 - **Treadmill wind charger**: three blades high on a steel mast. It's the first charger that makes real power.
 - **Car alternator wind charger**: the same mast belted to a car's alternator. It makes a third more in any wind for the same inputs, a straight upgrade.
+- **On a timber mast**: either of those two on three lashed logs. It makes exactly what the welded one does, at the same height, and its blades break and wear the same; dismantled, it gives back wood rather than metal.
 - **Homemade wind turbine**: speaker magnets on a car's brake hub turning past hand-wound coils. It makes well over twice the treadmill charger's power, and its tail swings it out of a gale.
 
 ### How much the wind gives
@@ -643,7 +644,7 @@ Tow it home and it keeps charging its batteries on the way, or strip it for part
   - Battery work, inverters, the controller, the failsafe and makeshift modules come from Electricity; reconditioning from Mechanics too, and making the plate mold, casting plates and reducing dross from Blacksmith too. Reglazing takes Electricity and Glassmaking together.
   - The barrel digester comes from Farming or Mechanics, the insulated digester from Woodwork and Farming together, the dome from Masonry and Farming together. The Gas Conversion Kit comes from Mechanics, the Gas Heater from Metalworking and Mechanics together.
   - The primitive gasifier comes from Mechanics, the bigger two from Metalworking and Mechanics together, and the advanced one takes Blacksmith as well.
-  - Wind chargers take Metalworking and Electricity together, and the car alternator wind charger Mechanics too; the homemade alternator takes Electricity and Mechanics. Wooden and plastic pipe blades come from Carving, steel ones from Blacksmith.
+  - Wind chargers take Metalworking and Electricity together, or Woodwork and Electricity on a timber mast, and the car alternator wind charger Mechanics too; the homemade alternator takes Electricity and Mechanics. Wooden and plastic pipe blades come from Carving, steel ones from Blacksmith.
 - **Research.** Researching a found module teaches the panel mounts and sealing, and a makeshift one teaches sealing. A plug-in inverter teaches battery boxes and the Makeshift Plug-in Inverter, a power inverter racks and the Makeshift Power Inverter, and an inverter/charger cabinets and the failsafe.
 
 ### What a recipe needs around it

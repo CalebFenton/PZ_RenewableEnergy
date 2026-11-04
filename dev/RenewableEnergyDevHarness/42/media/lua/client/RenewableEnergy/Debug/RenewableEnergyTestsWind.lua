@@ -316,6 +316,10 @@ local DRAWN = {
     carAlternatorWoodE = Sprites.windCharger.carAlternator.wood.E,
     carAlternatorPipeN = Sprites.windCharger.carAlternator.pipe.N,
     carAlternatorSteelW = Sprites.windCharger.carAlternator.steel.W,
+    timberPropellerWoodS = Sprites.windCharger.timberPropeller.wood.S,
+    timberPropellerSteelE = Sprites.windCharger.timberPropeller.steel.E,
+    timberCarAlternatorPipeW = Sprites.windCharger.timberCarAlternator.pipe.W,
+    timberCarAlternatorWoodN = Sprites.windCharger.timberCarAlternator.wood.N,
     turbineWoodS = Sprites.windCharger.alternator.wood.S,
     turbinePipeE = Sprites.windCharger.alternator.pipe.E,
     turbineSteelW = Sprites.windCharger.alternator.steel.W,
@@ -608,6 +612,8 @@ test("renewable_energy_wind_alternator_slots_and_furling", {
 local OFFERED = {
     { label = "wooden treadmill charger", sprite = Sprites.windCharger.propeller.wood.S },
     { label = "steel car alternator charger", sprite = Sprites.windCharger.carAlternator.steel.S },
+    { label = "pipe timber treadmill charger", sprite = Sprites.windCharger.timberPropeller.pipe.S },
+    { label = "steel timber car alternator charger", sprite = Sprites.windCharger.timberCarAlternator.steel.S },
     { label = "steel turbine", sprite = Sprites.windCharger.alternator.steel.S },
 }
 
@@ -728,6 +734,10 @@ local BUILT = {
         entity = "RenewableEnergy_PropellerPipe" },
     { entry = "Base.RenewableEnergy_CarAlternatorWood", kind = "carAlternator", material = "steel",
         entity = "RenewableEnergy_CarAlternatorSteel" },
+    { entry = "Base.RenewableEnergy_TimberPropellerWood", kind = "timberPropeller", material = "steel",
+        entity = "RenewableEnergy_TimberPropellerSteel" },
+    { entry = "Base.RenewableEnergy_TimberCarAlternatorWood", kind = "timberCarAlternator", material = "pipe",
+        entity = "RenewableEnergy_TimberCarAlternatorPipe" },
     { entry = "Base.RenewableEnergy_TurbineWood", kind = "alternator", material = "steel",
         entity = "RenewableEnergy_AlternatorWindCharger" },
 }

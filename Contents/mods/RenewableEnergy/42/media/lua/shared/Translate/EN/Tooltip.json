@@ -165,6 +165,8 @@
     "Tooltip_RenewableEnergy_NeedBlades": "Needs one of: %1.",
     "Tooltip_RenewableEnergy_TreadmillWindCharger": "Turns a Treadmill Motor in the wind. Set the brake in a gale or the blades may break. Uses 3 inputs, so the bank needs a charge controller.",
     "Tooltip_RenewableEnergy_CarAlternatorWindCharger": "Turns a Car Alternator in the wind, for more power than a Treadmill Wind Charger. Set the brake in a gale or the blades may break. Uses 3 inputs, so the bank needs a charge controller.",
+    "Tooltip_RenewableEnergy_TimberTreadmillWindCharger": "The Treadmill Wind Charger on three lashed logs instead of a welded mast: the same power, built with Carpentry. Set the brake in a gale or the blades may break. Uses 3 inputs, so the bank needs a charge controller.",
+    "Tooltip_RenewableEnergy_TimberCarAlternatorWindCharger": "The Car Alternator Wind Charger on three lashed logs instead of a welded mast: the same power, built with Carpentry. Set the brake in a gale or the blades may break. Uses 3 inputs, so the bank needs a charge controller.",
     "Tooltip_RenewableEnergy_WindTurbine": "The strongest wind charger. In a gale it turns out of the wind but keeps most of its output, and its blades take 20 km/h more wind before they break than on other chargers. Uses 3 inputs, so the bank needs a charge controller.",
     "Tooltip_RenewableEnergy_Blades": "All three blades for any bladed wind charger; a spare set replaces a broken one. Holds in a stronger gale than plastic pipe, a weaker one than steel.",
     "Tooltip_RenewableEnergy_PipeBlades": "All three blades for any bladed wind charger; a spare set replaces a broken one. Breaks in the weakest gale of any set.",

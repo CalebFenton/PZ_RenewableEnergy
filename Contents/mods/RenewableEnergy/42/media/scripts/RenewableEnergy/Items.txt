@@ -633,7 +633,7 @@ module RenewableEnergy
         WorldStaticModel = RenewableEnergy.HomesteadPowerMag4_Ground,
         BoredomChange = -20,
         StressChange = -15,
-        LearnedRecipes = RenewableEnergy_ScoopRotor;RenewableEnergy_PropellerWood;RenewableEnergy_CarAlternatorWood;RenewableEnergy_TurbineWood;RenewableEnergy_CarveWoodenBlades;RenewableEnergy_CutPipeBlades;RenewableEnergy_ForgeSteelBlades;RenewableEnergy_MakeHomemadeAlternator;RenewableEnergy_WeldMetalDrum,
+        LearnedRecipes = RenewableEnergy_ScoopRotor;RenewableEnergy_PropellerWood;RenewableEnergy_CarAlternatorWood;RenewableEnergy_TimberPropellerWood;RenewableEnergy_TimberCarAlternatorWood;RenewableEnergy_TurbineWood;RenewableEnergy_CarveWoodenBlades;RenewableEnergy_CutPipeBlades;RenewableEnergy_ForgeSteelBlades;RenewableEnergy_MakeHomemadeAlternator;RenewableEnergy_WeldMetalDrum,
         OnCreate = ItemCodeOnCreate.onCreateRecipeMagazine,
         Tags = base:magazine;base:ignorezombiedensity,
     }

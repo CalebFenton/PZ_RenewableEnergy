@@ -685,6 +685,258 @@ module RenewableEnergy
         texture = WorldItems/RenewableEnergy_CarAlternatorSteelBroken,
         scale = 1,
     }
+    model TimberPropellerWood0
+    {
+        mesh = WorldItems/RenewableEnergy_TimberPropellerWood0,
+        texture = WorldItems/RenewableEnergy_TimberPropellerWood,
+        scale = 1,
+    }
+    model TimberPropellerWood1
+    {
+        mesh = WorldItems/RenewableEnergy_TimberPropellerWood1,
+        texture = WorldItems/RenewableEnergy_TimberPropellerWood,
+        scale = 1,
+    }
+    model TimberPropellerWood2
+    {
+        mesh = WorldItems/RenewableEnergy_TimberPropellerWood2,
+        texture = WorldItems/RenewableEnergy_TimberPropellerWood,
+        scale = 1,
+    }
+    model TimberPropellerWood3
+    {
+        mesh = WorldItems/RenewableEnergy_TimberPropellerWood3,
+        texture = WorldItems/RenewableEnergy_TimberPropellerWood,
+        scale = 1,
+    }
+    model TimberPropellerWood4
+    {
+        mesh = WorldItems/RenewableEnergy_TimberPropellerWood4,
+        texture = WorldItems/RenewableEnergy_TimberPropellerWood,
+        scale = 1,
+    }
+    model TimberPropellerWood5
+    {
+        mesh = WorldItems/RenewableEnergy_TimberPropellerWood5,
+        texture = WorldItems/RenewableEnergy_TimberPropellerWood,
+        scale = 1,
+    }
+    model TimberPropellerWoodBroken
+    {
+        mesh = WorldItems/RenewableEnergy_TimberPropellerWoodBroken,
+        texture = WorldItems/RenewableEnergy_TimberPropellerWoodBroken,
+        scale = 1,
+    }
+    model TimberPropellerPipe0
+    {
+        mesh = WorldItems/RenewableEnergy_TimberPropellerPipe0,
+        texture = WorldItems/RenewableEnergy_TimberPropellerPipe,
+        scale = 1,
+    }
+    model TimberPropellerPipe1
+    {
+        mesh = WorldItems/RenewableEnergy_TimberPropellerPipe1,
+        texture = WorldItems/RenewableEnergy_TimberPropellerPipe,
+        scale = 1,
+    }
+    model TimberPropellerPipe2
+    {
+        mesh = WorldItems/RenewableEnergy_TimberPropellerPipe2,
+        texture = WorldItems/RenewableEnergy_TimberPropellerPipe,
+        scale = 1,
+    }
+    model TimberPropellerPipe3
+    {
+        mesh = WorldItems/RenewableEnergy_TimberPropellerPipe3,
+        texture = WorldItems/RenewableEnergy_TimberPropellerPipe,
+        scale = 1,
+    }
+    model TimberPropellerPipe4
+    {
+        mesh = WorldItems/RenewableEnergy_TimberPropellerPipe4,
+        texture = WorldItems/RenewableEnergy_TimberPropellerPipe,
+        scale = 1,
+    }
+    model TimberPropellerPipe5
+    {
+        mesh = WorldItems/RenewableEnergy_TimberPropellerPipe5,
+        texture = WorldItems/RenewableEnergy_TimberPropellerPipe,
+        scale = 1,
+    }
+    model TimberPropellerPipeBroken
+    {
+        mesh = WorldItems/RenewableEnergy_TimberPropellerPipeBroken,
+        texture = WorldItems/RenewableEnergy_TimberPropellerPipeBroken,
+        scale = 1,
+    }
+    model TimberPropellerSteel0
+    {
+        mesh = WorldItems/RenewableEnergy_TimberPropellerSteel0,
+        texture = WorldItems/RenewableEnergy_TimberPropellerSteel,
+        scale = 1,
+    }
+    model TimberPropellerSteel1
+    {
+        mesh = WorldItems/RenewableEnergy_TimberPropellerSteel1,
+        texture = WorldItems/RenewableEnergy_TimberPropellerSteel,
+        scale = 1,
+    }
+    model TimberPropellerSteel2
+    {
+        mesh = WorldItems/RenewableEnergy_TimberPropellerSteel2,
+        texture = WorldItems/RenewableEnergy_TimberPropellerSteel,
+        scale = 1,
+    }
+    model TimberPropellerSteel3
+    {
+        mesh = WorldItems/RenewableEnergy_TimberPropellerSteel3,
+        texture = WorldItems/RenewableEnergy_TimberPropellerSteel,
+        scale = 1,
+    }
+    model TimberPropellerSteel4
+    {
+        mesh = WorldItems/RenewableEnergy_TimberPropellerSteel4,
+        texture = WorldItems/RenewableEnergy_TimberPropellerSteel,
+        scale = 1,
+    }
+    model TimberPropellerSteel5
+    {
+        mesh = WorldItems/RenewableEnergy_TimberPropellerSteel5,
+        texture = WorldItems/RenewableEnergy_TimberPropellerSteel,
+        scale = 1,
+    }
+    model TimberPropellerSteelBroken
+    {
+        mesh = WorldItems/RenewableEnergy_TimberPropellerSteelBroken,
+        texture = WorldItems/RenewableEnergy_TimberPropellerSteelBroken,
+        scale = 1,
+    }
+    model TimberCarAlternatorWood0
+    {
+        mesh = WorldItems/RenewableEnergy_TimberCarAlternatorWood0,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorWood,
+        scale = 1,
+    }
+    model TimberCarAlternatorWood1
+    {
+        mesh = WorldItems/RenewableEnergy_TimberCarAlternatorWood1,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorWood,
+        scale = 1,
+    }
+    model TimberCarAlternatorWood2
+    {
+        mesh = WorldItems/RenewableEnergy_TimberCarAlternatorWood2,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorWood,
+        scale = 1,
+    }
+    model TimberCarAlternatorWood3
+    {
+        mesh = WorldItems/RenewableEnergy_TimberCarAlternatorWood3,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorWood,
+        scale = 1,
+    }
+    model TimberCarAlternatorWood4
+    {
+        mesh = WorldItems/RenewableEnergy_TimberCarAlternatorWood4,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorWood,
+        scale = 1,
+    }
+    model TimberCarAlternatorWood5
+    {
+        mesh = WorldItems/RenewableEnergy_TimberCarAlternatorWood5,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorWood,
+        scale = 1,
+    }
+    model TimberCarAlternatorWoodBroken
+    {
+        mesh = WorldItems/RenewableEnergy_TimberCarAlternatorWoodBroken,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorWoodBroken,
+        scale = 1,
+    }
+    model TimberCarAlternatorPipe0
+    {
+        mesh = WorldItems/RenewableEnergy_TimberCarAlternatorPipe0,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorPipe,
+        scale = 1,
+    }
+    model TimberCarAlternatorPipe1
+    {
+        mesh = WorldItems/RenewableEnergy_TimberCarAlternatorPipe1,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorPipe,
+        scale = 1,
+    }
+    model TimberCarAlternatorPipe2
+    {
+        mesh = WorldItems/RenewableEnergy_TimberCarAlternatorPipe2,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorPipe,
+        scale = 1,
+    }
+    model TimberCarAlternatorPipe3
+    {
+        mesh = WorldItems/RenewableEnergy_TimberCarAlternatorPipe3,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorPipe,
+        scale = 1,
+    }
+    model TimberCarAlternatorPipe4
+    {
+        mesh = WorldItems/RenewableEnergy_TimberCarAlternatorPipe4,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorPipe,
+        scale = 1,
+    }
+    model TimberCarAlternatorPipe5
+    {
+        mesh = WorldItems/RenewableEnergy_TimberCarAlternatorPipe5,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorPipe,
+        scale = 1,
+    }
+    model TimberCarAlternatorPipeBroken
+    {
+        mesh = WorldItems/RenewableEnergy_TimberCarAlternatorPipeBroken,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorPipeBroken,
+        scale = 1,
+    }
+    model TimberCarAlternatorSteel0
+    {
+        mesh = WorldItems/RenewableEnergy_TimberCarAlternatorSteel0,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorSteel,
+        scale = 1,
+    }
+    model TimberCarAlternatorSteel1
+    {
+        mesh = WorldItems/RenewableEnergy_TimberCarAlternatorSteel1,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorSteel,
+        scale = 1,
+    }
+    model TimberCarAlternatorSteel2
+    {
+        mesh = WorldItems/RenewableEnergy_TimberCarAlternatorSteel2,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorSteel,
+        scale = 1,
+    }
+    model TimberCarAlternatorSteel3
+    {
+        mesh = WorldItems/RenewableEnergy_TimberCarAlternatorSteel3,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorSteel,
+        scale = 1,
+    }
+    model TimberCarAlternatorSteel4
+    {
+        mesh = WorldItems/RenewableEnergy_TimberCarAlternatorSteel4,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorSteel,
+        scale = 1,
+    }
+    model TimberCarAlternatorSteel5
+    {
+        mesh = WorldItems/RenewableEnergy_TimberCarAlternatorSteel5,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorSteel,
+        scale = 1,
+    }
+    model TimberCarAlternatorSteelBroken
+    {
+        mesh = WorldItems/RenewableEnergy_TimberCarAlternatorSteelBroken,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorSteelBroken,
+        scale = 1,
+    }
     model AlternatorWood0
     {
         mesh = WorldItems/RenewableEnergy_AlternatorWood0,

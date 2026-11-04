@@ -23,13 +23,18 @@ RenewableEnergy.Wind = Wind
 -- governs the rotor near its rated speed; turned aside, its blades take less of the gale and
 -- break only furledBladeKph above their break speed.
 -- propeller is the treadmill wind charger, alternator the homebuilt wind turbine (their names in
--- saved records and tiles from before they were renamed).
+-- saved records and tiles from before they were renamed). The timber kinds are the treadmill and
+-- car alternator chargers on a lashed log tripod, built with Carpentry: their twins' in every row.
 Wind.SPEC = {
     turbines = {
         scoop = { slots = 1, watts = 150, cutInKph = 8, ratedKph = 45, rotorAbove = 0 },
         propeller = { slots = 3, watts = 300, cutInKph = 10, ratedKph = 40, rotorAbove = 1,
             blades = { "wood", "pipe", "steel" } },
         carAlternator = { slots = 3, watts = 400, cutInKph = 10, ratedKph = 40, rotorAbove = 1,
+            blades = { "wood", "pipe", "steel" } },
+        timberPropeller = { slots = 3, watts = 300, cutInKph = 10, ratedKph = 40, rotorAbove = 1,
+            blades = { "wood", "pipe", "steel" } },
+        timberCarAlternator = { slots = 3, watts = 400, cutInKph = 10, ratedKph = 40, rotorAbove = 1,
             blades = { "wood", "pipe", "steel" } },
         alternator = { slots = 3, watts = 800, cutInKph = 9, ratedKph = 40, rotorAbove = 1,
             furlKph = 55, furledShare = 0.85, furledBladeKph = 20, blades = { "steel", "wood", "pipe" } },

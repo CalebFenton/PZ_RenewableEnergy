@@ -327,6 +327,46 @@ return {
                 W = "renewable_energy_01_416",
             },
         },
+        timberPropeller = {
+            wood = {
+                N = "renewable_energy_01_445",
+                E = "renewable_energy_01_446",
+                S = "renewable_energy_01_447",
+                W = "renewable_energy_01_448",
+            },
+            pipe = {
+                N = "renewable_energy_01_449",
+                E = "renewable_energy_01_450",
+                S = "renewable_energy_01_451",
+                W = "renewable_energy_01_452",
+            },
+            steel = {
+                N = "renewable_energy_01_453",
+                E = "renewable_energy_01_454",
+                S = "renewable_energy_01_455",
+                W = "renewable_energy_01_456",
+            },
+        },
+        timberCarAlternator = {
+            wood = {
+                N = "renewable_energy_01_457",
+                E = "renewable_energy_01_458",
+                S = "renewable_energy_01_459",
+                W = "renewable_energy_01_460",
+            },
+            pipe = {
+                N = "renewable_energy_01_461",
+                E = "renewable_energy_01_462",
+                S = "renewable_energy_01_463",
+                W = "renewable_energy_01_464",
+            },
+            steel = {
+                N = "renewable_energy_01_465",
+                E = "renewable_energy_01_466",
+                S = "renewable_energy_01_467",
+                W = "renewable_energy_01_468",
+            },
+        },
     },
     windModels = {
         scoop = { name = "RenewableEnergy.ScoopRotor", steps = 6, stepsPerTurn = 12 },
@@ -346,6 +386,20 @@ return {
         },
         carAlternator = {
             name = "RenewableEnergy.CarAlternator",
+            byMaterial = true,
+            byFacing = true,
+            steps = 6,
+            stepsPerTurn = 18,
+        },
+        timberPropeller = {
+            name = "RenewableEnergy.TimberPropeller",
+            byMaterial = true,
+            byFacing = true,
+            steps = 6,
+            stepsPerTurn = 18,
+        },
+        timberCarAlternator = {
+            name = "RenewableEnergy.TimberCarAlternator",
             byMaterial = true,
             byFacing = true,
             steps = 6,

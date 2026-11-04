@@ -221,7 +221,7 @@ TILES[SCOOP_ROTOR] = [layer(wind.scoop_rotor)]
 # The blade machines, each facing's tile its sprite model's first spin step. They stand taller than
 # a tile's sprite can draw, so the tiles show them shrunk to fit, whole; in play the game draws
 # their sprite models at full size.
-WIND_TILE_SCALE = {"Propeller": 0.55, "CarAlternator": 0.55, "Alternator": 0.48}
+WIND_TILE_SCALE = {"Propeller": 0.55, "CarAlternator": 0.55, "TimberPropeller": 0.55, "TimberCarAlternator": 0.55, "Alternator": 0.48}
 for first, model, blades in WIND_TILES:
     for offset, facing in enumerate(DIRECTIONS):
         TILES[first + offset] = [layer(wind.SPRITE_MODELS[model]["model"], turn=FACING_TURN[facing], scale=WIND_TILE_SCALE[model],
@@ -246,5 +246,7 @@ BUILD_ICONS = {
     "ScoopRotor": [layer(wind.scoop_rotor)],
     "Propeller": [layer(wind.propeller_charger, turn=BUILD_ICON_TURN, stub=BUILD_ICON_MAST)],
     "CarAlternator": [layer(wind.car_alternator_charger, turn=BUILD_ICON_TURN, stub=BUILD_ICON_MAST)],
+    "TimberPropeller": [layer(wind.timber_propeller_charger, turn=BUILD_ICON_TURN, stub=BUILD_ICON_MAST)],
+    "TimberCarAlternator": [layer(wind.timber_car_alternator_charger, turn=BUILD_ICON_TURN, stub=BUILD_ICON_MAST)],
     "Alternator": [layer(wind.alternator_charger, turn=BUILD_ICON_TURN, stub=BUILD_ICON_MAST)],
 }

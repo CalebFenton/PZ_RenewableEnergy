@@ -67,6 +67,18 @@ module Base
             DisplayName = RenewableEnergy_CarAlternatorWood,
             Icon = RenewableEnergy_Build_CarAlternator,
         }
+        entity ES_RenewableEnergy_TimberPropellerWood
+        {
+            LuaWindowClass = ISEntityWindow,
+            DisplayName = RenewableEnergy_TimberPropellerWood,
+            Icon = RenewableEnergy_Build_TimberPropeller,
+        }
+        entity ES_RenewableEnergy_TimberCarAlternatorWood
+        {
+            LuaWindowClass = ISEntityWindow,
+            DisplayName = RenewableEnergy_TimberCarAlternatorWood,
+            Icon = RenewableEnergy_Build_TimberCarAlternator,
+        }
         entity ES_RenewableEnergy_TurbineWood
         {
             LuaWindowClass = ISEntityWindow,
@@ -622,6 +634,180 @@ module Base
             face E { layer { row = renewable_energy_01_414, } }
             face S { layer { row = renewable_energy_01_415, } }
             face W { layer { row = renewable_energy_01_416, } }
+        }
+    }
+
+    /* The treadmill wind charger on a timber mast: the same head, on three logs lashed into a
+       tripod with a plank head board and tail, and a found pipe for the yaw pivot. A carpenter's
+       route to the welded charger's power, with the same skill levels in Woodwork. */
+    entity RenewableEnergy_TimberPropellerWood
+    {
+        component UiConfig
+        {
+            xuiSkin = default,
+            entityStyle = ES_RenewableEnergy_TimberPropellerWood,
+            uiEnabled = false,
+        }
+        component SpriteConfig
+        {
+            OnCreate = RenewableEnergy.Wind.OnCreate,
+            face N { layer { row = renewable_energy_01_445, } }
+            face E { layer { row = renewable_energy_01_446, } }
+            face S { layer { row = renewable_energy_01_447, } }
+            face W { layer { row = renewable_energy_01_448, } }
+        }
+        component CraftRecipe
+        {
+            timedAction = BuildWoodenStructureMedium,
+            time = 500,
+            category = Carpentry,
+            Tags = Carpentry,
+            NeedToBeLearn = true,
+            AutoLearnAll = Woodwork:5;Electricity:4,
+            SkillRequired = Woodwork:3;Electricity:3,
+            xpAward = Woodwork:30;Electricity:20,
+            Tooltip = Tooltip_RenewableEnergy_TimberTreadmillWindCharger,
+            inputs
+            {
+                item 1 tags[base:hammer] mode:keep flags[Prop1;MayDegradeLight],
+                item 1 tags[base:saw] mode:keep flags[MayDegradeLight],
+                item 1 tags[base:drillwood] mode:keep flags[MayDegradeLight],
+                item 1 [RenewableEnergy.WoodenBlades;RenewableEnergy.PipeBlades;RenewableEnergy.SteelBlades],
+                item 1 [RenewableEnergy.TreadmillMotor],
+                item 3 [Base.Log],
+                item 2 [Base.Rope;Base.SheetRope],
+                item 3 [Base.Plank],
+                item 10 [Base.Nails],
+                item 1 [Base.MetalPipe],
+                item 3 [Base.ElectricWire],
+                item 1 [Base.ElectronicsScrap],
+            }
+        }
+    }
+
+    /* The timber treadmill wind charger on pipe blades, made as the welded one on pipe blades is. */
+    entity RenewableEnergy_TimberPropellerPipe
+    {
+        component UiConfig
+        {
+            xuiSkin = default,
+            entityStyle = ES_RenewableEnergy_TimberPropellerWood,
+            uiEnabled = false,
+        }
+        component SpriteConfig
+        {
+            OnCreate = RenewableEnergy.Wind.OnCreate,
+            face N { layer { row = renewable_energy_01_449, } }
+            face E { layer { row = renewable_energy_01_450, } }
+            face S { layer { row = renewable_energy_01_451, } }
+            face W { layer { row = renewable_energy_01_452, } }
+        }
+    }
+
+    /* The timber treadmill wind charger on steel blades, made as the welded one on pipe blades is. */
+    entity RenewableEnergy_TimberPropellerSteel
+    {
+        component UiConfig
+        {
+            xuiSkin = default,
+            entityStyle = ES_RenewableEnergy_TimberPropellerWood,
+            uiEnabled = false,
+        }
+        component SpriteConfig
+        {
+            OnCreate = RenewableEnergy.Wind.OnCreate,
+            face N { layer { row = renewable_energy_01_453, } }
+            face E { layer { row = renewable_energy_01_454, } }
+            face S { layer { row = renewable_energy_01_455, } }
+            face W { layer { row = renewable_energy_01_456, } }
+        }
+    }
+
+    /* The car alternator wind charger on a timber mast: the log tripod, a plank deck with the
+       pillow blocks lag-screwed down, and the welded one's belt drive and alternator. Its skills
+       are the welded one's, Woodwork for Welding. */
+    entity RenewableEnergy_TimberCarAlternatorWood
+    {
+        component UiConfig
+        {
+            xuiSkin = default,
+            entityStyle = ES_RenewableEnergy_TimberCarAlternatorWood,
+            uiEnabled = false,
+        }
+        component SpriteConfig
+        {
+            OnCreate = RenewableEnergy.Wind.OnCreate,
+            face N { layer { row = renewable_energy_01_457, } }
+            face E { layer { row = renewable_energy_01_458, } }
+            face S { layer { row = renewable_energy_01_459, } }
+            face W { layer { row = renewable_energy_01_460, } }
+        }
+        component CraftRecipe
+        {
+            timedAction = BuildWoodenStructureMedium,
+            time = 700,
+            category = Carpentry,
+            Tags = Carpentry,
+            NeedToBeLearn = true,
+            AutoLearnAll = Woodwork:7;Electricity:6;Mechanics:4,
+            SkillRequired = Woodwork:5;Electricity:5;Mechanics:3,
+            xpAward = Woodwork:50;Electricity:30;Mechanics:15,
+            Tooltip = Tooltip_RenewableEnergy_TimberCarAlternatorWindCharger,
+            inputs
+            {
+                item 1 tags[base:hammer] mode:keep flags[Prop1;MayDegradeLight],
+                item 1 tags[base:saw] mode:keep flags[MayDegradeLight],
+                item 1 tags[base:drillwood] mode:keep flags[MayDegradeLight],
+                item 1 [RenewableEnergy.WoodenBlades;RenewableEnergy.PipeBlades;RenewableEnergy.SteelBlades],
+                item 1 [RenewableEnergy.CarAlternator],
+                item 1 [Base.Belt2],
+                item 3 [Base.Log],
+                item 2 [Base.Rope;Base.SheetRope],
+                item 5 [Base.Plank],
+                item 12 [Base.Nails],
+                item 8 [Base.Screws],
+                item 1 [Base.MetalPipe],
+                item 6 [Base.ElectricWire],
+                item 5 [Base.ElectronicsScrap],
+            }
+        }
+    }
+
+    /* The timber car alternator wind charger on pipe blades, made as the welded one on pipe blades is. */
+    entity RenewableEnergy_TimberCarAlternatorPipe
+    {
+        component UiConfig
+        {
+            xuiSkin = default,
+            entityStyle = ES_RenewableEnergy_TimberCarAlternatorWood,
+            uiEnabled = false,
+        }
+        component SpriteConfig
+        {
+            OnCreate = RenewableEnergy.Wind.OnCreate,
+            face N { layer { row = renewable_energy_01_461, } }
+            face E { layer { row = renewable_energy_01_462, } }
+            face S { layer { row = renewable_energy_01_463, } }
+            face W { layer { row = renewable_energy_01_464, } }
+        }
+    }
+
+    /* The timber car alternator wind charger on steel blades, made as the welded one on pipe blades is. */
+    entity RenewableEnergy_TimberCarAlternatorSteel
+    {
+        component UiConfig
+        {
+            xuiSkin = default,
+            entityStyle = ES_RenewableEnergy_TimberCarAlternatorWood,
+            uiEnabled = false,
+        }
+        component SpriteConfig
+        {
+            OnCreate = RenewableEnergy.Wind.OnCreate,
+            face N { layer { row = renewable_energy_01_465, } }
+            face E { layer { row = renewable_energy_01_466, } }
+            face S { layer { row = renewable_energy_01_467, } }
+            face W { layer { row = renewable_energy_01_468, } }
         }
     }
 

@@ -303,6 +303,8 @@ local SOURCE_NAMES = {
     scoop = "IGUI_RenewableEnergy_WindScoop",
     propeller = "IGUI_RenewableEnergy_WindTreadmill",
     carAlternator = "IGUI_RenewableEnergy_WindCarAlternator",
+    timberPropeller = "IGUI_RenewableEnergy_WindTimberTreadmill",
+    timberCarAlternator = "IGUI_RenewableEnergy_WindTimberCarAlternator",
     alternator = "IGUI_RenewableEnergy_WindTurbine",
     treadmill = "IGUI_RenewableEnergy_Treadmill",
 }

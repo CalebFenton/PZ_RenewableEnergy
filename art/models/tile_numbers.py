@@ -121,7 +121,10 @@ SCOOP_ROTOR = 264
 # model it is (wind.SPRITE_MODELS) and its blades.
 WIND_TILES = ((265, "Propeller", "wood"), (269, "Propeller", "pipe"), (273, "Alternator", "steel"),
               (372, "Propeller", "steel"), (397, "Alternator", "wood"), (401, "Alternator", "pipe"),
-              (405, "CarAlternator", "wood"), (409, "CarAlternator", "pipe"), (413, "CarAlternator", "steel"))
+              (405, "CarAlternator", "wood"), (409, "CarAlternator", "pipe"), (413, "CarAlternator", "steel"),
+              (445, "TimberPropeller", "wood"), (449, "TimberPropeller", "pipe"), (453, "TimberPropeller", "steel"),
+              (457, "TimberCarAlternator", "wood"), (461, "TimberCarAlternator", "pipe"),
+              (465, "TimberCarAlternator", "steel"))
 # The sprite models' spins: each step's turn in degrees and how many steps a model has. The scoop
 # rotor turns whole, the same after half a turn; a bladed rotor about its hub, the same after a third.
 SCOOP_SPIN = (30, 6)

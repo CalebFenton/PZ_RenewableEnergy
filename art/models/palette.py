@@ -99,6 +99,10 @@ PALETTE = {
     "jaracid": lambda: material("RE_JarAcid", "#6b877d", roughness=0.12, grime=0.08, scale=20, streaks=("#a9c4ba", 0.6)),
     # Pale tan twine.
     "twine": lambda: material("RE_Twine", "#c8b07a", roughness=0.9, grime=0.15, scale=40),
+    # A log's bark, dark and furrowed, and the manila rope that lashes logs together.
+    "bark": lambda: material("RE_Bark", "#5a4331", roughness=0.95, grime=0.35, scale=14, grain="weathered",
+                             speckle=("#3b2c20", 0.5)),
+    "rope": lambda: material("RE_Rope", "#a88c5c", roughness=0.9, grime=0.25, scale=40, grain="fine"),
     "sand": lambda: material("RE_Sand", "#c9b48a", roughness=0.95, grime=0.2, scale=60, speckle=("#a48f64", 0.4)),
     "sulphate": lambda: material("RE_Sulphate", "#dcd9cb", roughness=0.95, grime=0.15, scale=60),
     # A plate's paste is dull grey lead in a grid of brighter cast lead. Worn out, it is black

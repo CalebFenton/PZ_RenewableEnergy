@@ -400,10 +400,10 @@
     {
       "name": "model_RenewableEnergy_BrokenPipeBlades",
       "box": [
-        78,
-        78,
-        300,
-        151
+        77,
+        77,
+        298,
+        150
       ]
     },
     {
@@ -430,7 +430,7 @@
         25,
         25,
         73,
-        96
+        97
       ]
     },
     {
@@ -481,10 +481,10 @@
     {
       "name": "model_RenewableEnergy_FridgeCompressor",
       "box": [
-        41,
-        41,
-        143,
-        159
+        42,
+        42,
+        144,
+        161
       ]
     },
     {
@@ -502,7 +502,7 @@
         78,
         78,
         270,
-        301
+        300
       ]
     },
     {
@@ -511,16 +511,16 @@
         59,
         59,
         229,
-        172
+        171
       ]
     },
     {
       "name": "model_RenewableEnergy_HomemadeInverter",
       "box": [
-        40,
-        40,
-        154,
-        108
+        39,
+        39,
+        150,
+        107
       ]
     },
     {
@@ -538,7 +538,7 @@
         26,
         26,
         100,
-        75
+        76
       ]
     },
     {
@@ -574,7 +574,7 @@
         76,
         76,
         294,
-        197
+        196
       ]
     },
     {
@@ -628,7 +628,7 @@
         27,
         27,
         103,
-        81
+        80
       ]
     },
     {
@@ -718,7 +718,7 @@
         63,
         63,
         243,
-        155
+        156
       ]
     },
     {
@@ -744,7 +744,7 @@
       "box": [
         105,
         105,
-        377,
+        376,
         407
       ]
     },
@@ -787,10 +787,10 @@
     {
       "name": "model_RenewableEnergy_TarpGasBag",
       "box": [
-        68,
-        68,
-        262,
-        163
+        69,
+        69,
+        265,
+        164
       ]
     },
     {
@@ -843,7 +843,7 @@
       "box": [
         24,
         24,
-        79,
+        78,
         93
       ]
     },
@@ -8431,6 +8431,231 @@
     },
     {
       "build": {
+        "icon": "icon_build_RenewableEnergy_TimberPropellerWood",
+        "name": "Treadmill Wind Charger on a Timber Mast"
+      },
+      "id": "RenewableEnergy_TimberPropellerWood",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Hammer",
+              "icon": "icon_Base_Hammer",
+              "name": "Claw Hammer"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Saw",
+              "icon": "icon_Base_Saw",
+              "name": "Hacksaw"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.HandDrill",
+              "icon": "icon_Base_HandDrill",
+              "name": "Hand Drill"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.WoodenBlades",
+              "icon": "icon_RenewableEnergy_WoodenBlades",
+              "name": "Wooden Blade Set"
+            },
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.PipeBlades",
+              "icon": "icon_RenewableEnergy_PipeBlades",
+              "name": "Plastic Pipe Blade Set"
+            },
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.SteelBlades",
+              "icon": "icon_RenewableEnergy_SteelBlades",
+              "name": "Steel Blade Set"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.TreadmillMotor",
+              "icon": "icon_RenewableEnergy_TreadmillMotor",
+              "name": "Treadmill Motor"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 3,
+          "items": [
+            {
+              "count": 3,
+              "fullType": "Base.Log",
+              "icon": "icon_Base_Log",
+              "name": "Log"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 2,
+          "items": [
+            {
+              "count": 2,
+              "fullType": "Base.Rope",
+              "icon": "icon_Base_Rope",
+              "name": "Rope"
+            },
+            {
+              "count": 2,
+              "fullType": "Base.SheetRope",
+              "icon": "icon_Base_SheetRope",
+              "name": "Sheet Rope"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 3,
+          "items": [
+            {
+              "count": 3,
+              "fullType": "Base.Plank",
+              "icon": "icon_Base_Plank",
+              "name": "Plank"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 10,
+          "items": [
+            {
+              "count": 10,
+              "fullType": "Base.Nails",
+              "icon": "icon_Base_Nails",
+              "name": "Nails"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.MetalPipe",
+              "icon": "icon_Base_MetalPipe",
+              "name": "Iron Pipe"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 3,
+          "items": [
+            {
+              "count": 3,
+              "fullType": "Base.ElectricWire",
+              "icon": "icon_Base_ElectricWire",
+              "name": "Electrical Wire"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.ElectronicsScrap",
+              "icon": "icon_Base_ElectronicsScrap",
+              "name": "Scrap Electronics"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        }
+      ],
+      "learn": {
+        "auto": [],
+        "autoAll": [
+          {
+            "level": 5,
+            "name": "Carpentry"
+          },
+          {
+            "level": 4,
+            "name": "Electrical"
+          }
+        ],
+        "magazines": [
+          "Magazine: Homestead Power #4 - Breaking Wind"
+        ],
+        "needed": true,
+        "research": []
+      },
+      "name": "Treadmill Wind Charger on a Timber Mast",
+      "outputs": [],
+      "skills": [
+        {
+          "level": 3,
+          "name": "Carpentry"
+        },
+        {
+          "level": 3,
+          "name": "Electrical"
+        }
+      ]
+    },
+    {
+      "build": {
         "icon": "icon_build_RenewableEnergy_PrimitiveGasifier",
         "name": "Primitive Gasifier"
       },
@@ -8574,6 +8799,267 @@
       "skills": [
         {
           "level": 2,
+          "name": "Mechanics"
+        }
+      ]
+    },
+    {
+      "build": {
+        "icon": "icon_build_RenewableEnergy_TimberCarAlternatorWood",
+        "name": "Car Alternator Wind Charger on a Timber Mast"
+      },
+      "id": "RenewableEnergy_TimberCarAlternatorWood",
+      "inputs": [
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Hammer",
+              "icon": "icon_Base_Hammer",
+              "name": "Claw Hammer"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Saw",
+              "icon": "icon_Base_Saw",
+              "name": "Hacksaw"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.HandDrill",
+              "icon": "icon_Base_HandDrill",
+              "name": "Hand Drill"
+            }
+          ],
+          "keep": true,
+          "tag": true,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.WoodenBlades",
+              "icon": "icon_RenewableEnergy_WoodenBlades",
+              "name": "Wooden Blade Set"
+            },
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.PipeBlades",
+              "icon": "icon_RenewableEnergy_PipeBlades",
+              "name": "Plastic Pipe Blade Set"
+            },
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.SteelBlades",
+              "icon": "icon_RenewableEnergy_SteelBlades",
+              "name": "Steel Blade Set"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "RenewableEnergy.CarAlternator",
+              "icon": "icon_RenewableEnergy_CarAlternator",
+              "name": "Car Alternator"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.Belt2",
+              "icon": "icon_Base_Belt2",
+              "name": "Belt"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 3,
+          "items": [
+            {
+              "count": 3,
+              "fullType": "Base.Log",
+              "icon": "icon_Base_Log",
+              "name": "Log"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 2,
+          "items": [
+            {
+              "count": 2,
+              "fullType": "Base.Rope",
+              "icon": "icon_Base_Rope",
+              "name": "Rope"
+            },
+            {
+              "count": 2,
+              "fullType": "Base.SheetRope",
+              "icon": "icon_Base_SheetRope",
+              "name": "Sheet Rope"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 5,
+          "items": [
+            {
+              "count": 5,
+              "fullType": "Base.Plank",
+              "icon": "icon_Base_Plank",
+              "name": "Plank"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 12,
+          "items": [
+            {
+              "count": 12,
+              "fullType": "Base.Nails",
+              "icon": "icon_Base_Nails",
+              "name": "Nails"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 8,
+          "items": [
+            {
+              "count": 8,
+              "fullType": "Base.Screws",
+              "icon": "icon_Base_Screws",
+              "name": "Screws"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 1,
+          "items": [
+            {
+              "count": 1,
+              "fullType": "Base.MetalPipe",
+              "icon": "icon_Base_MetalPipe",
+              "name": "Iron Pipe"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 6,
+          "items": [
+            {
+              "count": 6,
+              "fullType": "Base.ElectricWire",
+              "icon": "icon_Base_ElectricWire",
+              "name": "Electrical Wire"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        },
+        {
+          "count": 5,
+          "items": [
+            {
+              "count": 5,
+              "fullType": "Base.ElectronicsScrap",
+              "icon": "icon_Base_ElectronicsScrap",
+              "name": "Scrap Electronics"
+            }
+          ],
+          "keep": false,
+          "tag": false,
+          "uses": false
+        }
+      ],
+      "learn": {
+        "auto": [],
+        "autoAll": [
+          {
+            "level": 7,
+            "name": "Carpentry"
+          },
+          {
+            "level": 6,
+            "name": "Electrical"
+          },
+          {
+            "level": 4,
+            "name": "Mechanics"
+          }
+        ],
+        "magazines": [
+          "Magazine: Homestead Power #4 - Breaking Wind"
+        ],
+        "needed": true,
+        "research": []
+      },
+      "name": "Car Alternator Wind Charger on a Timber Mast",
+      "outputs": [],
+      "skills": [
+        {
+          "level": 5,
+          "name": "Carpentry"
+        },
+        {
+          "level": 5,
+          "name": "Electrical"
+        },
+        {
+          "level": 3,
           "name": "Mechanics"
         }
       ]
@@ -8774,6 +9260,7 @@
       "icon_Base_JarCrafted",
       "icon_Base_KitchenKnife",
       "icon_Base_LeadPipe",
+      "icon_Base_Log",
       "icon_Base_MasonsTrowel",
       "icon_Base_Matches",
       "icon_Base_MetalBar",
@@ -8797,6 +9284,7 @@
       "icon_Base_RadioRed",
       "icon_Base_RemoteCraftedV3",
       "icon_Base_RippedSheets",
+      "icon_Base_Rope",
       "icon_Base_RubberHose",
       "icon_Base_Sandbag",
       "icon_Base_Saw",
@@ -8804,6 +9292,7 @@
       "icon_Base_Screwdriver",
       "icon_Base_Screws",
       "icon_Base_SheetMetal",
+      "icon_Base_SheetRope",
       "icon_Base_Shovel2",
       "icon_Base_SmallSheetMetal",
       "icon_Base_SmithingHammer",
@@ -8893,6 +9382,8 @@
       "icon_build_RenewableEnergy_PrimitiveGasifier",
       "icon_build_RenewableEnergy_PropellerWood",
       "icon_build_RenewableEnergy_ScoopRotor",
+      "icon_build_RenewableEnergy_TimberCarAlternatorWood",
+      "icon_build_RenewableEnergy_TimberPropellerWood",
       "icon_build_RenewableEnergy_TurbineWood"
     ],
     "menu": [

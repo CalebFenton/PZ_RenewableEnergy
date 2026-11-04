@@ -207,6 +207,8 @@
     "IGUI_RenewableEnergy_ReasonIdle": "nobody running",
     "IGUI_RenewableEnergy_WindTreadmill": "Treadmill wind charger",
     "IGUI_RenewableEnergy_WindCarAlternator": "Car alternator wind charger",
+    "IGUI_RenewableEnergy_WindTimberTreadmill": "Treadmill wind charger on a timber mast",
+    "IGUI_RenewableEnergy_WindTimberCarAlternator": "Car alternator wind charger on a timber mast",
     "IGUI_RenewableEnergy_WindTurbine": "Homemade wind turbine",
     "IGUI_RenewableEnergy_ReasonBroken": "blades broken",
     "IGUI_RenewableEnergy_ReasonFurled": "turned out of the wind",

@@ -1393,6 +1393,1350 @@ module RenewableEnergy
         rotate = 0.0 90 0.0,
         scale = 0.6667,
     }
+    spriteModel TimberPropellerWoodN0
+    {
+        modelScript = RenewableEnergy.TimberPropellerWood0,
+        texture = WorldItems/RenewableEnergy_TimberPropellerWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerWoodN1
+    {
+        modelScript = RenewableEnergy.TimberPropellerWood1,
+        texture = WorldItems/RenewableEnergy_TimberPropellerWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerWoodN2
+    {
+        modelScript = RenewableEnergy.TimberPropellerWood2,
+        texture = WorldItems/RenewableEnergy_TimberPropellerWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerWoodN3
+    {
+        modelScript = RenewableEnergy.TimberPropellerWood3,
+        texture = WorldItems/RenewableEnergy_TimberPropellerWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerWoodN4
+    {
+        modelScript = RenewableEnergy.TimberPropellerWood4,
+        texture = WorldItems/RenewableEnergy_TimberPropellerWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerWoodN5
+    {
+        modelScript = RenewableEnergy.TimberPropellerWood5,
+        texture = WorldItems/RenewableEnergy_TimberPropellerWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerWoodE0
+    {
+        modelScript = RenewableEnergy.TimberPropellerWood0,
+        texture = WorldItems/RenewableEnergy_TimberPropellerWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerWoodE1
+    {
+        modelScript = RenewableEnergy.TimberPropellerWood1,
+        texture = WorldItems/RenewableEnergy_TimberPropellerWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerWoodE2
+    {
+        modelScript = RenewableEnergy.TimberPropellerWood2,
+        texture = WorldItems/RenewableEnergy_TimberPropellerWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerWoodE3
+    {
+        modelScript = RenewableEnergy.TimberPropellerWood3,
+        texture = WorldItems/RenewableEnergy_TimberPropellerWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerWoodE4
+    {
+        modelScript = RenewableEnergy.TimberPropellerWood4,
+        texture = WorldItems/RenewableEnergy_TimberPropellerWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerWoodE5
+    {
+        modelScript = RenewableEnergy.TimberPropellerWood5,
+        texture = WorldItems/RenewableEnergy_TimberPropellerWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerWoodS0
+    {
+        modelScript = RenewableEnergy.TimberPropellerWood0,
+        texture = WorldItems/RenewableEnergy_TimberPropellerWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerWoodS1
+    {
+        modelScript = RenewableEnergy.TimberPropellerWood1,
+        texture = WorldItems/RenewableEnergy_TimberPropellerWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerWoodS2
+    {
+        modelScript = RenewableEnergy.TimberPropellerWood2,
+        texture = WorldItems/RenewableEnergy_TimberPropellerWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerWoodS3
+    {
+        modelScript = RenewableEnergy.TimberPropellerWood3,
+        texture = WorldItems/RenewableEnergy_TimberPropellerWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerWoodS4
+    {
+        modelScript = RenewableEnergy.TimberPropellerWood4,
+        texture = WorldItems/RenewableEnergy_TimberPropellerWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerWoodS5
+    {
+        modelScript = RenewableEnergy.TimberPropellerWood5,
+        texture = WorldItems/RenewableEnergy_TimberPropellerWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerWoodW0
+    {
+        modelScript = RenewableEnergy.TimberPropellerWood0,
+        texture = WorldItems/RenewableEnergy_TimberPropellerWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerWoodW1
+    {
+        modelScript = RenewableEnergy.TimberPropellerWood1,
+        texture = WorldItems/RenewableEnergy_TimberPropellerWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerWoodW2
+    {
+        modelScript = RenewableEnergy.TimberPropellerWood2,
+        texture = WorldItems/RenewableEnergy_TimberPropellerWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerWoodW3
+    {
+        modelScript = RenewableEnergy.TimberPropellerWood3,
+        texture = WorldItems/RenewableEnergy_TimberPropellerWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerWoodW4
+    {
+        modelScript = RenewableEnergy.TimberPropellerWood4,
+        texture = WorldItems/RenewableEnergy_TimberPropellerWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerWoodW5
+    {
+        modelScript = RenewableEnergy.TimberPropellerWood5,
+        texture = WorldItems/RenewableEnergy_TimberPropellerWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerWoodNBroken
+    {
+        modelScript = RenewableEnergy.TimberPropellerWoodBroken,
+        texture = WorldItems/RenewableEnergy_TimberPropellerWoodBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerWoodEBroken
+    {
+        modelScript = RenewableEnergy.TimberPropellerWoodBroken,
+        texture = WorldItems/RenewableEnergy_TimberPropellerWoodBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerWoodSBroken
+    {
+        modelScript = RenewableEnergy.TimberPropellerWoodBroken,
+        texture = WorldItems/RenewableEnergy_TimberPropellerWoodBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerWoodWBroken
+    {
+        modelScript = RenewableEnergy.TimberPropellerWoodBroken,
+        texture = WorldItems/RenewableEnergy_TimberPropellerWoodBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerPipeN0
+    {
+        modelScript = RenewableEnergy.TimberPropellerPipe0,
+        texture = WorldItems/RenewableEnergy_TimberPropellerPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerPipeN1
+    {
+        modelScript = RenewableEnergy.TimberPropellerPipe1,
+        texture = WorldItems/RenewableEnergy_TimberPropellerPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerPipeN2
+    {
+        modelScript = RenewableEnergy.TimberPropellerPipe2,
+        texture = WorldItems/RenewableEnergy_TimberPropellerPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerPipeN3
+    {
+        modelScript = RenewableEnergy.TimberPropellerPipe3,
+        texture = WorldItems/RenewableEnergy_TimberPropellerPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerPipeN4
+    {
+        modelScript = RenewableEnergy.TimberPropellerPipe4,
+        texture = WorldItems/RenewableEnergy_TimberPropellerPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerPipeN5
+    {
+        modelScript = RenewableEnergy.TimberPropellerPipe5,
+        texture = WorldItems/RenewableEnergy_TimberPropellerPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerPipeE0
+    {
+        modelScript = RenewableEnergy.TimberPropellerPipe0,
+        texture = WorldItems/RenewableEnergy_TimberPropellerPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerPipeE1
+    {
+        modelScript = RenewableEnergy.TimberPropellerPipe1,
+        texture = WorldItems/RenewableEnergy_TimberPropellerPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerPipeE2
+    {
+        modelScript = RenewableEnergy.TimberPropellerPipe2,
+        texture = WorldItems/RenewableEnergy_TimberPropellerPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerPipeE3
+    {
+        modelScript = RenewableEnergy.TimberPropellerPipe3,
+        texture = WorldItems/RenewableEnergy_TimberPropellerPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerPipeE4
+    {
+        modelScript = RenewableEnergy.TimberPropellerPipe4,
+        texture = WorldItems/RenewableEnergy_TimberPropellerPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerPipeE5
+    {
+        modelScript = RenewableEnergy.TimberPropellerPipe5,
+        texture = WorldItems/RenewableEnergy_TimberPropellerPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerPipeS0
+    {
+        modelScript = RenewableEnergy.TimberPropellerPipe0,
+        texture = WorldItems/RenewableEnergy_TimberPropellerPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerPipeS1
+    {
+        modelScript = RenewableEnergy.TimberPropellerPipe1,
+        texture = WorldItems/RenewableEnergy_TimberPropellerPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerPipeS2
+    {
+        modelScript = RenewableEnergy.TimberPropellerPipe2,
+        texture = WorldItems/RenewableEnergy_TimberPropellerPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerPipeS3
+    {
+        modelScript = RenewableEnergy.TimberPropellerPipe3,
+        texture = WorldItems/RenewableEnergy_TimberPropellerPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerPipeS4
+    {
+        modelScript = RenewableEnergy.TimberPropellerPipe4,
+        texture = WorldItems/RenewableEnergy_TimberPropellerPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerPipeS5
+    {
+        modelScript = RenewableEnergy.TimberPropellerPipe5,
+        texture = WorldItems/RenewableEnergy_TimberPropellerPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerPipeW0
+    {
+        modelScript = RenewableEnergy.TimberPropellerPipe0,
+        texture = WorldItems/RenewableEnergy_TimberPropellerPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerPipeW1
+    {
+        modelScript = RenewableEnergy.TimberPropellerPipe1,
+        texture = WorldItems/RenewableEnergy_TimberPropellerPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerPipeW2
+    {
+        modelScript = RenewableEnergy.TimberPropellerPipe2,
+        texture = WorldItems/RenewableEnergy_TimberPropellerPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerPipeW3
+    {
+        modelScript = RenewableEnergy.TimberPropellerPipe3,
+        texture = WorldItems/RenewableEnergy_TimberPropellerPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerPipeW4
+    {
+        modelScript = RenewableEnergy.TimberPropellerPipe4,
+        texture = WorldItems/RenewableEnergy_TimberPropellerPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerPipeW5
+    {
+        modelScript = RenewableEnergy.TimberPropellerPipe5,
+        texture = WorldItems/RenewableEnergy_TimberPropellerPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerPipeNBroken
+    {
+        modelScript = RenewableEnergy.TimberPropellerPipeBroken,
+        texture = WorldItems/RenewableEnergy_TimberPropellerPipeBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerPipeEBroken
+    {
+        modelScript = RenewableEnergy.TimberPropellerPipeBroken,
+        texture = WorldItems/RenewableEnergy_TimberPropellerPipeBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerPipeSBroken
+    {
+        modelScript = RenewableEnergy.TimberPropellerPipeBroken,
+        texture = WorldItems/RenewableEnergy_TimberPropellerPipeBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerPipeWBroken
+    {
+        modelScript = RenewableEnergy.TimberPropellerPipeBroken,
+        texture = WorldItems/RenewableEnergy_TimberPropellerPipeBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerSteelN0
+    {
+        modelScript = RenewableEnergy.TimberPropellerSteel0,
+        texture = WorldItems/RenewableEnergy_TimberPropellerSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerSteelN1
+    {
+        modelScript = RenewableEnergy.TimberPropellerSteel1,
+        texture = WorldItems/RenewableEnergy_TimberPropellerSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerSteelN2
+    {
+        modelScript = RenewableEnergy.TimberPropellerSteel2,
+        texture = WorldItems/RenewableEnergy_TimberPropellerSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerSteelN3
+    {
+        modelScript = RenewableEnergy.TimberPropellerSteel3,
+        texture = WorldItems/RenewableEnergy_TimberPropellerSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerSteelN4
+    {
+        modelScript = RenewableEnergy.TimberPropellerSteel4,
+        texture = WorldItems/RenewableEnergy_TimberPropellerSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerSteelN5
+    {
+        modelScript = RenewableEnergy.TimberPropellerSteel5,
+        texture = WorldItems/RenewableEnergy_TimberPropellerSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerSteelE0
+    {
+        modelScript = RenewableEnergy.TimberPropellerSteel0,
+        texture = WorldItems/RenewableEnergy_TimberPropellerSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerSteelE1
+    {
+        modelScript = RenewableEnergy.TimberPropellerSteel1,
+        texture = WorldItems/RenewableEnergy_TimberPropellerSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerSteelE2
+    {
+        modelScript = RenewableEnergy.TimberPropellerSteel2,
+        texture = WorldItems/RenewableEnergy_TimberPropellerSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerSteelE3
+    {
+        modelScript = RenewableEnergy.TimberPropellerSteel3,
+        texture = WorldItems/RenewableEnergy_TimberPropellerSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerSteelE4
+    {
+        modelScript = RenewableEnergy.TimberPropellerSteel4,
+        texture = WorldItems/RenewableEnergy_TimberPropellerSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerSteelE5
+    {
+        modelScript = RenewableEnergy.TimberPropellerSteel5,
+        texture = WorldItems/RenewableEnergy_TimberPropellerSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerSteelS0
+    {
+        modelScript = RenewableEnergy.TimberPropellerSteel0,
+        texture = WorldItems/RenewableEnergy_TimberPropellerSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerSteelS1
+    {
+        modelScript = RenewableEnergy.TimberPropellerSteel1,
+        texture = WorldItems/RenewableEnergy_TimberPropellerSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerSteelS2
+    {
+        modelScript = RenewableEnergy.TimberPropellerSteel2,
+        texture = WorldItems/RenewableEnergy_TimberPropellerSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerSteelS3
+    {
+        modelScript = RenewableEnergy.TimberPropellerSteel3,
+        texture = WorldItems/RenewableEnergy_TimberPropellerSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerSteelS4
+    {
+        modelScript = RenewableEnergy.TimberPropellerSteel4,
+        texture = WorldItems/RenewableEnergy_TimberPropellerSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerSteelS5
+    {
+        modelScript = RenewableEnergy.TimberPropellerSteel5,
+        texture = WorldItems/RenewableEnergy_TimberPropellerSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerSteelW0
+    {
+        modelScript = RenewableEnergy.TimberPropellerSteel0,
+        texture = WorldItems/RenewableEnergy_TimberPropellerSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerSteelW1
+    {
+        modelScript = RenewableEnergy.TimberPropellerSteel1,
+        texture = WorldItems/RenewableEnergy_TimberPropellerSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerSteelW2
+    {
+        modelScript = RenewableEnergy.TimberPropellerSteel2,
+        texture = WorldItems/RenewableEnergy_TimberPropellerSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerSteelW3
+    {
+        modelScript = RenewableEnergy.TimberPropellerSteel3,
+        texture = WorldItems/RenewableEnergy_TimberPropellerSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerSteelW4
+    {
+        modelScript = RenewableEnergy.TimberPropellerSteel4,
+        texture = WorldItems/RenewableEnergy_TimberPropellerSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerSteelW5
+    {
+        modelScript = RenewableEnergy.TimberPropellerSteel5,
+        texture = WorldItems/RenewableEnergy_TimberPropellerSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerSteelNBroken
+    {
+        modelScript = RenewableEnergy.TimberPropellerSteelBroken,
+        texture = WorldItems/RenewableEnergy_TimberPropellerSteelBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerSteelEBroken
+    {
+        modelScript = RenewableEnergy.TimberPropellerSteelBroken,
+        texture = WorldItems/RenewableEnergy_TimberPropellerSteelBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerSteelSBroken
+    {
+        modelScript = RenewableEnergy.TimberPropellerSteelBroken,
+        texture = WorldItems/RenewableEnergy_TimberPropellerSteelBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberPropellerSteelWBroken
+    {
+        modelScript = RenewableEnergy.TimberPropellerSteelBroken,
+        texture = WorldItems/RenewableEnergy_TimberPropellerSteelBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorWoodN0
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorWood0,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorWoodN1
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorWood1,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorWoodN2
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorWood2,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorWoodN3
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorWood3,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorWoodN4
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorWood4,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorWoodN5
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorWood5,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorWoodE0
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorWood0,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorWoodE1
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorWood1,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorWoodE2
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorWood2,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorWoodE3
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorWood3,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorWoodE4
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorWood4,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorWoodE5
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorWood5,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorWoodS0
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorWood0,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorWoodS1
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorWood1,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorWoodS2
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorWood2,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorWoodS3
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorWood3,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorWoodS4
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorWood4,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorWoodS5
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorWood5,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorWoodW0
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorWood0,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorWoodW1
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorWood1,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorWoodW2
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorWood2,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorWoodW3
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorWood3,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorWoodW4
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorWood4,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorWoodW5
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorWood5,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorWood,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorWoodNBroken
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorWoodBroken,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorWoodBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorWoodEBroken
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorWoodBroken,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorWoodBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorWoodSBroken
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorWoodBroken,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorWoodBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorWoodWBroken
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorWoodBroken,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorWoodBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorPipeN0
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorPipe0,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorPipeN1
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorPipe1,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorPipeN2
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorPipe2,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorPipeN3
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorPipe3,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorPipeN4
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorPipe4,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorPipeN5
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorPipe5,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorPipeE0
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorPipe0,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorPipeE1
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorPipe1,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorPipeE2
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorPipe2,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorPipeE3
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorPipe3,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorPipeE4
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorPipe4,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorPipeE5
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorPipe5,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorPipeS0
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorPipe0,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorPipeS1
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorPipe1,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorPipeS2
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorPipe2,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorPipeS3
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorPipe3,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorPipeS4
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorPipe4,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorPipeS5
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorPipe5,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorPipeW0
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorPipe0,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorPipeW1
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorPipe1,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorPipeW2
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorPipe2,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorPipeW3
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorPipe3,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorPipeW4
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorPipe4,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorPipeW5
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorPipe5,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorPipe,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorPipeNBroken
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorPipeBroken,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorPipeBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorPipeEBroken
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorPipeBroken,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorPipeBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorPipeSBroken
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorPipeBroken,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorPipeBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorPipeWBroken
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorPipeBroken,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorPipeBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorSteelN0
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorSteel0,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorSteelN1
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorSteel1,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorSteelN2
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorSteel2,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorSteelN3
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorSteel3,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorSteelN4
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorSteel4,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorSteelN5
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorSteel5,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorSteelE0
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorSteel0,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorSteelE1
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorSteel1,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorSteelE2
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorSteel2,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorSteelE3
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorSteel3,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorSteelE4
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorSteel4,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorSteelE5
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorSteel5,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorSteelS0
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorSteel0,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorSteelS1
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorSteel1,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorSteelS2
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorSteel2,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorSteelS3
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorSteel3,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorSteelS4
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorSteel4,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorSteelS5
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorSteel5,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorSteelW0
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorSteel0,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorSteelW1
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorSteel1,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorSteelW2
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorSteel2,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorSteelW3
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorSteel3,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorSteelW4
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorSteel4,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorSteelW5
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorSteel5,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorSteel,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorSteelNBroken
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorSteelBroken,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorSteelBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 0 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorSteelEBroken
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorSteelBroken,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorSteelBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 -90 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorSteelSBroken
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorSteelBroken,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorSteelBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 180 0.0,
+        scale = 0.6667,
+    }
+    spriteModel TimberCarAlternatorSteelWBroken
+    {
+        modelScript = RenewableEnergy.TimberCarAlternatorSteelBroken,
+        texture = WorldItems/RenewableEnergy_TimberCarAlternatorSteelBroken,
+        translate = 0.0 0.0 0.0,
+        rotate = 0.0 90 0.0,
+        scale = 0.6667,
+    }
     spriteModel AlternatorWoodN0
     {
         modelScript = RenewableEnergy.AlternatorWood0,

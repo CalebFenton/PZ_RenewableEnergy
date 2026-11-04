@@ -43,7 +43,7 @@ from tile_numbers import (BARREL_DIGESTERS, BARREL_HOLDERS, BATTERY_LOOKS, CRACK
 MEDIA = os.path.join(HERE, "..", "Contents", "mods", "RenewableEnergy", "common", "media")
 # Each tileset's name and rows, tilefile.COLUMNS tiles to a row; the file numbers them from 1 in
 # this order.
-TILESETS = (("renewable_energy_01", 56), ("renewable_energy_02", 56))
+TILESETS = (("renewable_energy_01", 64), ("renewable_energy_02", 56))
 
 
 def moveable(item, level=None, tool="Electrician", **props):
@@ -156,12 +156,16 @@ for fixed, first in ((HEATER, TURNED_HEATER_FIRST), (HEATER_LIT, TURNED_HEATER_F
     TILES[fixed] = gas_heater()
     turned(first, gas_heater)
 
-WIND_NAMES = {"Propeller": "Treadmill Wind Charger", "Alternator": "Homebuilt Wind Turbine",
-              "CarAlternator": "Car Alternator Wind Charger"}
+# Each blade machine's name and the scrap of its mast.
+WIND_NAMES = {"Propeller": ("Treadmill Wind Charger", "MetalPipe"), "Alternator": ("Homebuilt Wind Turbine", "MetalPipe"),
+              "CarAlternator": ("Car Alternator Wind Charger", "MetalPipe"),
+              "TimberPropeller": ("Treadmill Wind Charger on a Timber Mast", "Wood"),
+              "TimberCarAlternator": ("Car Alternator Wind Charger on a Timber Mast", "Wood")}
 BLADE_MATERIAL = {"wood": "Wood", "pipe": "Plastic", "steel": "MetalScrap"}
 for first, model, blades in WIND_TILES:
+    name, mast = WIND_NAMES[model]
     for offset in range(4):
-        TILES[first + offset] = wind_charger(WIND_NAMES[model], "MetalPipe", BLADE_MATERIAL[blades])
+        TILES[first + offset] = wind_charger(name, mast, BLADE_MATERIAL[blades])
 
 # The barrel digester's tiles, one per barrel it can be built from, all steel like the game's own.
 for index in BARREL_DIGESTERS.values():

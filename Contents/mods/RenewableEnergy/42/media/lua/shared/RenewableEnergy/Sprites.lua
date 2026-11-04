@@ -183,7 +183,7 @@ end
 
 --- What a placed tile is.
 ---@param spriteName string?
----@return string? kind "flat", "wall", "rack", "failsafe", "cellCharger", "crate", "gardenLight", "scoop", "propeller", "carAlternator", "alternator", "treadmill", "digester", "gasifier", "gasHeater", or a bank's Sprites field such as "batteryRackWood"; nil for any other sprite
+---@return string? kind "flat", "wall", "rack", "failsafe", "cellCharger", "crate", "gardenLight", "scoop", "propeller", "carAlternator", "timberPropeller", "timberCarAlternator", "alternator", "treadmill", "digester", "gasifier", "gasHeater", or a bank's Sprites field such as "batteryRackWood"; nil for any other sprite
 ---@return string? facing "S", "E", "N" or "W" for walls, racks, banks, gas heaters, bladed wind chargers and treadmills; a digester's or gasifier's tier
 ---@return string? variant the material: "wood" or "metal" for walls and racks, the blades' "wood", "pipe" or "steel" for bladed wind chargers, the item type of a barrel digester's barrel, such as "MetalDrum"; a treadmill tile's end, "console" or "rear"; a gas heater's "off" or "lit"
 function Sprites.kindOf(spriteName)

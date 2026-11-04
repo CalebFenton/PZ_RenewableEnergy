@@ -62,6 +62,8 @@
     "RenewableEnergy_ScoopRotor": "Scoop Rotor Wind Charger",
     "RenewableEnergy_PropellerWood": "Treadmill Wind Charger",
     "RenewableEnergy_CarAlternatorWood": "Car Alternator Wind Charger",
+    "RenewableEnergy_TimberPropellerWood": "Treadmill Wind Charger on a Timber Mast",
+    "RenewableEnergy_TimberCarAlternatorWood": "Car Alternator Wind Charger on a Timber Mast",
     "RenewableEnergy_TurbineWood": "Homemade Wind Turbine",
     "RenewableEnergy_CarveWoodenBlades": "Carve Wooden Blade Set",
     "RenewableEnergy_CutPipeBlades": "Cut Plastic Pipe Blade Set",
