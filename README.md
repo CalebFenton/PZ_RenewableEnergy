@@ -15,6 +15,7 @@ Keep the lights on after the grid and the gas are gone, with what a Kentucky far
 - **Can I make it easier, or harder?** Yes, on the **Renewable Energy** sandbox page; each option says what it changes. Start with **Sunlight Multiplier**, **Battery Wear** and **Storm Damage**.
 - **Why isn't my panel making power?** Open **Status** on its bank: a source short for a reason you can fix gets a red row saying why.
 - **Does it work before the power goes out?** The bank stands by while the grid is on, filling its batteries, and takes over within minutes of the shutoff.
+- **Does it work in my language?** Every text it shows is in each language the game offers, in the game's own words for items and skills. The guide stays English.
 
 ## How it plays
 
@@ -45,11 +46,11 @@ Keep the lights on after the grid and the gas are gone, with what a Kentucky far
 
 1. Craft a battery box and **Place Object** indoors.
 2. Right-click it and **Wire In** batteries and an inverter.
-3. **Connect Bank**, like a generator: Electricity 3, or the generator magazine.
+3. **Connect Bank**, like a generator: Electrical 3, or the generator magazine.
 4. Put up a panel outside, then **Connect Sources in Reach**.
 5. **Turn On**. **Status** shows what it's doing, and which sources need fixing.
 
-The bank powers everything a generator in its spot would, the neighbours' fridges included, so set up away from town. Its status window shows what draws in other buildings.
+The bank powers everything a generator in its spot would, the neighbours' fridges included, so set up away from town.
 
 ## Wind
 
@@ -57,7 +58,7 @@ The bank powers everything a generator in its spot would, the neighbours' fridge
 
 Build them from **Welding**, or three in wood from **Carpentry**. A scoop rotor turns in any breeze and can't break. A treadmill motor, car alternator or homemade one makes real power, most in winter, via a charge controller. Set them high, clear of trees and buildings, 4 squares apart, or they rob each other's wind.
 
-When a gale sets the blades creaking and rattling, **Set the Brake** or you'll be replacing them: carved, cut from plastic pipe, or forged steel that breaks last. The turbine swings out of the worst of it.
+When a gale sets the blades creaking and rattling, **Set the Brake** or you'll be replacing them: carved, cut from plastic pipe, or forged steel that breaks last.
 
 ## Treadmills
 
@@ -79,7 +80,7 @@ FEMA's 1989 plans run an engine on wood: a gasifier from a trash can, a steel dr
 
 ## Crafting
 
-Learn recipes from the Homestead Power magazines and FEMA's plans, by levelling the skills they use, or by researching a part you found. Most need a table and enough light; battery rebuilds need a furnace, a hand press and a kiln. A makeshift inverter gets a bank going until you find a real one. The maintainer and the battery charger can't be crafted. Every recipe is on [one sheet](art/promo/images/recipes.png).
+Learn recipes from the Homestead Power magazines and FEMA's plans, by levelling the skills they use, or by researching a part you found. Most need a table and enough light; battery rebuilds need a furnace, a hand press and a kiln. A makeshift inverter does until you find a real one. Every recipe is on [one sheet](art/promo/images/recipes.png).
 
 ## Where to look
 

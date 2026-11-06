@@ -39,7 +39,7 @@ Later you'll want deep cycle batteries, a power inverter and a charge controller
 
 ### Skills and shortcuts
 
-Read the magazine first. It teaches the box and the panel. Without it, you learn the box at Woodwork, Metalworking or Electricity 5, and the panel at Electricity 4. Either way, making the **Wooden Battery Box** takes Woodwork 3 (the **Metal Battery Box** takes Metalworking 3), and the **Flat Solar Panel** Electricity 2. Connecting the bank takes Electricity 3, or the vanilla generator magazine. No inverter? Build a **Makeshift Plug-in Inverter** at Electricity 2 (see [Inverters](#inverters)).
+Read the magazine first. It teaches the box and the panel. Without it, you learn the box at Carpentry, Welding or Electrical 5, and the panel at Electrical 4. Either way, making the **Wooden Battery Box** takes Carpentry 3 (the **Metal Battery Box** takes Welding 3), and the **Flat Solar Panel** Electrical 2. Connecting the bank takes Electrical 3, or the vanilla generator magazine. No inverter? Build a **Makeshift Plug-in Inverter** at Electrical 2 (see [Inverters](#inverters)).
 
 **No skills yet?** Two shortcuts need no crafting:
 
@@ -138,25 +138,25 @@ The inverter decides how much you can switch on at once. With two inverters, a b
 
 | Inverter | Carries | Wastes | Wire it in at | Comes from |
 |---|---|---|---|---|
-| Makeshift Plug-in Inverter | 400 W | A quarter | Electricity 0 | Crafted (Electricity 2) |
-| Plug-in Inverter | 400 W | A tenth | Electricity 0 | Common |
-| Makeshift Power Inverter | 600 W | A fifth | Electricity 2 | Crafted (Electricity 4) |
-| Power Inverter | 600 W | A tenth | Electricity 2 | Uncommon |
-| Inverter/Charger | 1000 W | A tenth | Electricity 4 | Rare |
+| Makeshift Plug-in Inverter | 400 W | A quarter | Electrical 0 | Crafted (Electrical 2) |
+| Plug-in Inverter | 400 W | A tenth | Electrical 0 | Common |
+| Makeshift Power Inverter | 600 W | A fifth | Electrical 2 | Crafted (Electrical 4) |
+| Power Inverter | 600 W | A tenth | Electrical 2 | Uncommon |
+| Inverter/Charger | 1000 W | A tenth | Electrical 4 | Rare |
 
 The Inverter/Charger also has a 1000 W charger built in (see [Chargers and generators](#chargers-and-generators)). As a guide, 400 W runs a fridge-freezer (a mini fridge counts as one) with the TV, the radio and the lights; 600 W adds the washer, the stove or the microwave; 1000 W runs a fridge-freezer, the stove and the washer at once; a pair of inverter/chargers runs the whole house.
 
-**Building one.** A makeshift inverter carries what the found one of its size does, but wastes more of your charge, idles hotter, wears a little faster and never comes up to a found one's condition: a Makeshift Plug-in Inverter tops out at 80, a Makeshift Power Inverter at 90. The better your Electricity when you build it, the closer to that it comes out. A found inverter is always an upgrade.
+**Building one.** A makeshift inverter carries what the found one of its size does, but wastes more of your charge, idles hotter, wears a little faster and never comes up to a found one's condition: a Makeshift Plug-in Inverter tops out at 80, a Makeshift Power Inverter at 90. The better your Electrical when you build it, the closer to that it comes out. A found inverter is always an upgrade.
 
-- **Makeshift Plug-in Inverter**: a Car Battery Charger or a Microwave Transformer, an Amplifier, two Scrap Electronics and two lengths of wire, with a screwdriver, at Electricity 2.
-- **Makeshift Power Inverter**: a Microwave Transformer (a battery charger's is too small), two Amplifiers, four Scrap Electronics, four lengths of wire, a small sheet of metal and four screws, with a screwdriver and pliers, at Electricity 4.
+- **Makeshift Plug-in Inverter**: a Car Battery Charger or a Microwave Transformer, an Amplifier, two Scrap Electronics and two lengths of wire, with a screwdriver, at Electrical 2.
+- **Makeshift Power Inverter**: a Microwave Transformer (a battery charger's is too small), two Amplifiers, four Scrap Electronics, four lengths of wire, a small sheet of metal and four screws, with a screwdriver and pliers, at Electrical 4.
 
-Taking apart a radio or a TV often gives an Amplifier, and a Speaker always does. Dismantling a microwave gives its transformer 20% of the time at Electricity 0, 10% more for each level, and every time from Electricity 8.
+Taking apart a radio or a TV often gives an Amplifier, and a Speaker always does. Dismantling a microwave gives its transformer 20% of the time at Electrical 0, 10% more for each level, and every time from Electrical 8.
 
-**Controllers and the failsafe.** Homestead Power #2 teaches both; without it, you learn the controller at Electricity 8 and the failsafe at Electricity 6.
+**Controllers and the failsafe.** Homestead Power #2 teaches both; without it, you learn the controller at Electrical 8 and the failsafe at Electrical 6.
 
-- **Charge Controller**: an Amplifier, six Scrap Electronics, two lengths of wire, a small sheet of metal and four screws, with a screwdriver and pliers, at Electricity 5.
-- **Solar Failsafe**: a Remote Controller (Long-Range), two Scrap Electronics and two lengths of wire, with a screwdriver and pliers, at Electricity 3.
+- **Charge Controller**: an Amplifier, six Scrap Electronics, two lengths of wire, a small sheet of metal and four screws, with a screwdriver and pliers, at Electrical 5.
+- **Solar Failsafe**: a Remote Controller (Long-Range), two Scrap Electronics and two lengths of wire, with a screwdriver and pliers, at Electrical 3.
 
 ### Sources
 
@@ -197,7 +197,7 @@ A box, rack or cabinet works only inside a building's room. A box is small enoug
 
 Parts go in with **Wire In** and come out with **Unwire**; you can't drag them. **Wire In** lists every part you carry by type, each with its condition. **Wire In > All Batteries** fills the bank with your best batteries first, and **Unwire > All Batteries** empties it in one go. What doesn't fit in your inventory lands at your feet.
 
-Every part takes a screwdriver, Electric Wire and light to see by; an L-16's cable lugs bolt on, so it takes a wrench too. Unwiring takes the same tools and gives the wire back. The first time an item is wired in, it gives Electricity XP, and higher Electricity makes the work faster. A charge controller needs Electricity 3 and a Scrap Electronics.
+Every part takes a screwdriver, Electric Wire and light to see by; an L-16's cable lugs bolt on, so it takes a wrench too. Unwiring takes the same tools and gives the wire back. The first time an item is wired in, it gives Electrical XP, and higher Electrical makes the work faster. A charge controller needs Electrical 3 and a Scrap Electronics.
 
 **Turn On** stays greyed out until the bank has a working inverter and a battery.
 
@@ -251,7 +251,7 @@ Place it on a generator's square. It starts the generator when the bank drops to
 
 ### Upkeep
 
-Inverters lose condition every hour the bank powers its area, about one Scrap Electronics' worth every two and a half weeks. Controllers wear half as fast, so even a full metal cabinet needs only a scrap every few days. **Repair with Scrap** in the bank's menu (Electricity 2) adds the same amount for each scrap. A part at zero is broken, but you can still repair it. Found inverters and controllers are usually in good shape, but now and then one is a dud.
+Inverters lose condition every hour the bank powers its area, about one Scrap Electronics' worth every two and a half weeks. Controllers wear half as fast, so even a full metal cabinet needs only a scrap every few days. **Repair with Scrap** in the bank's menu (Electrical 2) adds the same amount for each scrap. A part at zero is broken, but you can still repair it. Found inverters and controllers are usually in good shape, but now and then one is a dud.
 
 ### The status window
 
@@ -288,15 +288,15 @@ Once a game day, each battery wears by that day's deepest drop from its peak. We
 
 Batteries last as long as you keep at it. You can bring them back a few times, and after that they need rebuilding:
 
-1. **Service Battery**: Electricity 1, water, and a rag, baking soda or wood ash. It adds 10 condition and keeps the charge, but stops 20 short of the ceiling. It doesn't count as a repair, so service as often as you like.
-2. **Recondition Battery** (Homestead Power #2, or learned at Electricity or Mechanics 5): Electricity 3, water and baking soda or wood ash bring it straight up to its ceiling, but leave it empty.
+1. **Service Battery**: Electrical 1, water, and a rag, baking soda or wood ash. It adds 10 condition and keeps the charge, but stops 20 short of the ceiling. It doesn't count as a repair, so service as often as you like.
+2. **Recondition Battery** (Homestead Power #2, or learned at Electrical or Mechanics 5): Electrical 3, water and baking soda or wood ash bring it straight up to its ceiling, but leave it empty.
 3. **The ceiling**: it starts at 85, and each recondition lowers it by 10. After a handful, the battery needs a rebuild.
-4. **Rebuild.** No magazine teaches it; you learn every step at Electricity 6, and the mold and plate casting at Blacksmith 4 too.
-   1. **Strip** the battery (Electricity 4, gloves, and containers to catch the acid) for its case, worn plates and acid.
-   2. Make the mold once: **Make Wooden Battery Plate Pattern** (Woodwork 2, a hammer, a saw, a plank and nails), **Press Battery Plate Mold** from clay and the pattern at a hand press, then **Fire Battery Plate Mold** in a kiln. The pattern and the mold are kept.
-   3. **Recast Battery Plates** (Blacksmith 3) at a furnace with the mold and charcoal. A third of the lead skims off as **Lead Dross**, so three worn sets make two, and a lead pipe can stand in for one set. **Cast Battery Plates from Lead Pipe** makes a set from three lead pipes.
-   4. **Rebuild** the battery (Electricity 5, a screwdriver, and a wrench for an L-16) from its case, new plates, acid and water. It comes back like new, empty, with its repair count cleared.
-5. **Reduce Lead Dross** (Blacksmith 5) at the furnace with charcoal and the mold: each dross makes one set of plates, so no lead is ever lost, only charcoal.
+4. **Rebuild.** No magazine teaches it; you learn every step at Electrical 6, and the mold and plate casting at Blacksmithing 4 too.
+   1. **Strip** the battery (Electrical 4, gloves, and containers to catch the acid) for its case, worn plates and acid.
+   2. Make the mold once: **Make Wooden Battery Plate Pattern** (Carpentry 2, a hammer, a saw, a plank and nails), **Press Battery Plate Mold** from clay and the pattern at a hand press, then **Fire Battery Plate Mold** in a kiln. The pattern and the mold are kept.
+   3. **Recast Battery Plates** (Blacksmithing 3) at a furnace with the mold and charcoal. A third of the lead skims off as **Lead Dross**, so three worn sets make two, and a lead pipe can stand in for one set. **Cast Battery Plates from Lead Pipe** makes a set from three lead pipes.
+   4. **Rebuild** the battery (Electrical 5, a screwdriver, and a wrench for an L-16) from its case, new plates, acid and water. It comes back like new, empty, with its repair count cleared.
+5. **Reduce Lead Dross** (Blacksmithing 5) at the furnace with charcoal and the mold: each dross makes one set of plates, so no lead is ever lost, only charcoal.
 
 Acid can't be made, and it needn't be: stripping a battery gives back exactly the acid rebuilding it takes. More comes from auto parts stores and garages, or from batteries you strip. A rebuild keeps the battery's kind: a deep cycle or L-16 can only be rebuilt from its own case.
 
@@ -308,7 +308,7 @@ A bank found in a room comes stocked, connected and switched off. Its batteries 
 
 ### Jar battery
 
-Six glass jars, one set of plates (three lead pipes cast a set), acid and water, at Electricity 4. It holds two-thirds of a car battery but lasts three times as many charge cycles, and everything except the acid can be made.
+Six glass jars, one set of plates (three lead pipes cast a set), acid and water, at Electrical 4. It holds two-thirds of a car battery but lasts three times as many charge cycles, and everything except the acid can be made.
 
 ### In a car
 
@@ -359,8 +359,8 @@ The glass shows how worn a module is: whole down to 85 condition, a few fine cra
 
 Sealing is the cheap fix, reglazing the good one.
 
-- **Seal Cracked Module** (Electricity 2) takes a screwdriver and 1 use of epoxy, glue or wood glue. Seal a loose module in the crafting window, or one still on a placed panel from the panel's menu. Each seal adds 15 condition, up to 80, less 10 for each earlier seal, for either kind of module; the glass still looks cracked. A module at its ceiling can't be sealed, and the menu greys the seal out: reglaze it instead. A module never sealed at 80 or more is too lightly cracked for a seal to help.
-- **Reglaze Module** (Electricity 3) puts on a new pane of glass, with a screwdriver, a glass pane, 1 use of epoxy, and electric wire. Glue won't hold glass. Reglaze a loose module in the crafting window, or one still on a placed panel or on the arrow board trailer from its menu. Any damaged module can be reglazed, cracked or not. It comes back as new, looks whole, and its seal count clears.
+- **Seal Cracked Module** (Electrical 2) takes a screwdriver and 1 use of epoxy, glue or wood glue. Seal a loose module in the crafting window, or one still on a placed panel from the panel's menu. Each seal adds 15 condition, up to 80, less 10 for each earlier seal, for either kind of module; the glass still looks cracked. A module at its ceiling can't be sealed, and the menu greys the seal out: reglaze it instead. A module never sealed at 80 or more is too lightly cracked for a seal to help.
+- **Reglaze Module** (Electrical 3) puts on a new pane of glass, with a screwdriver, a glass pane, 1 use of epoxy, and electric wire. Glue won't hold glass. Reglaze a loose module in the crafting window, or one still on a placed panel or on the arrow board trailer from its menu. Any damaged module can be reglazed, cracked or not. It comes back as new, looks whole, and its seal count clears.
 
 **Unmount** always gives back the same modules at the same condition, plus some of the frame.
 
@@ -368,7 +368,7 @@ Sealing and reglazing in place follow the crafting window's item protections: fa
 
 ### Makeshift modules
 
-A **Makeshift Solar Module** (Electricity 4) is 16 solar cells under glass, rated 96 W. Cells come from taking apart calculators, garden lights, solar battery chargers, maintainers, and shattered factory modules (only at 0 condition, for 12 cells). It wears, cracks, seals and reglazes like a factory module.
+A **Makeshift Solar Module** (Electrical 4) is 16 solar cells under glass, rated 96 W. Cells come from taking apart calculators, garden lights, solar battery chargers, maintainers, and shattered factory modules (only at 0 condition, for 12 cells). It wears, cracks, seals and reglazes like a factory module.
 
 ### Glass
 
@@ -376,7 +376,7 @@ Reglazing and makeshift modules each take a flat pane of glass. Car windows are 
 
 ## Wind chargers
 
-Wind blows day and night, and hardest in winter, just when the panels give the least. Wind chargers are built on the **Welding** page of the build menu, and each needs a generator: a treadmill's motor, a car's alternator, or an alternator you make yourself. The treadmill and car alternator chargers can instead stand on a timber mast from the **Carpentry** page, at the same skill levels with Woodwork for Metalworking: 3 logs, 2 rope or sheet rope, planks, nails and a metal pipe, with a hammer, a saw and a hand drill, take the place of the welding and metal. Every charger but the scoop rotor also takes a set of blades, wooden, plastic pipe or steel, and stands with whichever set the build used. Those bladed chargers take 3 inputs, so their bank needs a charge controller.
+Wind blows day and night, and hardest in winter, just when the panels give the least. Wind chargers are built on the **Welding** page of the build menu, and each needs a generator: a treadmill's motor, a car's alternator, or an alternator you make yourself. The treadmill and car alternator chargers can instead stand on a timber mast from the **Carpentry** page, at the same skill levels with Carpentry for Welding: 3 logs, 2 rope or sheet rope, planks, nails and a metal pipe, with a hammer, a saw and a hand drill, take the place of the welding and metal. Every charger but the scoop rotor also takes a set of blades, wooden, plastic pipe or steel, and stands with whichever set the build used. Those bladed chargers take 3 inputs, so their bank needs a charge controller.
 
 ### The four kinds
 
@@ -389,7 +389,7 @@ The figures here are at the default **Wind Multiplier** of 2, which scales them 
 | Car Alternator Wind Charger | Car Alternator | 800 W at 40 km/h | 3 | Yes |
 | Homemade Wind Turbine | Homemade Alternator | 1600 W at 40 km/h | 3 | Yes, but turns aside in a gale |
 
-- **Scoop rotor**: two half-drum scoops on a short pole. It never needs the brake and never breaks, but it makes little. It's the one charger that needs no controller. On the **Carpentry** page it also stands between two poles dug into the ground, guyed with rope: hammer, saw and hand drill, 2 logs, 4 planks, 10 nails, 2 rope, 4 screws, the drum and the motor, at Woodwork 2 and Electricity 2, for the same power.
+- **Scoop rotor**: two half-drum scoops on a short pole. It never needs the brake and never breaks, but it makes little. It's the one charger that needs no controller. On the **Carpentry** page it also stands between two poles dug into the ground, guyed with rope: hammer, saw and hand drill, 2 logs, 4 planks, 10 nails, 2 rope, 4 screws, the drum and the motor, at Carpentry 2 and Electrical 2, for the same power.
 - **Treadmill wind charger**: three blades high on a steel mast. It's the first charger that makes real power.
 - **Car alternator wind charger**: the same mast belted to a car's alternator. It makes a third more in any wind for the same inputs, a straight upgrade.
 - **On a timber mast**: either of those two on three lashed logs. It makes exactly what the welded one does, at the same height, and its blades break and wear the same; dismantled, it gives back wood rather than metal.
@@ -453,14 +453,14 @@ From 55 km/h, the homemade turbine's tail swings its head out of the wind ("turn
 ### Making the generators
 
 - **Treadmill Motor**: take a treadmill apart. Every one gives its motor.
-- **Car Alternator**: in the vehicle mechanics window, the engine's menu has **Take Out Alternator** (engine off, a wrench, Mechanics 2; it opens the hood if it's shut). Each car has one. The car still runs without it, but it stops charging its battery until you **Put Back Alternator**. Cutting up a smashed wreck gives one as often as it gives engine parts, more with Metalworking and Mechanics; a burnt wreck never does. Mechanics' shelves and auto parts stores have them too.
-- **Homemade Alternator**: a car's brake, two speakers (or two ham radios, or four portable radios, for their smaller speakers' magnets), four lengths of wire, two Scrap Electronics and a small sheet of metal, with a screwdriver and a wrench, at Electricity 5 and Mechanics 3.
+- **Car Alternator**: in the vehicle mechanics window, the engine's menu has **Take Out Alternator** (engine off, a wrench, Mechanics 2; it opens the hood if it's shut). Each car has one. The car still runs without it, but it stops charging its battery until you **Put Back Alternator**. Cutting up a smashed wreck gives one as often as it gives engine parts, more with Welding and Mechanics; a burnt wreck never does. Mechanics' shelves and auto parts stores have them too.
+- **Homemade Alternator**: a car's brake, two speakers (or two ham radios, or four portable radios, for their smaller speakers' magnets), four lengths of wire, two Scrap Electronics and a small sheet of metal, with a screwdriver and a wrench, at Electrical 5 and Mechanics 3.
 
 ## Treadmills
 
 No sun and no wind? Run for it.
 
-Right-click a treadmill and pick a bank in reach under **Connect to a Battery Bank** (Electricity 2, a screwdriver, wire and a Scrap Electronics): that wires its motor to make power instead of using it. **Run on Treadmill** lasts half an hour and banks roughly what a fridge-freezer draws in that time. The energy goes in when the run ends and reaches the batteries over the next half hour; stopping early banks your share of the run.
+Right-click a treadmill and pick a bank in reach under **Connect to a Battery Bank** (Electrical 2, a screwdriver, wire and a Scrap Electronics): that wires its motor to make power instead of using it. **Run on Treadmill** lasts half an hour and banks roughly what a fridge-freezer draws in that time. The energy goes in when the run ends and reaches the batteries over the next half hour; stopping early banks your share of the run.
 
 A run costs a good chunk of endurance and some thirst, and trains Fitness and Sprinting. You stop by yourself when you're nearly spent. If the bank has no free input, the run still tires you, but the energy is lost.
 
@@ -571,9 +571,9 @@ A barrel or insulated digester inside a building poisons the whole building whil
 A digester fills propane tanks, welding torches and propane lantern bottles. Generators burn raw gas, but bottling past a quarter needs it cleaned first.
 
 - **Fill With Tire Pump** fills a tank, torch or bottle only a quarter of the way, and it's tiring work. That's enough to keep a torch going: weld, then pump it up again.
-- **Fit Compressor** wires a **Fridge Compressor** to the digester (Electricity 1, a screwdriver); salvage one by cutting up a fridge. **Fill With Compressor** then fills a tank, torch or bottle all the way while the digester has power, using scrubbed gas past the first quarter. The digester's **Status** says whether its compressor is fitted and has power. **Remove Compressor** gives it back.
+- **Fit Compressor** wires a **Fridge Compressor** to the digester (Electrical 1, a screwdriver); salvage one by cutting up a fridge. **Fill With Compressor** then fills a tank, torch or bottle all the way while the digester has power, using scrubbed gas past the first quarter. The digester's **Status** says whether its compressor is fitted and has power. **Remove Compressor** gives it back.
 - **Fit Scrubber**, then keep it going from **Refill Scrubber**. Each refill takes 4 L of water, clean or tainted, from any container you carry. Its water cleans about 5 m³, with wood ash 15 m³ and with quicklime 30 m³, and new water replaces the old. Its packing cleans about 10 m³ before it needs more: a use of **Steel Wool**, or an **Iron Sponge**. The water and the packing wear out separately.
-- **Make Iron Sponge** (Metalworking 1, with a file) from two pieces of any kind of scrap metal or ten nails, three wood splinters and half a litre of water, clean or tainted. A spent sponge comes back out at the next packing; **Air Out Iron Sponge** with a little water, clean or tainted, revives it, twice before it crumbles.
+- **Make Iron Sponge** (Welding 1, with a file) from two pieces of any kind of scrap metal or ten nails, three wood splinters and half a litre of water, clean or tainted. A spent sponge comes back out at the next packing; **Air Out Iron Sponge** with a little water, clean or tainted, revives it, twice before it crumbles.
 
 A full torch takes about 2.2 m³ and a lantern bottle 0.8 m³, what refilling them from a tank would. A propane tank still refills lantern bottles and torches the vanilla way. Bottle refills transfer whole uses of the tank; if the bottle has less room than one tank use, neither store changes. Where there's power, a Fridge Compressor you carry inflates tires too.
 
@@ -640,11 +640,11 @@ Tow it home and it keeps charging its batteries on the way, or strip it for part
 ### Other ways to learn
 
 - **Skills.** Every recipe is also learned by reaching a skill level, usually above what crafting it needs, so a magazine gets you there sooner. The battery rebuild is learned only this way.
-  - Battery boxes, racks and cabinets, wall panels and solar racks come from any one of Woodwork, Metalworking or Electricity; the flat panel from Electricity alone.
-  - Battery work, inverters, the controller, the failsafe and makeshift modules come from Electricity; reconditioning from Mechanics too, and making the plate mold, casting plates and reducing dross from Blacksmith too. Reglazing takes Electricity and Glassmaking together.
-  - The barrel digester comes from Farming or Mechanics, the insulated digester from Woodwork and Farming together, the dome from Masonry and Farming together. The Gas Conversion Kit comes from Mechanics, the Gas Heater from Metalworking and Mechanics together.
-  - The primitive gasifier comes from Mechanics, the bigger two from Metalworking and Mechanics together, and the advanced one takes Blacksmith as well.
-  - Wind chargers take Metalworking and Electricity together, or Woodwork and Electricity on a timber mast or wooden frame, and the car alternator wind charger Mechanics too; the homemade alternator takes Electricity and Mechanics. Wooden and plastic pipe blades come from Carving, steel ones from Blacksmith.
+  - Battery boxes, racks and cabinets, wall panels and solar racks come from any one of Carpentry, Welding or Electrical; the flat panel from Electrical alone.
+  - Battery work, inverters, the controller, the failsafe and makeshift modules come from Electrical; reconditioning from Mechanics too, and making the plate mold, casting plates and reducing dross from Blacksmithing too. Reglazing takes Electrical and Glassmaking together.
+  - The barrel digester comes from Farming or Mechanics, the insulated digester from Carpentry and Farming together, the dome from Masonry and Farming together. The Gas Conversion Kit comes from Mechanics, the Gas Heater from Welding and Mechanics together.
+  - The primitive gasifier comes from Mechanics, the bigger two from Welding and Mechanics together, and the advanced one takes Blacksmithing as well.
+  - Wind chargers take Welding and Electrical together, or Carpentry and Electrical on a timber mast or wooden frame, and the car alternator wind charger Mechanics too; the homemade alternator takes Electrical and Mechanics. Wooden and plastic pipe blades come from Carving, steel ones from Blacksmithing.
 - **Research.** Researching a found module teaches the panel mounts and sealing, and a makeshift one teaches sealing. A plug-in inverter teaches battery boxes and the Makeshift Plug-in Inverter, a power inverter racks and the Makeshift Power Inverter, and an inverter/charger cabinets and the failsafe.
 
 ### What a recipe needs around it
@@ -655,11 +655,11 @@ Light is also needed for wiring and fittings: wiring parts in and out, connectin
 
 ### Blades
 
-A blade set is all three blades of a charger, so a charger takes one. **Carve Wooden Blade Set** (Carving) and **Cut Plastic Pipe Blade Set** are in the crafting window. **Forge Steel Blade Set** (Blacksmith 3) is only in a Forge's or an Advanced Forge's own crafting window, not the primitive forge's. Whole steel sets melt down at a smelting or blast furnace; broken ones, like a broken sword blade, only at a blast furnace.
+A blade set is all three blades of a charger, so a charger takes one. **Carve Wooden Blade Set** (Carving) and **Cut Plastic Pipe Blade Set** are in the crafting window. **Forge Steel Blade Set** (Blacksmithing 3) is only in a Forge's or an Advanced Forge's own crafting window, not the primitive forge's. Whole steel sets melt down at a smelting or blast furnace; broken ones, like a broken sword blade, only at a blast furnace.
 
 ### What you can't craft
 
-Found inverters, the maintainer, the solar battery charger, garden lights, factory modules, car alternators, and new deep cycle or L-16 batteries all have to be found. Treadmill motors, fridge compressors and microwave transformers come only from taking things apart. Cutting up a fridge (a blowtorch and a welding mask, as in vanilla) gives its compressor 10% of the time at Metalworking 0, 10% more for each level, and every time from Metalworking 9.
+Found inverters, the maintainer, the solar battery charger, garden lights, factory modules, car alternators, and new deep cycle or L-16 batteries all have to be found. Treadmill motors, fridge compressors and microwave transformers come only from taking things apart. Cutting up a fridge (a blowtorch and a welding mask, as in vanilla) gives its compressor 10% of the time at Welding 0, 10% more for each level, and every time from Welding 9.
 
 ## When something isn't working
 

@@ -1,6 +1,6 @@
--- Text for the status windows, the menus and the item tooltips. Unit symbols are SI and the
--- same in every language, so they are not translated (m³ is a translation key only for its
--- character; see Format.cubicMetres).
+-- Text for the status windows, the menus and the item tooltips. Each unit is a translation with
+-- the number as %1, as vanilla's IGUI_CraftUI_CountLitres is: Russian writes "95 Вт", Chinese
+-- "15 升". Decimals use a point, as vanilla's string.format numbers do.
 
 local Items = require "cf_commonlib/Items"
 
@@ -8,20 +8,20 @@ local Format = {}
 
 -- Whole units below a thousand, then one decimal: "95 W", "1.5 kW". Real 1993 setups run from
 -- tens of watts to a few kilowatts, so both ends stay readable.
-local function scaled(value, unit, kiloUnit)
+local function scaled(value, unitKey, kiloUnitKey)
     local magnitude = math.abs(value)
     if magnitude >= 1000 then
-        return string.format("%.1f %s", value / 1000, kiloUnit)
+        return getText(kiloUnitKey, string.format("%.1f", value / 1000))
     end
-    return string.format("%d %s", round(value), unit)
+    return getText(unitKey, string.format("%d", round(value)))
 end
 
 function Format.watts(watts)
-    return scaled(watts or 0, "W", "kW")
+    return scaled(watts or 0, "IGUI_RenewableEnergy_Watts", "IGUI_RenewableEnergy_Kilowatts")
 end
 
 function Format.wattHours(wattHours)
-    return scaled(wattHours or 0, "Wh", "kWh")
+    return scaled(wattHours or 0, "IGUI_RenewableEnergy_WattHours", "IGUI_RenewableEnergy_KilowattHours")
 end
 
 -- With an explicit sign, for flows into (+) and out of (-) the bank.
@@ -51,12 +51,12 @@ end
 
 -- "2.5 kg" of fuel, to a tenth.
 function Format.kilograms(kg)
-    return Format.number(kg, 1) .. " kg"
+    return getText("IGUI_RenewableEnergy_Kilograms", Format.number(kg, 1))
 end
 
 -- "15 L", in whole litres.
 function Format.litres(litres)
-    return Format.number(litres, 0) .. " L"
+    return getText("IGUI_RenewableEnergy_Litres", Format.number(litres, 0))
 end
 
 -- "1.25 m³", to a hundredth. The symbol comes from a translation, which is read as UTF-8:

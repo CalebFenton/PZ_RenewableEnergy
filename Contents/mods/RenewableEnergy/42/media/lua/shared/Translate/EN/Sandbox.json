@@ -39,7 +39,7 @@
     "Sandbox_RenewableEnergy_StashMode_option3": "Add map items and random initial",
     "Sandbox_RenewableEnergy_StashMode_option4": "Add random initial",
     "Sandbox_RenewableEnergy_ConnectPanelMin": "Connect Panel Time",
-    "Sandbox_RenewableEnergy_ConnectPanelMin_tooltip": "In-game minutes it takes to connect one panel, wind charger or treadmill to a battery bank, before higher Electricity shortens it.",
+    "Sandbox_RenewableEnergy_ConnectPanelMin_tooltip": "In-game minutes it takes to connect one panel, wind charger or treadmill to a battery bank, before a higher Electrical level shortens it.",
     "Sandbox_RenewableEnergy_StormDamage": "Storm Damage",
     "Sandbox_RenewableEnergy_StormDamage_tooltip": "Whether storms damage what stands outside.<br>Thunderstorms with strong wind crack solar modules, which then make less until you seal or reglaze them. Wall panels never crack; metal mounts crack least, wooden solar racks most.<br>Gales break the blades of wind chargers left running: plastic pipe blades first, then carved wood, then forged steel. The charger creaks and rattles first, and Set the Brake keeps it safe. A homemade wind turbine swings out of the wind and holds longer. The scoop rotor never breaks.<br>Off, nothing breaks in storms.",
     "Sandbox_RenewableEnergy_StormDamageRate": "Storm Damage Rate",
