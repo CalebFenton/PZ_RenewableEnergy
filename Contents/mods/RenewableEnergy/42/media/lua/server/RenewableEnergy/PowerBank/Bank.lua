@@ -26,6 +26,7 @@ local Battery = require "RenewableEnergy/PowerBank/Battery"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local Payers = require "RenewableEnergy/PowerBank/Payers"
 local Loads = require "RenewableEnergy/PowerBank/Loads"
+local GpbBuildings = require "RenewableEnergy/PowerBank/GpbBuildings"
 local Fumes = require "RenewableEnergy/Fumes"
 local Clock = require "cf_commonlib/Clock"
 local LibObjectSystem = require "cf_commonlib/ObjectSystem"
@@ -45,6 +46,9 @@ Bank.SAVED_FIELDS = {
     "inverters", "chargers", "controllers", "sources", "loadW", "loadByKind", "loadElsewhere",
     "chargeSource", "chargeWantW", "generator", "day", "cycleHigh", "cycleDepth", "pendingDepths", "pendingPartWear",
     "solarWhToday", "loadWhToday", "empty", "windWhToday", "runWhToday", "backupWhToday", "connected",
+    -- A building powered through Generator Powered Buildings (GpbBuildings): the litres it took
+    -- since the last pass, and its watts.
+    "gpbLitres", "gpbW",
     -- The last pass's sun and watts, for a status built before the next pass.
     "now",
 }
@@ -124,6 +128,7 @@ function Bank:loaded(isoObject)
     self.indoors = PowerBank.canPlaceBank(isoObject:getSquare())
     -- The truth is the generator's own connected flag; the record keeps it for while it's unloaded.
     self.connected = isoObject:isConnected()
+    GpbBuildings.topUp(self, isoObject, false)
     self:refresh()
 end
 
@@ -256,17 +261,33 @@ end
 
 --- Measure what the bank pays for, and whether the grid powers its square. The load counts what is
 --- switched on in its reach even while the grid powers it, so a bank unloaded when the grid goes
---- carries what was on. Unloaded, the last measurement stands until the grid shuts down. A bank
---- that is off with no charger skips the scan. Returns the running generators that reach the bank.
+--- carries what was on, and the building it powers through Generator Powered Buildings at the last
+--- pass's watts (GpbBuildings.takeWatts). Unloaded, the last measurement stands, but for that
+--- building, until the grid shuts down. A bank that is off with no charger skips the scan. Returns
+--- the running generators that reach the bank.
 function Bank:measure()
     local square = self:getSquare()
     if not square then
         self.gridPowered = self.gridPowered and getSandboxOptions():doesPowerGridExist()
+        -- That mod bills the building for the time away when the chunk loads.
+        if (self.gpbW or 0) > 0 then
+            self.loadW = self.loadW - self.gpbW
+            for i, entry in ipairs(self.loadByKind) do
+                if entry.kind == "building" then
+                    table.remove(self.loadByKind, i)
+                    break
+                end
+            end
+            self.gpbW = 0
+        end
         return {}
     end
-    self.gridPowered = square:hasGridPower()
+    self.gridPowered = Squares.hasGridPower(square)
     local load = (self.on or self:chargerMaxW() > 0) and Payers.scan(Payers.ofBank(self), Payers.running(), true)
         or Loads.new()
+    if (self.gpbW or 0) > 0 then
+        Loads.add(load, "building", self.gpbW)
+    end
     self.loadW = load.watts
     self.loadByKind = Loads.byKind(load)
     self.loadElsewhere = Loads.elsewhere(load) or false
@@ -426,6 +447,9 @@ function Bank:advance(hours, context)
         sourcesW = sourcesW + w
     end
     self:updateGenerator()
+    if self:getSquare() then
+        self.gpbW = GpbBuildings.takeWatts(self, self:getIsoObject(), hours)
+    end
     local generators = self:measure()
     if self:checkOverload() then
         self:addPartWear(container, 0, 1)

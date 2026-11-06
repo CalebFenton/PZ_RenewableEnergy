@@ -78,6 +78,7 @@
     "IGUI_RenewableEnergy_LoadDryer": "Uscător de rufe",
     "IGUI_RenewableEnergy_LoadBatteryCharger": "Încărcător de baterii",
     "IGUI_RenewableEnergy_LoadOther": "Altele",
+    "IGUI_RenewableEnergy_LoadBuilding": "Clădire conectată",
     "IGUI_RenewableEnergy_Storage": "Stocare",
     "IGUI_RenewableEnergy_Stored": "Stocat",
     "IGUI_RenewableEnergy_Capacity": "Capacitate",

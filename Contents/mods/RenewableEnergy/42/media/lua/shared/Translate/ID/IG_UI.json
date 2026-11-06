@@ -78,6 +78,7 @@
     "IGUI_RenewableEnergy_LoadDryer": "Pengering Pakaian",
     "IGUI_RenewableEnergy_LoadBatteryCharger": "Pengisi daya aki",
     "IGUI_RenewableEnergy_LoadOther": "Lainnya",
+    "IGUI_RenewableEnergy_LoadBuilding": "Bangunan terhubung",
     "IGUI_RenewableEnergy_Storage": "Penyimpanan",
     "IGUI_RenewableEnergy_Stored": "Tersimpan",
     "IGUI_RenewableEnergy_Capacity": "Kapasitas",

@@ -78,6 +78,7 @@
     "IGUI_RenewableEnergy_LoadDryer": "Asciugatrice",
     "IGUI_RenewableEnergy_LoadBatteryCharger": "Caricabatteria",
     "IGUI_RenewableEnergy_LoadOther": "Altro",
+    "IGUI_RenewableEnergy_LoadBuilding": "Edificio connesso",
     "IGUI_RenewableEnergy_Storage": "Accumulo",
     "IGUI_RenewableEnergy_Stored": "Accumulata",
     "IGUI_RenewableEnergy_Capacity": "Capacità",

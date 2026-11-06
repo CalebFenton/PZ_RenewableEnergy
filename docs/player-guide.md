@@ -249,6 +249,15 @@ A running generator within 3 squares of the bank, on its floor, takes over the l
 
 Place it on a plugged-in generator's square. The generator can stand anywhere its power reaches the bank, so you can keep it outdoors, away from the fumes; with more than one bank in reach, the failsafe answers to the nearest. It starts the generator when the bank drops to the start charge (20% by default) and stops it at the stop charge (80%). It won't start a generator with no fuel, or one worn enough to catch fire. The bank's status window shows a **Failsafe** row once it is set up. To fill the bank from the generator, wire a charger into the bank. A running generator within 3 squares of the bank, on its floor, also carries the bank's load; without a charger, the charge then climbs only as fast as your sources fill it. Sandbox: **Failsafe Start Charge**, **Failsafe Stop Charge**.
 
+### Powering a whole building (Generator Powered Buildings)
+
+With the [Generator Powered Buildings](https://steamcommunity.com/sharedfiles/filedetails/?id=3597471949) mod, a bank can power a whole building instead of only its reach. Switch the bank on, then use that mod's **Generator > Connect to Building** on the bank; the building needs a light switch, as for any generator. The bank then powers the building, alone or together with fuel generators connected to it, and its status window shows what it pays as **Connected building**. The bank's own switch turns it on and off; that mod's Turn On/Off doesn't work on a bank.
+
+- **Equal shares.** That mod splits a building's load evenly between everything running in it, whatever its size. A small bank pooled with generators can overload on its share and drop out, and the generators then carry the rest.
+- **Heating is cheap.** That mod bills its heating at a small rate, tens of watts for each heated spot, so heating a building from batteries costs little.
+- **A full tank.** That mod's window shows the bank as a generator with a full tank of fuel; the bank's charge is in its own status window.
+- **Free when generators are.** With the **Generator Fuel Consumption** sandbox option at 0, the building costs the bank nothing, as it costs a generator no fuel.
+
 ### Upkeep
 
 Inverters lose condition every hour the bank powers its area, about one Scrap Electronics' worth every two and a half weeks. Controllers wear half as fast, so even a full metal cabinet needs only a scrap every few days. **Repair with Scrap** in the bank's menu (Electrical 2) adds the same amount for each scrap. A part at zero is broken, but you can still repair it. Found inverters and controllers are usually in good shape, but now and then one is a dud.

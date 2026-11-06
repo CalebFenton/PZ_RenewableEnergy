@@ -78,6 +78,7 @@
     "IGUI_RenewableEnergy_LoadDryer": "Tørretumbler",
     "IGUI_RenewableEnergy_LoadBatteryCharger": "Batterilader",
     "IGUI_RenewableEnergy_LoadOther": "Andet",
+    "IGUI_RenewableEnergy_LoadBuilding": "Tilsluttet bygning",
     "IGUI_RenewableEnergy_Storage": "Lager",
     "IGUI_RenewableEnergy_Stored": "Lagret",
     "IGUI_RenewableEnergy_Capacity": "Kapacitet",

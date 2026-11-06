@@ -78,6 +78,7 @@
     "IGUI_RenewableEnergy_LoadDryer": "Trockner",
     "IGUI_RenewableEnergy_LoadBatteryCharger": "Batterieladegerät",
     "IGUI_RenewableEnergy_LoadOther": "Sonstiges",
+    "IGUI_RenewableEnergy_LoadBuilding": "Angeschlossenes Gebäude",
     "IGUI_RenewableEnergy_Storage": "Speicher",
     "IGUI_RenewableEnergy_Stored": "Gespeichert",
     "IGUI_RenewableEnergy_Capacity": "Kapazität",

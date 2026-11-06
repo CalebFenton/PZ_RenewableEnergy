@@ -78,6 +78,7 @@
     "IGUI_RenewableEnergy_LoadDryer": "乾燥機",
     "IGUI_RenewableEnergy_LoadBatteryCharger": "バッテリー充電器",
     "IGUI_RenewableEnergy_LoadOther": "その他",
+    "IGUI_RenewableEnergy_LoadBuilding": "接続した建物",
     "IGUI_RenewableEnergy_Storage": "蓄電",
     "IGUI_RenewableEnergy_Stored": "蓄電量",
     "IGUI_RenewableEnergy_Capacity": "容量",

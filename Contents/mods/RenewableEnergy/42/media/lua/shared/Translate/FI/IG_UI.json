@@ -78,6 +78,7 @@
     "IGUI_RenewableEnergy_LoadDryer": "Kuivausrumpu",
     "IGUI_RenewableEnergy_LoadBatteryCharger": "Akkulaturi",
     "IGUI_RenewableEnergy_LoadOther": "Muu",
+    "IGUI_RenewableEnergy_LoadBuilding": "Kytketty rakennus",
     "IGUI_RenewableEnergy_Storage": "Varasto",
     "IGUI_RenewableEnergy_Stored": "Varastoitu",
     "IGUI_RenewableEnergy_Capacity": "Kapasiteetti",

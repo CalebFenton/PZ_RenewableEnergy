@@ -78,6 +78,7 @@
     "IGUI_RenewableEnergy_LoadDryer": "Eixugadora",
     "IGUI_RenewableEnergy_LoadBatteryCharger": "Carregador de bateria",
     "IGUI_RenewableEnergy_LoadOther": "Altres",
+    "IGUI_RenewableEnergy_LoadBuilding": "Edifici connectat",
     "IGUI_RenewableEnergy_Storage": "Emmagatzematge",
     "IGUI_RenewableEnergy_Stored": "Emmagatzemat",
     "IGUI_RenewableEnergy_Capacity": "Capacitat",

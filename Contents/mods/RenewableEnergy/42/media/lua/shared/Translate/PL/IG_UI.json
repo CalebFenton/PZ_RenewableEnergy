@@ -78,6 +78,7 @@
     "IGUI_RenewableEnergy_LoadDryer": "Suszarka",
     "IGUI_RenewableEnergy_LoadBatteryCharger": "Prostownik",
     "IGUI_RenewableEnergy_LoadOther": "Inne",
+    "IGUI_RenewableEnergy_LoadBuilding": "Podłączony budynek",
     "IGUI_RenewableEnergy_Storage": "Magazynowanie",
     "IGUI_RenewableEnergy_Stored": "Zgromadzono",
     "IGUI_RenewableEnergy_Capacity": "Pojemność",

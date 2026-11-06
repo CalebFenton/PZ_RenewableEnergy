@@ -78,6 +78,7 @@
     "IGUI_RenewableEnergy_LoadDryer": "Droger",
     "IGUI_RenewableEnergy_LoadBatteryCharger": "Batterijlader",
     "IGUI_RenewableEnergy_LoadOther": "Overig",
+    "IGUI_RenewableEnergy_LoadBuilding": "Aangesloten gebouw",
     "IGUI_RenewableEnergy_Storage": "Opslag",
     "IGUI_RenewableEnergy_Stored": "Opgeslagen",
     "IGUI_RenewableEnergy_Capacity": "Capaciteit",

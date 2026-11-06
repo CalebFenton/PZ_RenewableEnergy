@@ -78,6 +78,7 @@
     "IGUI_RenewableEnergy_LoadDryer": "Dryer",
     "IGUI_RenewableEnergy_LoadBatteryCharger": "Battery charger",
     "IGUI_RenewableEnergy_LoadOther": "Other",
+    "IGUI_RenewableEnergy_LoadBuilding": "Connected building",
     "IGUI_RenewableEnergy_Storage": "Storage",
     "IGUI_RenewableEnergy_Stored": "Stored",
     "IGUI_RenewableEnergy_Capacity": "Capacity",

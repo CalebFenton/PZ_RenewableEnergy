@@ -4,7 +4,7 @@
 
 Keep the lights on after the grid and the gas are gone, with what a Kentucky farm, cabin or RV owner could have had in 1993: solar panels, wind chargers, a treadmill, a bank of batteries, and a generator that runs on manure gas or wood. You start with a car battery in a wooden box, enough for the TV and a lamp. Every panel after that is one you found, fixed or built, every battery wears out, and the weather decides what you get.
 
-**Build 42.20 or newer.** Single player and multiplayer. Fine to add to a save in progress. Requires **cf_commonlib**.
+**Build 42.20 or newer.** Single player and multiplayer. Needs **cf_commonlib**. Works with Generator Powered Buildings.
 
 **Languages:** English, Català, Čeština, Dansk, Deutsch, Español (España, México, Chile, Argentina), Suomi, Français, Magyar, Bahasa Indonesia, Italiano, 日本語, 한국어, Nederlands, Norsk, Polski, Português (Portugal, Brasil), Română, Русский, ไทย, Türkçe, Українська, 简体中文, 繁體中文.
 

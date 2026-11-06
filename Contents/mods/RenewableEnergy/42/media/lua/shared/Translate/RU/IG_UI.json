@@ -78,6 +78,7 @@
     "IGUI_RenewableEnergy_LoadDryer": "Сушилка для одежды",
     "IGUI_RenewableEnergy_LoadBatteryCharger": "Зарядное устройство",
     "IGUI_RenewableEnergy_LoadOther": "Другое",
+    "IGUI_RenewableEnergy_LoadBuilding": "Подключённое здание",
     "IGUI_RenewableEnergy_Storage": "Запас энергии",
     "IGUI_RenewableEnergy_Stored": "Запасено",
     "IGUI_RenewableEnergy_Capacity": "Ёмкость",

@@ -78,6 +78,7 @@
     "IGUI_RenewableEnergy_LoadDryer": "Sèche-linge",
     "IGUI_RenewableEnergy_LoadBatteryCharger": "Chargeur de batterie",
     "IGUI_RenewableEnergy_LoadOther": "Autre",
+    "IGUI_RenewableEnergy_LoadBuilding": "Bâtiment branché",
     "IGUI_RenewableEnergy_Storage": "Stockage",
     "IGUI_RenewableEnergy_Stored": "Stocké",
     "IGUI_RenewableEnergy_Capacity": "Capacité",

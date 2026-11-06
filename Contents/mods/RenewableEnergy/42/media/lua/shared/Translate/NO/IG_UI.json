@@ -78,6 +78,7 @@
     "IGUI_RenewableEnergy_LoadDryer": "Tørketrommel",
     "IGUI_RenewableEnergy_LoadBatteryCharger": "Batterilader",
     "IGUI_RenewableEnergy_LoadOther": "Annet",
+    "IGUI_RenewableEnergy_LoadBuilding": "Tilkoblet bygning",
     "IGUI_RenewableEnergy_Storage": "Lagring",
     "IGUI_RenewableEnergy_Stored": "Lagret",
     "IGUI_RenewableEnergy_Capacity": "Kapasitet",

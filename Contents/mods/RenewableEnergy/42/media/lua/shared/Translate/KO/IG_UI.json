@@ -78,6 +78,7 @@
     "IGUI_RenewableEnergy_LoadDryer": "건조기",
     "IGUI_RenewableEnergy_LoadBatteryCharger": "배터리 충전기",
     "IGUI_RenewableEnergy_LoadOther": "기타",
+    "IGUI_RenewableEnergy_LoadBuilding": "연결된 건물",
     "IGUI_RenewableEnergy_Storage": "저장",
     "IGUI_RenewableEnergy_Stored": "저장량",
     "IGUI_RenewableEnergy_Capacity": "용량",

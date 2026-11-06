@@ -167,6 +167,8 @@ local LOAD_KINDS = {
     dryer = "IGUI_RenewableEnergy_LoadDryer",
     batteryCharger = "IGUI_RenewableEnergy_LoadBatteryCharger",
     treadmill = "IGUI_RenewableEnergy_Treadmill",
+    -- What the bank pays of a building it powers through Generator Powered Buildings (GpbBuildings).
+    building = "IGUI_RenewableEnergy_LoadBuilding",
     other = "IGUI_RenewableEnergy_LoadOther",
 }
 

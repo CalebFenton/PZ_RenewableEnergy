@@ -78,6 +78,7 @@
     "IGUI_RenewableEnergy_LoadDryer": "Secadora",
     "IGUI_RenewableEnergy_LoadBatteryCharger": "Cargador de baterías",
     "IGUI_RenewableEnergy_LoadOther": "Otro",
+    "IGUI_RenewableEnergy_LoadBuilding": "Edificio conectado",
     "IGUI_RenewableEnergy_Storage": "Almacenamiento",
     "IGUI_RenewableEnergy_Stored": "Almacenado",
     "IGUI_RenewableEnergy_Capacity": "Capacidad",

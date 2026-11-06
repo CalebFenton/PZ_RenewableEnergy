@@ -78,6 +78,7 @@
     "IGUI_RenewableEnergy_LoadDryer": "เครื่องอบผ้า",
     "IGUI_RenewableEnergy_LoadBatteryCharger": "เครื่องชาร์จแบตเตอรี่",
     "IGUI_RenewableEnergy_LoadOther": "อื่น ๆ",
+    "IGUI_RenewableEnergy_LoadBuilding": "อาคารที่เชื่อมต่อ",
     "IGUI_RenewableEnergy_Storage": "ที่เก็บพลังงาน",
     "IGUI_RenewableEnergy_Stored": "สะสมอยู่",
     "IGUI_RenewableEnergy_Capacity": "ความจุ",

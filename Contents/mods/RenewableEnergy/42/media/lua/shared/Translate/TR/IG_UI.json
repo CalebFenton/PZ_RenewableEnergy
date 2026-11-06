@@ -78,6 +78,7 @@
     "IGUI_RenewableEnergy_LoadDryer": "Kurutma makinesi",
     "IGUI_RenewableEnergy_LoadBatteryCharger": "Akü şarj cihazı",
     "IGUI_RenewableEnergy_LoadOther": "Diğer",
+    "IGUI_RenewableEnergy_LoadBuilding": "Bağlı bina",
     "IGUI_RenewableEnergy_Storage": "Depolama",
     "IGUI_RenewableEnergy_Stored": "Depolanan",
     "IGUI_RenewableEnergy_Capacity": "Kapasite",

@@ -20,6 +20,7 @@ if isClient() then return end
 
 local Specs = require "RenewableEnergy/Specs"
 local Treadmill = require "RenewableEnergy/PowerBank/Treadmill"
+local GpbBuildings = require "RenewableEnergy/PowerBank/GpbBuildings"
 local GeneratorReach = require "cf_commonlib/GeneratorReach"
 
 local Loads = {}
@@ -169,7 +170,10 @@ function Loads.eachDraw(square, fn, onGenerator)
                 local kind, modFuel = GeneratorReach.drawOf(object)
                 draw = kind and { kind = kind, watts = Specs.wattsFromFuel(modFuel) }
             end
-            if draw then
+            -- Generator Powered Buildings bills a building's vanilla appliances to its pool, a bank
+            -- in it included (GpbBuildings), so no payer here pays for them again; it knows nothing
+            -- of a treadmill or another mod's draws.
+            if draw and not (draw.fuel and GpbBuildings.powers(scanned)) then
                 draw.object, draw.x, draw.y, draw.z, draw.index = object, x, y, z, i
                 draw.onGrid, draw.building = onGrid(object), buildingOf(scanned)
                 fn(draw)

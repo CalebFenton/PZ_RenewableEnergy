@@ -78,6 +78,7 @@
     "IGUI_RenewableEnergy_LoadDryer": "Sušička",
     "IGUI_RenewableEnergy_LoadBatteryCharger": "Nabíječka baterií",
     "IGUI_RenewableEnergy_LoadOther": "Ostatní",
+    "IGUI_RenewableEnergy_LoadBuilding": "Připojená budova",
     "IGUI_RenewableEnergy_Storage": "Úložiště",
     "IGUI_RenewableEnergy_Stored": "Uloženo",
     "IGUI_RenewableEnergy_Capacity": "Kapacita",

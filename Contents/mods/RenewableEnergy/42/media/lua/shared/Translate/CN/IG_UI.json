@@ -78,6 +78,7 @@
     "IGUI_RenewableEnergy_LoadDryer": "烘干机",
     "IGUI_RenewableEnergy_LoadBatteryCharger": "电池充电器",
     "IGUI_RenewableEnergy_LoadOther": "其他",
+    "IGUI_RenewableEnergy_LoadBuilding": "已连接的建筑",
     "IGUI_RenewableEnergy_Storage": "储能",
     "IGUI_RenewableEnergy_Stored": "已存储",
     "IGUI_RenewableEnergy_Capacity": "容量",

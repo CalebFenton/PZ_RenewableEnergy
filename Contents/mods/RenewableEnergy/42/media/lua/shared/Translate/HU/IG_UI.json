@@ -78,6 +78,7 @@
     "IGUI_RenewableEnergy_LoadDryer": "Szárító",
     "IGUI_RenewableEnergy_LoadBatteryCharger": "Akkumulátortöltő",
     "IGUI_RenewableEnergy_LoadOther": "Egyéb",
+    "IGUI_RenewableEnergy_LoadBuilding": "Csatlakoztatott épület",
     "IGUI_RenewableEnergy_Storage": "Tárolás",
     "IGUI_RenewableEnergy_Stored": "Eltárolva",
     "IGUI_RenewableEnergy_Capacity": "Kapacitás",
