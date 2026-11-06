@@ -148,7 +148,7 @@ RECIPES = promo.RecipeSheet(CAPTURES, RECIPE_SECTIONS, SOLAR, SECTION_ACCENTS, R
 # garden lights' height, around the trailer and the cones behind it.
 GALLERY_TRAILER_CROP = (0, 32, 1260, 944)
 # The bank's status window, as large as leaves the room and its menu as tall beside it.
-GALLERY_STATUS_SCALE = 1.86
+GALLERY_STATUS_SCALE = 1.74
 # The digester's and gasifier's windows, as large as leaves the world shot most of the page.
 GALLERY_GAS_WINDOW_SCALE = 1.8
 # The treadmill's room at its captured size, clear of the black past the rooms the character saw.
