@@ -34,9 +34,9 @@ function Format.signedWatts(watts)
     return text
 end
 
--- A 0..1 fraction as "64%".
+-- A 0..1 fraction as "64%", spaced as the language writes it: French "64 %".
 function Format.percent(fraction)
-    return string.format("%d%%", round((fraction or 0) * 100))
+    return getText("IGUI_RenewableEnergy_Percent", string.format("%d", round((fraction or 0) * 100)))
 end
 
 -- "18 °C" or "64 °F", as the player's options show temperatures, with vanilla's unit.

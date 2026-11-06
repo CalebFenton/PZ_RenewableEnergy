@@ -2,9 +2,7 @@ require "RenewableEnergy/Debug/RenewableEnergyTestLib"
 local BankJobs = require "RenewableEnergy/PowerBank/BankJobs"
 local SourceJobs = require "RenewableEnergy/PowerBank/SourceJobs"
 require "RenewableEnergy/TimedActions/RenewableEnergyAction"
-local Format = require "RenewableEnergy/UI/Format"
 local BankMenu = require "RenewableEnergy/UI/BankMenu"
-local SourceMenu = require "RenewableEnergy/UI/SourceMenu"
 local Squares = require "cf_commonlib/Squares"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local Sprites = require "RenewableEnergy/Sprites"
@@ -18,7 +16,9 @@ local test, expect, expectEqual, player = T.test, T.expect, T.expectEqual, T.pla
 -- Connecting -----------------------------------------------------------------------------------
 
 -- A bank starts unconnected, like a generator: switched on it powers nothing, nor a square near it,
--- and its status says so, until it is connected; then both have power, here too.
+-- and its status says so, until it is connected; then both have power, here too. As vanilla's
+-- generator, a connected bank that is on offers no Disconnect and the authority refuses one, so a
+-- running bank can't be unplugged into a state where it powers what it no longer feeds.
 test("renewable_energy_bank_needs_connecting", {
     run = function(self)
         T.setGrid(self, false)
@@ -33,6 +33,12 @@ test("renewable_energy_bank_needs_connecting", {
         T.job(self, "bank", BankJobs.CONNECT, bank, nil, "connected")
         T.waitFor(self, function() return bank.square:haveElectricity() and self.near:haveElectricity() end,
             "power on the connected bank's square and the square near it here")
+        T.waitFor(self, function() return bank.object:isConnected() end, "this client's copy of the connected bank")
+        T.step(function()
+            self.disconnectWhileOn = T.menuOption(BankMenu.addBankOptions, bank.object,
+                getText("ContextMenu_RenewableEnergy_DisconnectBank"))
+        end)
+        T.job(self, "bank", BankJobs.DISCONNECT, bank, nil, "disconnectedOn")
         T.readRecord(self, bank)
     end,
     validate = function(self)
@@ -43,6 +49,8 @@ test("renewable_energy_bank_needs_connecting", {
         T.expectOk(self.reads.connected, "connecting the bank")
         expect(after.activated and after.powered, "the connected bank doesn't power its square")
         expectEqual("the connected bank's state", after.status.state, "on")
+        expect(self.disconnectWhileOn == nil, "the menu offers to disconnect a bank that is on")
+        T.expectRefused(self.reads.disconnectedOn, "already on", "the authority disconnected a bank that is on")
     end,
 })
 
@@ -177,42 +185,44 @@ test("renewable_energy_bank_sources_need_a_connected_bank", {
     end,
 })
 
--- A battery box and a battery rack in reach of a panel are both offered to it. A panel already on
--- one of them names that one as what it is connected to instead of offering it again.
-test("renewable_energy_bank_box_and_rack_both_offered", {
+-- A source is offered every bank in its reach, a battery box and a battery rack alike, each by its
+-- own Connect. One already on a bank doesn't offer that bank again but still offers the other, to
+-- move over; neither bank's Connect Sources in Reach counts it, as it moves only by its own
+-- Connect.
+test("renewable_energy_bank_source_offered_every_bank_in_reach", {
     run = function(self)
         self.box = T.bank(self, "batteryBoxWood", {})
         self.rack = self.box and T.bank(self, "batteryRackWood", {}, { near = self.box })
-        self.panel = self.rack and T.panel(self, Sprites.rack.wood.S, { near = self.box })
-        if not self.panel then return end
-        local box, rack, panel = self.box, self.rack, self.panel
+        self.wired = self.rack and T.panel(self, Sprites.rack.wood.S, { near = self.box, connect = true })
+        self.loose = self.wired and T.panel(self, Sprites.flat, { near = self.box })
+        if not self.loose then return end
+        local box, rack, wired, loose = self.box, self.rack, self.wired, self.loose
         T.holdLight(self)
         T.step(function()
-            if not T.need(self, PowerBank.inSourceReach(box, panel.x, panel.y, panel.z)
-                and PowerBank.inSourceReach(rack, panel.x, panel.y, panel.z), "the box and the rack in reach of the panel") then
+            local function inReach(bank, panel) return PowerBank.inSourceReach(bank, panel.x, panel.y, panel.z) end
+            if not T.need(self, inReach(box, wired) and inReach(rack, wired) and inReach(box, loose) and inReach(rack, loose),
+                "both panels in reach of the box and the rack") then
                 return
             end
-            self.offered = { box = T.connectOptions(box, panel, 1).one, rack = T.connectOptions(rack, panel, 1).one }
-        end)
-        T.job(self, "source", SourceJobs.CONNECT, panel, box, "onBox")
-        T.waitFor(self, function() return Squares.samePosition(PowerBank.connectedBank(panel.object), box) end,
-            "this client's summary of the box listing the panel")
-        T.step(function()
-            -- Each fresh context reuses the player's one context menu, so read this one first.
-            local wiredTo = T.optionState(T.menuOption(SourceMenu.addSourceOptions, panel.object, getText("ContextMenu_RenewableEnergy_WiredTo",
-                Format.bankName(PowerBank.summaryOf(box.object)), Format.away(panel, box))))
-            self.wired = { wiredTo = wiredTo, box = T.connectOptions(box, panel, 1).one, rack = T.connectOptions(rack, panel, 1).one }
+            -- Each fresh context reuses the player's one context menu, so each read is taken whole.
+            self.offers = {
+                looseBox = T.connectOptions(box, loose, 1), looseRack = T.connectOptions(rack, loose, 1),
+                wiredBox = T.connectOptions(box, wired, 1), wiredRack = T.connectOptions(rack, wired, 1),
+            }
         end)
     end,
     validate = function(self)
-        for name, option in pairs(self.offered) do
-            expect(option.shown and not option.greyed, "the " .. name .. " isn't offered open (" .. tostring(option.reason) .. ")")
+        if not T.expectConnected(self.wired) then return end
+        local function open(option) return option.shown and not option.greyed end
+        local offers = self.offers
+        for name, option in pairs({ box = offers.looseBox.one, rack = offers.looseRack.one }) do
+            expect(open(option), "a loose panel isn't offered the " .. name .. " (" .. tostring(option.reason) .. ")")
         end
-        T.expectOk(self.reads.onBox, "putting the panel on the box")
-        local wired = self.wired
-        expect(wired.wiredTo.shown, "a panel on the box doesn't say it is connected to the box")
-        expect(not wired.box.shown, "a panel on the box offers to connect to the box again")
-        expect(wired.rack.shown and not wired.rack.greyed, "a panel on the box isn't offered the rack")
+        expect(not offers.wiredBox.one.shown, "a panel on the box offers to connect to the box again")
+        expect(open(offers.wiredRack.one), "a panel on the box isn't offered the rack (" .. tostring(offers.wiredRack.one.reason) .. ")")
+        -- Found by its count: one that counted the panel on the box would read 2.
+        expect(open(offers.looseBox.all), "the box's Connect Sources in Reach doesn't count only the loose panel")
+        expect(open(offers.looseRack.all), "the rack's Connect Sources in Reach doesn't count only the loose panel")
     end,
 })
 

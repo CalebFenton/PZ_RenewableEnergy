@@ -5,6 +5,7 @@ local Squares = require "cf_commonlib/Squares"
 local Digester = require "RenewableEnergy/Biogas/Digester"
 local DigesterJobs = require "RenewableEnergy/Biogas/DigesterJobs"
 local GasHeater = require "RenewableEnergy/Biogas/GasHeater"
+local GasKit = require "RenewableEnergy/GasLine/GasKit"
 local Sprites = require "RenewableEnergy/Sprites"
 
 -- What the digester's gas is used for (Contents/.../RenewableEnergy/Biogas/*, the propane bottle
@@ -40,8 +41,11 @@ local function fedDigesterAndHeater(self, facing)
 end
 
 -- A lit gas heater keeps one digester beside it warm on that digester's gas, the other beside it
--- neither warmed nor paying, and goes out when the gas does. Each digester's own pass finds the
--- heater as its tile shows and the air as its square has it.
+-- neither warmed nor paying, and goes out when the gas does. In 0 °C air the warmed barrel heads for
+-- the heater's 25 °C (GasHeater.TEMP) and the other for the air, each with the barrel's time
+-- constant of a day: three hours from 5 °C leave 25 − 20·e^(−1/8) and 5·e^(−1/8). Below 10 °C
+-- neither digests, so the warmed one's gas falls by the heater's three hours alone. Each
+-- digester's own pass finds the heater as its tile shows and the air as its square has it.
 test("renewable_energy_biogas_heater_warms_digester", {
     instant = true,
     -- A heavier burn, so hours of it stand out from the digester's own gas.
@@ -52,7 +56,9 @@ test("renewable_energy_biogas_heater_warms_digester", {
         local second = square and T.placeRecord(self, "digester", "barrel.MetalDrum", { near = square })
         if not second then return end
         self.digesters = { first, second }
-        self.rate = GasHeater.m3PerHour()
+        -- A heater burns an idling generator's bill: IDLE_FUEL litres an hour at the option's 1,
+        -- M3_PER_LITRE m³ of gas each.
+        self.rate = GasKit.IDLE_FUEL * 1 * GasKit.M3_PER_LITRE
         -- Gas for more than the warming hours and less than the whole run.
         self.temp, self.gas = 5, 4.5 * self.rate
         if not T.need(self, self.gas < Digester.HOLDERS.bags.capacity, "bags that hold four and a half hours of the heater's gas") then return end
@@ -86,10 +92,13 @@ test("renewable_energy_biogas_heater_warms_digester", {
         if not T.expect(warmed, "a lit heater warmed neither digester beside it") then return end
         local other = 3 - warmed
         local warming, idle = reads["warming" .. warmed], reads["warming" .. other]
-        T.expect(warming.temp > self.temp, "a lit heater didn't warm its digester: " .. tostring(warming.temp) .. " °C")
-        T.expectNear("gas after 3 hours of heating", warming.gas, self.gas - 3 * self.rate, self.rate)
-        T.expect(not idle.heaterLit and idle.temp < self.temp, "the heater warmed both digesters beside it")
-        T.expectNear("gas of the digester it doesn't warm", idle.gas, self.gas, self.rate)
+        -- The digesters' own passes may run for the minutes before the batch, at the real air: far
+        -- less than an hour's change.
+        T.expectNear("°C of the heated digester after 3 hours", warming.temp, 25 - 20 * math.exp(-1 / 8), 0.05)
+        T.expectNear("gas after 3 hours of heating", warming.gas, self.gas - 3 * self.rate, 0.1 * self.rate)
+        T.expect(not idle.heaterLit, "the heater warmed both digesters beside it")
+        T.expectNear("°C of the digester it doesn't warm after 3 hours", idle.temp, 5 * math.exp(-1 / 8), 0.05)
+        T.expectNear("gas of the digester it doesn't warm", idle.gas, self.gas, 1e-8)
         T.expect(not reads["out" .. warmed].heaterLit, "the heater kept burning with no gas")
         local aged, agedOther = reads["aged" .. warmed], reads["aged" .. other]
         T.expect(aged.heaterLit and not agedOther.heaterLit, "the digesters' own passes didn't find the heater its tile shows lit")
@@ -163,32 +172,6 @@ test("renewable_energy_biogas_pump_fills_tank_to_limit", {
             1 - self.pumped * Digester.PUMP_ENDURANCE_PER_M3, 0.02)
         local refusal = DigesterJobs.refusal(T.player(), DigesterJobs.FILL_PUMP, self.digester.object, self.items.tools[2])
         T.expectEqual("the pump's refusal for a tank at its limit", refusal, "Tooltip_RenewableEnergy_PumpLimit")
-    end,
-})
-
--- An empty holder refuses a fill as having no gas; gas short of one use of a blowtorch (a tank's
--- use is below what the summary resolves), as too little, not as the compressor's want of scrubbed gas.
-test("renewable_energy_biogas_pump_refuses_too_little_gas", {
-    instant = true,
-    run = function(self)
-        local handle = T.placeRecord(self, "digester", "dome")
-        if not handle then return end
-        local torch = instanceItem(Digester.TORCH)
-        local gas = Digester.M3_PER_TANK * Digester.FILL_SHARES[Digester.TORCH] * torch:getUseDelta() / 2
-        T.give(self, "tools", { { type = Digester.PUMP }, { type = Digester.TORCH, uses = 0 } })
-        local function refusal()
-            return DigesterJobs.refusal(T.player(), DigesterJobs.FILL_PUMP, handle.object, self.items.tools[2])
-        end
-        T.setRecord(self, handle, Fixtures.matureDigester("dome", { gas = 0 }))
-        T.waitForGas(self, handle, 0)
-        T.step(function() self.empty = refusal() end)
-        T.setRecord(self, handle, Fixtures.matureDigester("dome", { gas = gas }))
-        T.waitForGas(self, handle, gas)
-        T.step(function() self.little = refusal() end)
-    end,
-    validate = function(self)
-        T.expectEqual("the pump's refusal from an empty holder", self.empty, "Tooltip_RenewableEnergy_NoGasToFill")
-        T.expectEqual("the pump's refusal for half a use of gas", self.little, "Tooltip_RenewableEnergy_TooLittleGas")
     end,
 })
 
@@ -296,30 +279,47 @@ test("renewable_energy_biogas_compressor_fills_past_pump_with_scrubber", {
 
 -- A tire pump fills a welding torch straight from the digester, as close to the pump's share of
 -- the torch as its whole uses come without passing it, taking the torch's fill share of a tank's
--- gas for each use. The torch's few uses put the share between two of them.
+-- gas for each use. The torch's few uses put the share between two of them. Before that, an empty
+-- holder refuses the fill as having no gas, and gas short of one of the torch's uses as too
+-- little, not as the compressor's want of scrubbed gas (a tank's use is below what the summary
+-- resolves, a torch's isn't).
 test("renewable_energy_biogas_pump_fills_torch", {
     instant = true,
     run = function(self)
         local handle = T.placeRecord(self, "digester", "dome")
         if not handle then return end
+        -- Nothing to digest, so the holder holds only what each case and the fill leave.
+        local function holding(gas)
+            T.setRecord(self, handle, Fixtures.matureDigester("dome", { gas = gas, potential = 0 }))
+            T.waitForGas(self, handle, gas)
+        end
+        T.give(self, "tools", { { type = Digester.PUMP }, { type = Digester.TORCH, uses = 0 } })
+        self.refusals = {}
+        local halfUse = Digester.M3_PER_TANK * Digester.FILL_SHARES[Digester.TORCH] * instanceItem(Digester.TORCH):getUseDelta() / 2
+        for _, case in ipairs({ { "empty", 0 }, { "halfUse", halfUse } }) do
+            holding(case[2])
+            T.step(function()
+                self.refusals[case[1]] = DigesterJobs.refusal(T.player(), DigesterJobs.FILL_PUMP, handle.object, self.items.tools[2])
+            end)
+        end
         self.gas = Digester.HOLDERS.dome.capacity
-        T.setRecord(self, handle, Fixtures.matureDigester("dome", { gas = self.gas }))
-        T.waitForGas(self, handle, self.gas)
-        T.give(self, "tools", { { type = Digester.PUMP }, { type = "Base.BlowTorch", uses = 0 } })
+        holding(self.gas)
         T.actionJob(self, "digester", handle, DigesterJobs.FILL_PUMP, function() return self.items.tools[2] end)
         T.batch(function()
             T.readRecord(self, handle, "after")
-            T.readCarried(self, { "Base.BlowTorch" })
+            T.readCarried(self, { Digester.TORCH })
         end)
     end,
     validate = function(self)
-        local torch = T.carriedFirst(self, "Base.BlowTorch")
+        T.expectEqual("the pump's refusal from an empty holder", self.refusals.empty, "Tooltip_RenewableEnergy_NoGasToFill")
+        T.expectEqual("the pump's refusal for half a use of gas", self.refusals.halfUse, "Tooltip_RenewableEnergy_TooLittleGas")
+        local torch = T.carriedFirst(self, Digester.TORCH)
         if not T.expect(torch ~= nil, "the torch is gone") then return end
-        local delta = getScriptManager():FindItem("Base.BlowTorch"):getUseDelta()
+        local delta = getScriptManager():FindItem(Digester.TORCH):getUseDelta()
         T.expect(torch.uses <= Digester.PUMP_FILL + 0.001 and torch.uses > Digester.PUMP_FILL - delta,
             "the pump filled the torch to " .. torch.uses .. ", not the last use up to its share")
         local m3 = torch.uses * Digester.FILL_SHARES[Digester.TORCH] * Digester.M3_PER_TANK
-        T.expectNear("gas the torch took", self.gas - self.reads.after.gas, m3, 0.02)
+        T.expectNear("gas the torch took", self.gas - self.reads.after.gas, m3, 0.005)
     end,
 })
 

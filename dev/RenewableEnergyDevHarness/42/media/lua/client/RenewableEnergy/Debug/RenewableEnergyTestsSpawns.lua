@@ -217,13 +217,16 @@ serverCheck("renewable_energy_world_cracked_modules", "crackedModules")
 
 -- A room seen for the first time gets a bank of its room's stock (a shed's or garage's a wooden
 -- battery box, a farm storeroom's or barn's a wooden rack) on a roll just under one in its odds ×
--- the Battery Bank Spawn setting's rarity and none at it, and none at all at None or in a room not
--- listed. A garage gets a crate of solar gear on a roll just under its crate odds and none at it,
--- and its rarer bank on neither.
+-- the Battery Bank Spawn setting's rarity and none at it, and none at all at None, in a room not
+-- listed, or where its free square is open to the sky. A bank comes with one module beside it, as
+-- every roll here comes in under its stock's module chance and gives the lowest count. A garage
+-- gets a crate of solar gear on a roll just under its crate odds and none at it, and its rarer
+-- bank on neither.
 local SEEN_ROOMS = {
     { trial = { room = "shed", setting = 3, edge = "bank", roll = "under" }, bank = "batteryBoxWood" },
     { trial = { room = "shed", setting = 3, edge = "bank", roll = "at" } },
     { trial = { room = "shed", setting = 1, roll = 0 } },
+    { trial = { room = "shed", setting = 4, roll = 0, outdoors = true } },
     { trial = { room = "farmstorage", setting = 4, roll = 0 }, bank = "batteryRackWood" },
     { trial = { room = "barn", setting = 4, roll = 0 }, bank = "batteryRackWood" },
     { trial = { room = "kitchen", setting = 4, roll = 0 } },
@@ -235,18 +238,19 @@ test("renewable_energy_world_bank_rooms_seen_first_time", {
     sandbox = { LRMSolarPanels = 1, LRMBatteries = 1, LRMMisc = 1 },
     run = function(self)
         local square = T.square(self, { indoors = true }, "a free indoor square")
-        if not square then return end
+        local outdoor = square and T.square(self, nil, "a free outdoor square")
+        if not outdoor then return end
         local trials = {}
         for i, entry in ipairs(SEEN_ROOMS) do
             trials[i] = entry.trial
         end
-        T.read(self, "seenRoom", T.at(square, { trials = trials }), "seen")
+        T.read(self, "seenRoom", T.at(square, { trials = trials, outdoor = T.at(outdoor) }), "seen")
     end,
     validate = function(self)
         for i, entry in ipairs(SEEN_ROOMS) do
-            local trial, tiles = entry.trial, {}
+            local trial, result, tiles = entry.trial, self.reads.seen.results[i], {}
             -- By kind: a bank stands in whichever facing puts its back to a wall.
-            for _, tile in ipairs(self.reads.seen.results[i].tiles) do
+            for _, tile in ipairs(result.tiles) do
                 table.insert(tiles, Sprites.kindOf(tile) or tile)
             end
             local wanted = {}
@@ -254,9 +258,10 @@ test("renewable_energy_world_bank_rooms_seen_first_time", {
             if entry.crate then table.insert(wanted, "crate") end
             table.sort(wanted)
             table.sort(tiles)
-            expectEqual(string.format("what a %s seen at setting %d with roll %s placed", trial.room, trial.setting,
-                tostring(trial.roll) .. (trial.edge and " " .. trial.edge .. " odds" or "")), table.concat(tiles, ","),
-                table.concat(wanted, ","))
+            local what = string.format("a %s%s seen at setting %d with roll %s", trial.room, trial.outdoors and " open to the sky" or "",
+                trial.setting, tostring(trial.roll) .. (trial.edge and " " .. trial.edge .. " odds" or ""))
+            expectEqual("what " .. what .. " placed", table.concat(tiles, ","), table.concat(wanted, ","))
+            expectEqual("modules " .. what .. " laid", result.modules, entry.bank and 1 or 0)
         end
     end,
 })

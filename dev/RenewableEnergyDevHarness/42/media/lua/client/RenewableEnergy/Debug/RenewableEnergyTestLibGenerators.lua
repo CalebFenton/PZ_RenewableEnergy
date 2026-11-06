@@ -5,10 +5,10 @@ local Yardsticks = require "RenewableEnergy/Debug/RenewableEnergyYardsticks"
 local T = RenewableEnergyTest
 
 --- Queues a Base.Generator plugged in on `opts.square`, else near `opts.near` but not next to it,
---- with `opts.fuel` litres, running if `opts.running`, with a failsafe on its square if
---- `opts.failsafe`. When the test ends the server removes it and this client lets go of its squares
---- (PZHarness.Fixtures.releaseGeneratorPower). Returns its handle (T.where), whose object is this
---- client's copy once it has one.
+--- with `opts.fuel` litres, at `opts.condition` (new if nil), running if `opts.running`, with a
+--- failsafe on its square if `opts.failsafe`. When the test ends the server removes it and this
+--- client lets go of its squares (PZHarness.Fixtures.releaseGeneratorPower). Returns its handle
+--- (T.where), whose object is this client's copy once it has one.
 function T.generator(self, opts)
     opts = opts or {}
     local square = opts.square
@@ -17,7 +17,8 @@ function T.generator(self, opts)
         return nil
     end
     local handle = T.where(square)
-    T.server(self, "placeGenerator", T.at(square, { fuel = opts.fuel, running = opts.running, failsafe = opts.failsafe }),
+    T.server(self, "placeGenerator", T.at(square, { fuel = opts.fuel, condition = opts.condition, running = opts.running,
+        failsafe = opts.failsafe }),
         function()
             handle.object = square:getGenerator()
             return handle.object ~= nil

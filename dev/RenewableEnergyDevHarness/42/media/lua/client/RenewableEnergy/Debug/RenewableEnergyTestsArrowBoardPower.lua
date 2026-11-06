@@ -14,12 +14,10 @@ local test, expect, expectEqual, expectNear = T.test, T.expect, T.expectEqual, T
 local spawnTrailer, batchOnTrailer, boxItems, modulesOnBothPanels = T.spawnTrailer, T.batchOnTrailer, T.boxItems, T.modulesOnBothPanels
 local LEFT, RIGHT = ArrowBoard.PANELS[1], ArrowBoard.PANELS[2]
 
--- Each installed panel makes power by its module's condition, a half-cracked one half what a whole
--- one does and a new homemade one, capped lower, less than a new factory one; the trailer stores
--- nothing without panels or without a battery. The trailer reads a module's watts with the mounts'
--- own Panel.moduleWatts, so the checks compare the passes with each other rather than with that
--- function. An hour's output goes to the emptiest battery first, all of it while that has room;
--- once all are full the rest goes unstored.
+-- Each installed panel makes its module's rating by its condition, a half-cracked one half what a
+-- whole one does and a new homemade one its lower rating; the trailer stores nothing without
+-- panels or without a battery. An hour's output goes to the emptiest battery first, all of it
+-- while that has room; once all are full the rest goes unstored.
 test("renewable_energy_world_arrow_board_panels_charge_the_box", {
     hour = 12,
     run = function(self)
@@ -50,12 +48,13 @@ test("renewable_energy_world_arrow_board_panels_charge_the_box", {
         local reads = self.reads
         local flatWh = reads.whole.flatWh
         if not expect(flatWh > 0, "no sun at noon") then return end
-        local whole = reads.whole.watts
-        if not expect(whole > 0, "a whole panel made nothing at noon") then return end
+        -- A new module makes its full rating (160 W factory, 96 W homemade); one at half its
+        -- condition half of it: 160 + 160 × 50 / 100.
+        local whole = Specs.modules[T.FACTORY_MODULE].watts
+        expectNear("watts of a whole factory panel", reads.whole.watts, whole, 0.001)
         expectNear("watt-hours a whole panel stores in an hour", reads.whole.result, whole * flatWh, 0.001)
-        expectNear("watts of a half-cracked panel over a whole one", (reads.wholeAndHalf.watts - whole) / whole, 0.5, 0.001)
-        expect(reads.homemade.watts > 0 and reads.homemade.watts < whole, "a new homemade module makes "
-            .. reads.homemade.watts .. " W, expected some and less than a new factory module's " .. whole)
+        expectNear("watts of a whole and a half-cracked panel", reads.wholeAndHalf.watts, 1.5 * whole, 0.001)
+        expectNear("watts of a new homemade panel", reads.homemade.watts, Specs.modules[T.HOMEMADE_MODULE].watts, 0.001)
         expectNear("watt-hours stored with no panels", reads.none.result, 0)
         expectNear("watt-hours stored with no battery", reads.noBattery.result, 0)
 
@@ -98,13 +97,17 @@ end
 
 -- The lamps light only while switched on with the lamp board intact and a battery in the box:
 -- switching off or wrecking the board darkens them, welding it relights them, and after dark the
--- photocell sets night.
-test("renewable_energy_world_arrow_board_lamps_follow_switch_board_and_photocell", {
+-- photocell sets night. Lit, by day or night, they drain ArrowBoard.SPEC.lampShare of a car
+-- battery an hour; switched off, nothing.
+test("renewable_energy_world_arrow_board_lamps_light_and_drain", {
     run = function(self)
         if not spawnTrailer(self, { repair = true }) then return end
         local trailer, board = self.trailer, ArrowBoard.BOARD
         self.stages = {}
         local function stage(name, args, night, want) lampStage(self, trailer, name, args, night, want) end
+        local function lamps(hours, night, label)
+            T.onVehicle(self, trailer, "arrowBoardRun", { call = "runLamps", with = { hours, night } }, label)
+        end
         batchOnTrailer(function()
             stage("switched on with only a controller in the box", { switchOn = true, box = { { type = Specs.controller } } },
                 false, nil)
@@ -113,46 +116,38 @@ test("renewable_energy_world_arrow_board_lamps_follow_switch_board_and_photocell
             stage("switched off", { switchOn = false }, false, nil)
             stage("on with its lamp board wrecked", { switchOn = true, frame = { [board] = 0 } }, false, nil)
             stage("on with its lamp board welded", { frame = { [board] = 100 } }, false, "day")
-        end)
-    end,
-    validate = function(self)
-        expectLampStages(self)
-    end,
-})
-
--- Lit, by day or night, the lamps drain ArrowBoard.SPEC.lampShare of a car battery an hour.
-test("renewable_energy_world_arrow_board_lamps_drain_a_lightbars_share", {
-    run = function(self)
-        if not spawnTrailer(self, { repair = true }) then return end
-        local trailer = self.trailer
-        local function lamps(hours, night, label)
-            T.onVehicle(self, trailer, "arrowBoardRun", { call = "runLamps", with = { hours, night } }, label)
-        end
-        batchOnTrailer(function()
-            T.onVehicle(self, trailer, "setTrailer", { switchOn = true, box = { { type = T.CAR_BATTERY, charge = 0.8 } } })
+            T.onVehicle(self, trailer, "setTrailer", { box = { { type = T.CAR_BATTERY, charge = 0.8 } } })
             -- A pass draws at the lamps' current state and only then sets it for `night`
             -- (ArrowBoard.runLamps), so a zero-hour pass sets the state the measured pass draws at.
             lamps(0, false)
             lamps(2, false, "day")
             lamps(0, true)
             lamps(2, true, "night")
+            T.onVehicle(self, trailer, "setTrailer", { switchOn = false })
+            lamps(2, false, "off")
         end)
     end,
     validate = function(self)
+        expectLampStages(self)
         -- A battery's charge is kept in whole uses of its UseDelta, which each pass rounds to.
         local function charge(answer)
             local battery = boxItems(answer.state, T.CAR_BATTERY)[1]
             return battery and battery.charge or -1
         end
+        -- Two hours at the lamps' share each.
         local share = 2 * ArrowBoard.SPEC.lampShare
         expectNear("the car battery's charge after two hours lit by day", charge(self.reads.day), 0.8 - share, 2e-5)
         expectNear("the car battery's charge after two more hours lit at night", charge(self.reads.night), 0.8 - 2 * share, 3e-5)
+        expectNear("watt-hours the lamps drew in two hours switched off", self.reads.off.result, 0)
+        expectNear("the car battery's charge after two hours switched off", charge(self.reads.off), 0.8 - 2 * share, 3e-5)
     end,
 })
 
 -- The controller cuts the lamps off once every battery is down to its cutoff, drawing none below
 -- it, and relights them only at the reconnect level. Charges are whole uses, so each boundary is
--- probed one use either side; the panels charging back past reconnect relight them.
+-- probed one use either side. A battery above the cutoff keeps them lit beside one at it, and
+-- only it is drawn on. The clock's charge pass over the loaded vehicles charges the box back past
+-- reconnect and relights them.
 test("renewable_energy_world_arrow_board_lamps_cut_off_and_come_back", {
     hour = 12,
     run = function(self)
@@ -172,9 +167,13 @@ test("renewable_energy_world_arrow_board_lamps_cut_off_and_come_back", {
             stage("cut off, a use under the reconnect level", { box = battery(spec.reconnect - use) }, nil)
             stage("cut off, at the reconnect level", { box = battery(spec.reconnect) }, "day")
             stage("lit, set to the cutoff", { box = battery(spec.cutoff) }, nil)
+            stage("cut off, back at the reconnect level", { box = battery(spec.reconnect) }, "day")
+            stage("lit, one battery at the cutoff beside one a use above it", { box = {
+                { type = T.DEEP_CYCLE, charge = spec.cutoff }, { type = T.DEEP_CYCLE, charge = spec.cutoff + use } } }, "day")
+            T.onVehicle(self, trailer, "arrowBoardRun", { call = "runLamps", with = { 2, false } }, "pair")
             -- A few hours of noon sun on two whole panels put it back over the reconnect level.
             T.onVehicle(self, trailer, "setTrailer", { panels = modulesOnBothPanels(100), box = battery(spec.reconnect - use) })
-            T.onVehicle(self, trailer, "arrowBoardRun", { call = "update", with = { 3 } }, "charged")
+            T.onVehicle(self, trailer, "arrowBoardRun", { call = "gadgetPass", with = { 3 } }, "charged")
         end)
     end,
     validate = function(self)
@@ -185,6 +184,12 @@ test("renewable_energy_world_arrow_board_lamps_cut_off_and_come_back", {
         expectNear("watt-hours drawn down to the cutoff", self.reads.cut.result, self.use * wh, 1e-3)
         expectNear("the battery's charge once cut off", boxItems(cut, T.DEEP_CYCLE)[1].charge, spec.cutoff, 1e-6)
         expectEqual("the lamps drawn down to the cutoff", cut.lamps, nil)
+        local pair = self.reads.pair
+        expectNear("watt-hours drawn from a pair, one at the cutoff and one a use above it", pair.result, self.use * wh, 1e-3)
+        expectEqual("batteries in the pair's box", #boxItems(pair.state, T.DEEP_CYCLE), 2)
+        for i, battery in ipairs(boxItems(pair.state, T.DEEP_CYCLE)) do
+            expectNear("battery " .. i .. "'s charge once the pair is cut off", battery.charge, spec.cutoff, 1e-6)
+        end
         local charged = boxItems(chargedState, T.DEEP_CYCLE)[1]
         if not expect(charged.charge >= spec.reconnect, "the panels left the battery at " .. charged.charge
             .. ", too little sun to show the lamps coming back") then
@@ -226,12 +231,13 @@ test("renewable_energy_world_arrow_board_lamps_flash_for_players", {
             T.onVehicle(self, trailer, "arrowBoardRun", { call = "runLamps", with = { 0, false } })
         end)
         look("by day", "day")
-        -- The game's own frames flash the board, both ways within a flash.
+        -- The game's own frames flash the board, both ways within a flash; two flashes' time
+        -- leaves room for a slow frame.
         local seen = {}
         T.waitFor(self, function()
             seen[trailer.vehicle:getWindowLightsOn()] = true
             return seen[true] and seen[false]
-        end, "the board flashing lit and dark by itself", self.period)
+        end, "the board flashing lit and dark by itself", 2 * self.period)
         T.onVehicle(self, trailer, "arrowBoardRun", { call = "runLamps", with = { 0, true } })
         look("at night", "night")
         T.onVehicle(self, trailer, "setTrailer", { switchOn = false })
@@ -303,7 +309,10 @@ test("renewable_energy_world_arrow_board_cycle_ends_at_midnight", {
         local full = instanceItem(T.CAR_BATTERY):getConditionMax()
         expectEqual("the battery's condition after the evening's passes", before.condition, full)
         local drawn = before.charge - after.charge
-        if not expect(drawn > 0, "the lamps drew nothing across midnight") then return end
+        -- The lamps' share of a car battery an hour over the pass, to the battery's nearest use.
+        local useDelta = instanceItem(T.CAR_BATTERY):getUseDelta()
+        if not expectNear("the share of the car battery the lamps drew across midnight", drawn,
+            ArrowBoard.SPEC.lampShare * PASS_HOURS, useDelta) then return end
         local afterMidnight = drawn * PAST_MIDNIGHT / PASS_HOURS
         local expected = T.conditionAfterDischarge(T.CAR_BATTERY, 1 - EVENING_CHARGE + drawn - afterMidnight)
         if not expect(expected < full, "the day's depth wears a car battery less than a point, so its wear can't show") then return end

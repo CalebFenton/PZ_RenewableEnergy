@@ -37,7 +37,8 @@ end
 -- options (StormChance.stormDamage): a chance an hour compounds over the hours, the rate scales the
 -- chance an hour, a chance scaled past certain stays certain, and no hours or Storm Damage off is
 -- no chance; those expected chances are worked by hand. A roll under a panel's chance cracks a
--- module by Specs.storm.crack, never below 0, and a roll at it doesn't.
+-- module by Specs.storm.crack, never below 0, and a roll at it doesn't. Catches a mount or
+-- material share applied wrongly, or the hours not compounding.
 test("renewable_energy_solar_storms_crack_chance", {
     sandbox = { StormDamage = true, StormDamageRate = 100 },
     run = function(self)
@@ -62,10 +63,17 @@ test("renewable_energy_solar_storms_crack_chance", {
     end,
     validate = function(self)
         local wall, woodRack, flat, metalRack, longer, none = unpack(self.reads.mounts.chances)
+        -- Specs.storm's panelPerHour 0.0035 times the mount's share and its material's, compounded:
+        -- 1 - (1 - 0.0035 × share)^hours.
         expectEqual("a wall panel's chance of a crack", wall, 0)
-        expect(woodRack > flat and flat > metalRack and metalRack > 0,
-            string.format("chances of a crack in 20 hours of storm: wooden rack %g, flat %g, metal rack %g", woodRack, flat, metalRack))
-        expect(longer > flat, string.format("a flat panel's chance in 40 hours of storm %g, in 20 %g", longer, flat))
+        -- Wooden rack: share 1 × 1 = 1, 1 - 0.9965^20.
+        expectNear("a wooden rack's chance in 20 hours of storm", woodRack, 0.0677207, 1e-6)
+        -- Flat: share 0.5, 1 - 0.99825^20.
+        expectNear("a flat panel's chance in 20 hours of storm", flat, 0.0344242, 1e-6)
+        -- Metal rack: share 1 × 0.25, 1 - 0.999125^20.
+        expectNear("a metal rack's chance in 20 hours of storm", metalRack, 0.0173553, 1e-6)
+        -- Flat, 1 - 0.99825^40.
+        expectNear("a flat panel's chance in 40 hours of storm", longer, 0.0676634, 1e-6)
         expectEqual("a flat panel's chance in no storm", none, 0)
         expectNear("10% an hour over an hour", self.normal[1], 0.1, 1e-9)
         expectNear("10% an hour over two hours", self.normal[2], 0.19, 1e-9)
@@ -123,17 +131,21 @@ test("renewable_energy_solar_storms_unloaded_damage_then_immediate_seal", {
         local away = self.reads.away
         expectEqual("bank items while its chunk was unloaded", #away.items, 0)
         expectEqual("module condition after the unloaded storm", away.status.sources[1].modules[1].condition, STORMED)
-        expect(away.status.sources[1].snow > 0.5, "the panel lost its snow cover before the repair")
-        local condition, seals = ModuleRepair.sealed(T.FACTORY_MODULE, STORMED, 1)
+        -- Two hours of snowfall cover it whole, and a dark hour at -10 °C melts none; the trip away
+        -- may let the game's own weather take a trace.
+        expectNear("snow on the panel after the unloaded storm", away.status.sources[1].snow, 1, 0.02)
+        -- A seal adds 15 up to a cap of 80 less 10 for each earlier seal: min(80 - 10, 20 + 15) = 35,
+        -- its second seal.
+        local condition = 35
         local module = self.reads.panel.modules[1]
         expectEqual("sealed module condition", module.condition, condition)
-        expectEqual("seals after repairing the storm damage", module.repaired, seals)
+        expectEqual("seals after repairing the storm damage", module.repaired, 2)
         expect(module.mounted and module.connected, "the repair lost the module's earned-XP markers")
         expectEqual("bank's module immediately after repair", self.reads.sealedBank.status.sources[1].modules[1].condition, condition)
         expectEqual("bank's module after another pass", self.reads.later.status.sources[1].modules[1].condition, condition)
-        local look = ModuleRepair.crackLookOf(T.FACTORY_MODULE, condition)
+        -- 35 of 100 is below Specs.crackLooks' heavyBelow, 0.5.
         expectEqual("cracks below the snow after repair", table.concat(self.reads.panel.overlays, ","),
-            tostring(look and Sprites.cracks[look].flat[1]) .. "," .. Sprites.snow.flat)
+            Sprites.cracks.heavy.flat[1] .. "," .. Sprites.snow.flat)
     end,
 })
 

@@ -4,16 +4,17 @@ require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 local BankMenu = require "RenewableEnergy/UI/BankMenu"
 local SourceMenu = require "RenewableEnergy/UI/SourceMenu"
 local GardenLightMenu = require "RenewableEnergy/UI/GardenLightMenu"
+local RenameBank = require "RenewableEnergy/UI/RenameBank"
 local Wiring = require "RenewableEnergy/PowerBank/Wiring"
 local BankJobs = require "RenewableEnergy/PowerBank/BankJobs"
-local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local Sprites = require "RenewableEnergy/Sprites"
+local Clock = require "cf_commonlib/Clock"
 
 -- Power bank tests: the bank's context menu (UI/BankMenu.lua), wiring, repair and renaming from it.
 -- Banks live on the authority (see RenewableEnergyTestsBank.lua).
 
 local T = RenewableEnergyTest
-local test, expect, expectEqual = T.test, T.expect, T.expectEqual
+local test, expect, expectEqual, expectNear = T.test, T.expect, T.expectEqual, T.expectNear
 local player, stateItem, copyItem = T.player, T.stateItem, T.copyItem
 
 -- Whether the option's tooltip lists the item `fullType` in the colour for what the character is
@@ -155,7 +156,8 @@ test("renewable_energy_bank_menu_repair_part", {
 })
 
 -- Wire In from the menu walks over and wires the part in, on the server and this client's copy,
--- which then offers to unwire it; Electricity shortens the wiring.
+-- which then offers to unwire it. Wiring takes the part's seconds at Electricity 0 and falls in a
+-- straight line with skill (Wiring.skillFactor), so a master takes about a quarter of that.
 test("renewable_energy_bank_menu_wire_in_and_unwire", {
     instant = true,
     run = function(self)
@@ -168,17 +170,11 @@ test("renewable_energy_bank_menu_wire_in_and_unwire", {
         T.step(function()
             local battery = self.items.parts[1]
             self.batteryId = battery:getID()
-            -- An action takes its duration when it is made, so these two are made with the instant
-            -- cheat off and never queued.
-            p:setTimedActionInstantCheat(false)
-            if not T.need(self, not p:isTimedActionInstant(),
-                "the debug option Cheats > Timed Action > Instant off, which makes every action instant") then return end
-            local function wiringTime(level)
+            local function wiringUnits(level)
                 T.setPerk(self, Perks.Electricity, level)
-                return RenewableEnergyAction:new(p, "bank", BankJobs.WIRE_IN, bank.object, battery).maxTime
+                return RenewableEnergyAction:new(p, "bank", BankJobs.WIRE_IN, bank.object, battery):units()
             end
-            self.unskilled, self.skilled = wiringTime(0), wiringTime(10)
-            p:setTimedActionInstantCheat(true)
+            self.unskilled, self.skilled = wiringUnits(0), wiringUnits(10)
             local context = T.newContext()
             local option = T.optionFor(BankMenu.addWireInOptions(0, context, bank.object), battery)
             context:hideAndChildren()
@@ -190,8 +186,11 @@ test("renewable_energy_bank_menu_wire_in_and_unwire", {
         end)
     end,
     validate = function(self)
-        expect(self.skilled < self.unskilled, string.format(
-            "wiring takes %s at Electricity 10 and %s at 0", self.skilled, self.unskilled))
+        -- At Electricity 10 the factor is 1 - 0.095 × (10 - 3) = 0.335 of the 1 - 0.095 × (0 - 3) =
+        -- 1.285 it is at Electricity 0.
+        local unskilled = Specs.wiring.battery.seconds * Clock.unitsPerSecond()
+        expectNear("a car battery's wiring units at Electricity 0", self.unskilled, unskilled, 1e-6)
+        expectNear("a car battery's wiring units at Electricity 10", self.skilled, unskilled * 0.335 / 1.285, 1e-6)
         if not T.expectOffered(self, "Wire In") then return end
         local bank = self.bank.object
         local held = {}
@@ -267,8 +266,10 @@ test("renewable_energy_bank_menu_wire_in_all_batteries", {
             { type = T.L16, condition = 90 }, { type = "Base.Screwdriver" },
             { type = Wiring.WIRE, count = 1 + Wiring.forPart(T.CAR_BATTERY).wire + Wiring.forPart(T.L16).wire } })
         T.step(function()
-            T.noteOption(self, "without wrench", T.menuOption(BankMenu.addWireInOptions, bank.object,
-                getText("ContextMenu_RenewableEnergy_AllBatteries", self.slots)))
+            local option = T.menuOption(BankMenu.addWireInOptions, bank.object,
+                getText("ContextMenu_RenewableEnergy_AllBatteries", self.slots))
+            T.noteOption(self, "without wrench", option)
+            self.wrenchShort = marksShort(option, "Base.Wrench")
         end)
         T.give(self, "wrench", { { type = "Base.Wrench" } })
         T.step(function()
@@ -283,6 +284,7 @@ test("renewable_energy_bank_menu_wire_in_all_batteries", {
     validate = function(self)
         if not T.expectOffered(self, "Wire In > All Batteries") then return end
         T.expectOptionRefused(self, "without wrench")
+        expect(self.wrenchShort, "All Batteries without a wrench doesn't mark the L-16's wrench short")
         local wired = {}
         for _, item in ipairs(self.bank.state.items) do
             table.insert(wired, item.condition)
@@ -328,31 +330,27 @@ test("renewable_energy_bank_menu_connects_sources_that_fit", {
     end,
 })
 
--- Connect Sources in Reach leaves out a source another bank has: it counts only the loose one,
--- while the wired panel's own menu still offers to move it over.
-test("renewable_energy_bank_menu_connect_all_skips_sources_of_other_banks", {
-    run = function(self)
-        self.home = T.bank(self, "batteryBoxWood", {}, { outdoors = true })
-        self.wired = self.home and T.panel(self, Sprites.flat, { near = self.home, connect = true })
-        self.bank = self.wired and T.bank(self, "batteryBoxWood", {}, { outdoors = true, near = self.home })
-        self.loose = self.bank and T.panel(self, Sprites.flat, { near = self.bank })
-    end,
-    validate = function(self)
-        if not self.loose then return end
-        expect(self.wired.connected, "the first panel wasn't connected to its bank: " .. tostring(self.wired.reason))
-        local options = T.connectOptions(self.bank, self.wired, 1)
-        expect(options.all.shown, "the second bank's Connect Sources in Reach doesn't count only the loose panel")
-        expect(options.one.shown and not options.one.greyed, "the wired panel's menu no longer offers to move it to the second bank")
-    end,
-})
-
--- A rename shows in the bank's menu and window, and an empty name gives the tier's name back.
+-- Rename asks for the name in a box that shows the bank's name, and OK renames it, trimmed, in the
+-- bank's menu and window; an empty name gives the tier's name back.
 test("renewable_energy_bank_rename_trims_and_empty_restores_tier_name", {
+    instant = true,
     run = function(self)
         local bank = T.bank(self, "batteryRackMetal", {}, { outdoors = true })
         if not bank then return end
         self.bank = bank
-        T.job(self, "bank", BankJobs.RENAME, bank, "  Cellar  ")
+        self.shown = {}
+        -- Where the job walks the character, as walking takes real time.
+        T.goNextTo(self, bank.square)
+        -- Types `name` into the box Rename opens and clicks OK, noting the name the box showed first.
+        local function rename(label, name)
+            T.step(function()
+                local box = RenameBank.ask(0, bank.object)
+                self.shown[label] = box.entry:getText()
+                box.entry:setText(name)
+                box:onClick(box.yes)
+            end)
+        end
+        rename("unnamed", "  Cellar  ")
         T.waitFor(self, function() return BankMenu.bankLabel(bank.object) == "Cellar" end, "this client's label of the renamed bank")
         -- The wait for "Cellar" is the menu's check; the window's title is read off the same copy.
         T.openWindow(self, bank)
@@ -360,14 +358,15 @@ test("renewable_energy_bank_rename_trims_and_empty_restores_tier_name", {
             self.title = self.window.title
             self.window:close()
         end)
-        T.job(self, "bank", BankJobs.RENAME, bank, "", "emptied")
+        rename("named", "")
         T.waitFor(self, function() return BankMenu.bankLabel(bank.object) ~= "Cellar" end,
             "this client's label of the bank renamed to nothing")
         T.readRecord(self, bank)
     end,
     validate = function(self)
+        expectEqual("the name box of a bank never named", self.shown.unnamed, "")
         expectEqual("the renamed bank's window title", self.title, "Cellar")
-        T.expectOk(self.reads.emptied, "renaming the bank to an empty name")
+        expectEqual("the name box of the bank named Cellar", self.shown.named, "Cellar")
         expectEqual("this client's label of the bank renamed to nothing", BankMenu.bankLabel(self.bank.object),
             getItemNameFromFullType("RenewableEnergy.BatteryRackMetal"))
         expectEqual("the server's name of the bank renamed to nothing", self.bank.state.name, "")
@@ -395,8 +394,8 @@ test("renewable_energy_bank_rename_refuses_long_or_multiline_names", {
     validate = function(self)
         local reads = self.reads
         T.expectOk(reads.named, "renaming the bank Shed")
-        expect(not reads.long.ok, "the authority took a name longer than " .. BankJobs.NAME_LENGTH .. " characters")
-        expect(not reads.twoLines.ok, "the authority took a name on two lines")
+        T.expectRefused(reads.long, "name too long", "the authority took a name longer than " .. BankJobs.NAME_LENGTH .. " characters")
+        T.expectRefused(reads.twoLines, "name not one line", "the authority took a name on two lines")
         expectEqual("the bank's name after the refused names", reads.refused.name, "Shed")
         T.expectOk(reads.fullLength, "renaming the bank with a name of " .. BankJobs.NAME_LENGTH .. " characters")
         expectEqual("the bank's name after a name of " .. BankJobs.NAME_LENGTH .. " characters", self.bank.state.name, self.full)

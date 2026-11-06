@@ -55,7 +55,8 @@ test("renewable_energy_bank_panel_charges_bank", {
         expectEqual("percent of full sun", status.sources[1] and status.sources[1].fullSunPct, 100)
         local battery = stateItem(after, T.CAR_BATTERY)
         expectNear("the battery's charge", battery and battery.uses, after.charge, 0.001)
-        expect(table.concat(after.overlays, ",") ~= "", "the charged bank's tile shows no batteries")
+        -- Each battery in its slot, and the meter the south-facing box shows.
+        expectEqual("overlays on the charged bank's tile", #after.overlays, 2 + 1)
         battery = stateItem(full, T.CAR_BATTERY)
         expectEqual("the bank's charge after more sun than it holds", full.charge, 1)
         expectEqual("the battery's charge after more sun than it holds", battery and battery.uses, 1)
@@ -85,8 +86,50 @@ test("renewable_energy_bank_status_kept_through_save", {
     end,
 })
 
+-- A bank's capacity is each battery's watt-hours at its condition, a dead one's nothing, on this
+-- client's summary too. The batteries are wired in parallel: sun fills them by that capacity and
+-- leaves every live one at the same charge, while a dead one keeps what it held. Catches capacity
+-- counted at the rating, and a pass that charges a dead battery or splits the charge unevenly.
+test("renewable_energy_bank_capacity_counts_each_battery_by_condition", {
+    run = function(self)
+        local bank = T.bank(self, "batteryRackWood", { T.CAR_BATTERY, T.L16, T.JAR_BATTERY }, { charge = 0.5 })
+        self.panel = bank and T.panel(self, Sprites.flat, { near = bank, connect = true })
+        if not self.panel then return end
+        self.bank = bank
+        self.carMax = instanceItem(T.CAR_BATTERY):getConditionMax()
+        self.carCondition = math.floor(self.carMax / 2)
+        T.batch(function()
+            T.bankPart(self, bank, T.CAR_BATTERY, { condition = self.carCondition })
+            T.bankPart(self, bank, T.JAR_BATTERY, { condition = 0, recount = true })
+            T.readRecord(self, bank, "worn")
+            T.bankPass(self, bank, Sun.FULL_SUN, { label = "sunny" })
+        end)
+        T.waitForSummary(self, bank, function(summary) return summary.capacityWh == bank.state.nominalWh end,
+            "this client's summary with the worn bank's capacity")
+        T.waitFor(self, function() return math.abs(T.copyUses(bank, T.L16) - bank.state.charge) < 0.001 end,
+            "this client's copy of the charged L-16")
+    end,
+    validate = function(self)
+        if not T.expectConnected(self.panel) then return end
+        local worn, sunny = self.reads.worn, self.reads.sunny
+        -- Half a car battery, a whole L-16 and nothing of the dead jar battery.
+        local capacity = Specs.batteries[T.CAR_BATTERY].wh * self.carCondition / self.carMax + Specs.batteries[T.L16].wh
+        expectNear("the worn bank's capacity", worn.nominalWh, capacity, 1e-6)
+        expectNear("the worn bank's charge", worn.charge, 0.5, 1e-4)
+        local charge = 0.5 + T.flatPanelW() / capacity
+        expectNear("the bank's charge after an hour of full sun", sunny.charge, charge, 1e-4)
+        for _, fullType in ipairs({ T.CAR_BATTERY, T.L16 }) do
+            local battery = stateItem(sunny, fullType)
+            expectNear("the charge of the " .. fullType .. " after the sun", battery and battery.uses, charge, 1e-4)
+        end
+        local dead = stateItem(sunny, T.JAR_BATTERY)
+        expectNear("the dead jar battery's charge after the sun", dead and dead.uses, 0.5, 1e-4)
+    end,
+})
+
 -- At night a bank that is on powers its squares, here too, and pays its inverter's idle draw and
--- losses on top of the appliances its pass finds; the pass takes that draw from the batteries.
+-- losses on top of the appliances its pass finds; the pass takes that draw from the batteries, and
+-- the status says how long they last. Switched off, it powers nothing, here too, and draws nothing.
 test("renewable_energy_bank_powers_at_night", {
     run = function(self)
         T.setGrid(self, false)
@@ -102,11 +145,19 @@ test("renewable_energy_bank_powers_at_night", {
         T.step(function() T.placeTile(self, fridge, T.MINI_FRIDGE) end)
         T.batch(function()
             T.bankPass(self, bank, 0, { label = "with" })
-            T.bankPass(self, bank, 0)
+            T.bankPass(self, bank, 0, { label = "lastOn" })
+        end)
+        T.job(self, "bank", BankJobs.TURN_OFF, bank, nil, "switchOff")
+        T.waitFor(self, function() return not bank.square:haveElectricity() end,
+            "this client's copy of the switched-off bank's square without power")
+        T.batch(function()
+            T.readRecord(self, bank, "off")
+            T.bankPass(self, bank, 0, { label = "offPass" })
         end)
     end,
     validate = function(self)
-        local on, after, without, with = self.reads.on, self.bank.state, self.reads.without.status, self.reads.with.status
+        local on, without, with = self.reads.on, self.reads.without.status, self.reads.with.status
+        local lastOn = self.reads.lastOn
         expect(on.activated and on.powered, "switching on a charged bank with an inverter did not power its square")
         -- One inverter carries the load at its efficiency and idles on top.
         local inverter = Specs.inverters[T.INVERTER_CHARGER]
@@ -114,16 +165,23 @@ test("renewable_energy_bank_powers_at_night", {
         -- Vanilla bills appliances in single-precision fuel.
         expectNear("the load a fridge adds", with.loadW - without.loadW, T.fridgeW(), 0.001)
         expectNear("the draw a fridge adds", with.drawW - without.drawW, T.fridgeW() / inverter.efficiency, 0.001)
-        expectNear("Wh used in an hour", self.reads.with.storedWh - after.storedWh, after.status.drawW, 0.5)
-        local charging = after.status.charging
-        expect(charging.watts < 0 and charging.hours ~= nil, "the status doesn't say the bank is draining")
+        expectNear("Wh used in an hour", self.reads.with.storedWh - lastOn.storedWh, lastOn.status.drawW, 0.5)
+        -- Nothing comes in at night, so the net is the draw, which empties what is stored at that rate.
+        local charging, drawW = lastOn.status.charging, lastOn.status.drawW
+        expectNear("the status's net watts into the batteries", charging.watts, -drawW, 1e-9)
+        expectNear("the status's hours until the batteries are empty", charging.hours, lastOn.storedWh / drawW, 1e-6)
+        if not T.expectOk(self.reads.switchOff, "switching the bank off") then return end
+        local off, offPass = self.reads.off, self.reads.offPass
+        expect(not off.activated and not off.powered, "the switched-off bank still powers its square")
+        expectEqual("the switched-off bank's draw", offPass.drawW, 0)
+        expectNear("Wh the switched-off bank used in an hour", off.storedWh - offPass.storedWh, 0, 1e-6)
     end,
 })
 
 -- While the grid still powers its square, a bank that is on stands by: its generator stays off and
 -- its batteries carry nothing, so through a night they don't drain or wear, and its inverter/charger
--- fills them from the grid. It still measures what is switched on in its reach, the same load it
--- carries once the grid goes, at its next pass.
+-- fills them from the grid, up to full and no further. It still measures what is switched on in its
+-- reach, the same load it carries once the grid goes, at its next pass, which the batteries pay.
 test("renewable_energy_bank_stands_by_on_the_grid", {
     run = function(self)
         T.setGrid(self, true)
@@ -149,10 +207,11 @@ test("renewable_energy_bank_stands_by_on_the_grid", {
             offGrid.status.loadW)
         expectEqual("the bank's deepest drop after a night on the grid", onGrid.cycleDepth, 0)
         expectEqual("what the chargers charge from on the grid", onGrid.status.chargeSource, "grid")
-        expect(onGrid.charge > 0.5, string.format("on the grid the bank's charge went from 0.5 to %.3f", onGrid.charge))
+        -- Twelve hours of a charger with its rating to spare fill the room exactly.
+        expectNear("the bank's charge after a night of grid charging from half", onGrid.charge, 1, 1e-4)
         expect(offGrid.activated and offGrid.drawW > 0, string.format("with the grid gone the bank reads %s, powers %s and draws %.1f W for a load of %.1f W",
             tostring(offGrid.status.state), tostring(offGrid.activated), offGrid.drawW, offGrid.status.loadW))
-        expect(offGrid.charge < onGrid.charge, "with the grid gone the bank's charge didn't fall")
+        expectNear("Wh the batteries gave in the first hour off the grid", onGrid.storedWh - offGrid.storedWh, offGrid.drawW, 0.5)
     end,
 })
 

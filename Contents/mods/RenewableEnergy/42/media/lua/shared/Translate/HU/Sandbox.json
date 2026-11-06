@@ -27,7 +27,7 @@
     "Sandbox_RenewableEnergy_ChargeFreq": "Töltés gyakorisága",
     "Sandbox_RenewableEnergy_ChargeFreq_tooltip": "Milyen gyakran számolják ki az akkumulátorbankok a töltésüket és a terhelésüket.<br>Tízpercenként: a túlterhelés vagy üres bank miatt elment áram a hiba elhárítása után perceken belül visszajön.<br>Óránként: kíméletesebb egy sok bankkal teli, forgalmas szerverrel, de egy áramszünet akár egy óráig is tarthat.",
     "Sandbox_RenewableEnergy_BatteryBankSpawn": "Akkumulátorbankok megjelenése",
-    "Sandbox_RenewableEnergy_BatteryBankSpawn_tooltip": "Milyen gyakran van a farmok raktáraiban, a pajtákban és fészerekben, néha a garázsokban és raktárhelyiségekben is, felszerelt akkumulátordoboz vagy -polc, a garázsokban és raktárhelyiségekben pedig lakóautós napelemes felszereléses láda, amikor valaki először meglátja őket.<br>Ezek korai kezdést adnak készség vagy magazin nélkül. A Nincs mellett mindent magadnak kell megépítened vagy megtalálnod.",
+    "Sandbox_RenewableEnergy_BatteryBankSpawn_tooltip": "Milyen gyakran van a farmok raktáraiban, a pajtákban és fészerekben, néha a garázsokban és raktárhelyiségekben is, felszerelt akkumulátordoboz vagy -polc, a garázsokban és raktárhelyiségekben pedig lakóautós napelemes felszereléses láda, amikor valaki először meglátja őket.<br>Ezek korai kezdést adnak készség vagy magazin nélkül. A „Nincs” beállításnál mindent magadnak kell megépítened vagy megtalálnod.",
     "Sandbox_RenewableEnergy_BatteryBankSpawn_option1": "Nincs",
     "Sandbox_RenewableEnergy_BatteryBankSpawn_option2": "Nagyon ritka",
     "Sandbox_RenewableEnergy_BatteryBankSpawn_option3": "Ritka",

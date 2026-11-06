@@ -109,8 +109,16 @@ local WITH_MAINTAINER = {
 }
 local ROW_HOURS, ROW_START = 1, 0.5
 
+-- The charge `hours` of the maintainer add to a car battery under `flat` W/m²: its 10 W rating
+-- times the 0.8 system efficiency times the Sunlight Multiplier (T.fullSunW), times flat over the
+-- 1000 W/m² it is rated in, times the hours, over the car battery's 600 Wh (Specs). At
+-- multiplier 1 and full sun an hour is 10 x 0.8 x 1 = 8 Wh, 8 / 600 = 0.0133 of a charge.
+local function maintainerCharge(flat, hours)
+    return T.fullSunW(SolarMaintainer.WATTS) * flat / Sun.FULL_SUN * hours / Specs.batteries[T.CAR_BATTERY].wh
+end
+
 -- Charges only by day with a maintainer attached, its rating in the sky the hour ran under, and
--- the pass over every vehicle gives as much.
+-- the pass over every vehicle gives as much; the charge reaches this client's copy of the car.
 test("renewable_energy_gadgets_maintainer_charge", {
     instant = true,
     run = function(self)
@@ -131,48 +139,87 @@ test("renewable_energy_gadgets_maintainer_charge", {
         for _, row in ipairs(WITH_MAINTAINER) do
             hour(row)
         end
+        -- The server sends a charge that shows at two decimals, as vanilla's alternator does; the
+        -- noon hour's 0.5 to 0.51 does. A game pass meanwhile may add a few uses more, unsent.
+        T.waitFor(self, function()
+            local battery, noon = T.vehicleBattery(car), self.reads[WITH_MAINTAINER[2].what]
+            return battery ~= nil and noon ~= nil and math.abs(battery:getCurrentUsesFloat() - noon.after) < 0.001
+        end, "this client's car battery showing the maintainer's noon charge")
         T.onVehicle(self, car, "chargeVehicles", { hours = ROW_HOURS }, "pass")
     end,
     validate = function(self)
-        local charged
+        -- The battery keeps whole uses: a car battery's is 0.006 Wh, and the charge reads back to
+        -- within half of one.
+        local useDelta = instanceItem(T.CAR_BATTERY):getUseDelta()
         for _, row in ipairs({ WITHOUT_MAINTAINER, WITH_MAINTAINER[1], WITH_MAINTAINER[2] }) do
             local reply = self.reads[row.what]
-            local wh, after = reply.wh, reply.after
-            if row.charges then
-                charged = reply
-                -- The battery keeps whole uses of its capacity, a car battery's a few thousandths of a Wh.
-                local useWh = instanceItem(T.CAR_BATTERY):getUseDelta() * reply.capacityWh
-                expect(reply.flat > 0, "no sun at " .. row.what)
-                expectNear("Wh an hour at " .. row.what .. " added", wh, Sun.wattsFrom(SolarMaintainer.WATTS, reply.flat, 0) * ROW_HOURS,
-                    useWh)
-                expect(after > ROW_START, "an hour at " .. row.what .. " left the battery at " .. after)
-            else
-                expect(wh == 0 and math.abs(after - ROW_START) < 0.001, "an hour at " .. row.what .. " added " .. wh .. " Wh")
+            if not row.charges then
+                expectEqual("Wh an hour at " .. row.what .. " added", reply.wh, 0)
+                expectNear("charge after an hour at " .. row.what, reply.after, ROW_START, useDelta)
+            elseif expect(reply.flat > 0, "no sun at " .. row.what) then
+                local added = maintainerCharge(reply.flat, ROW_HOURS)
+                expectEqual("Wh the new car battery holds full", reply.capacityWh, Specs.batteries[T.CAR_BATTERY].wh)
+                expectNear("charge after an hour at " .. row.what, reply.after, ROW_START + added, useDelta)
+                expectNear("Wh an hour at " .. row.what .. " reported", reply.wh, added * reply.capacityWh, useDelta * reply.capacityWh)
             end
         end
-        -- The pass runs the maintainer for as long as the noon row, right after it, so it adds what
-        -- that hour added; the light can still move a little between the two calls.
-        local pass, capacityWh = self.reads.pass, charged.capacityWh
-        expectNear("Wh the vehicle pass gave the maintained car", (pass.after - pass.before) * capacityWh, charged.wh, charged.wh / 50)
+        local pass = self.reads.pass
+        if expect(pass.flat > 0, "no sun for the vehicle pass") then
+            expectNear("charge the vehicle pass gave the maintained car", pass.after - pass.before,
+                maintainerCharge(pass.flat, ROW_HOURS), useDelta)
+        end
     end,
 })
 
 -- Solar battery charger --------------------------------------------------------------------------
 
--- A solar battery charger the character places on a free outdoor square; see T.placeAsPlayer.
-local function placeCharger(self)
-    local square = T.square(self, { bare = true }, "a free outdoor square")
+-- A solar battery charger the character places on a free square, outdoors unless `indoors`; see
+-- T.placeAsPlayer.
+local function placeCharger(self, indoors)
+    local where = indoors and "indoor" or "outdoor"
+    local square = T.square(self, { bare = not indoors, indoors = indoors }, "a free " .. where .. " square for a charger")
     return square and T.placeAsPlayer(self, square, SolarCellCharger.ITEM, Sprites.cellCharger)
 end
 
--- Placed as a player does, it takes SolarCellCharger.SLOTS vanilla batteries and nothing else,
--- on the server and this client's copy.
-test("renewable_energy_gadgets_solar_battery_charger_container", {
+local CELL_HOURS = 2
+
+-- Rows, each filling its charger afresh: the outdoor one by night, full at noon and empty at noon,
+-- the pass row last, since the pass charges every charger, and the one under a roof at noon.
+-- "full" holds cells as the game makes them full (their float reads just under 1).
+local CHARGER_ROWS = {
+    { name = "midnight", hour = MIDNIGHT, uses = 0 },
+    { name = "full", hour = NOON },
+    { name = "indoors", hour = NOON, uses = 0, indoors = true },
+    { name = "noon", hour = NOON, uses = 0, pass = true },
+}
+
+-- Watt-hours `hours` of the charger's cell make under `flat` W/m²: its 5 W rating times the 0.8
+-- system efficiency times the Sunlight Multiplier (T.fullSunW), times flat over the 1000 W/m² it
+-- is rated in, times the hours. At multiplier 1 and full sun 2 hours are 5 x 0.8 x 2 = 8 Wh.
+local function chargerWh(flat, hours)
+    return T.fullSunW(SolarCellCharger.WATTS) * flat / Sun.FULL_SUN * hours
+end
+
+-- `total` uses given a use at a time to the emptiest of SLOTS empty cells, the first of equals
+-- first: the first total % SLOTS cells hold one more than the rest.
+local function spread(total)
+    local slots, list = SolarCellCharger.SLOTS, {}
+    for i = 1, slots do
+        list[i] = math.floor(total / slots) + (i <= total % slots and 1 or 0)
+    end
+    return list
+end
+
+-- Placed as a player does, it takes SolarCellCharger.SLOTS vanilla batteries and nothing else, on
+-- the server and this client's copy. It charges by day only, its rating in the sky the run had, in
+-- whole uses of a cell's 25 Wh spread evenly, keeping what is short of a use for the next run; the
+-- pass over every charger gives as much again. Full cells take nothing and nothing is stored for
+-- later, and under a roof it charges nothing.
+test("renewable_energy_gadgets_solar_battery_charger", {
     instant = true,
     run = function(self)
-        local charger = placeCharger(self)
-        if not charger then return end
-        self.charger = charger
+        local charger, indoor = placeCharger(self), placeCharger(self, true)
+        if not (charger and indoor) then return end
         T.give(self, "batteries", { { type = SolarCellCharger.BATTERY, count = SolarCellCharger.SLOTS } })
         T.step(function()
             local p, container = T.player(), charger.object:getContainer()
@@ -187,68 +234,66 @@ test("renewable_energy_gadgets_solar_battery_charger_container", {
             T.read(self, "chargerState", T.at(charger, { kind = "charger" }), "charger")
             T.step(function() self.acceptsPastSlots = container:isItemAllowed(instanceItem(SolarCellCharger.BATTERY)) end)
         end)
+        for _, row in ipairs(CHARGER_ROWS) do
+            T.step(function() T.setTime(self, row.hour) end)
+            T.read(self, "cellCharge", T.at(row.indoors and indoor or charger,
+                { kind = "charger", count = SolarCellCharger.SLOTS, uses = row.uses, hours = CELL_HOURS, pass = row.pass }), row.name)
+        end
+        -- The server sends a cell whose charge shows a change at two decimals, so this client's
+        -- copies, which a player reads in the charger, lie within 0.01 of the server's.
+        T.waitFor(self, function()
+            local container, noon = charger.object and charger.object:getContainer(), self.reads.noon
+            if not (container and noon and noon.afterPass) then
+                return false
+            end
+            for _, cell in ipairs(noon.afterPass) do
+                local copy = container:getItemWithID(cell.id)
+                if not (copy and math.abs(copy:getCurrentUsesFloat() - cell.uses) < 0.01) then
+                    return false
+                end
+            end
+            return true
+        end, "this client's cells in the charger showing the noon charge")
     end,
     validate = function(self)
         expect(self.acceptsBattery, "the solar battery charger refuses a battery")
         expect(not self.acceptsCarBattery, "the solar battery charger takes a car battery")
         expectEqual("batteries in the server's charger", #self.reads.charger.items, SolarCellCharger.SLOTS)
         expect(not self.acceptsPastSlots, "the solar battery charger takes a battery past its " .. SolarCellCharger.SLOTS .. " slots")
-    end,
-})
 
-local CELL_HOURS = 2
-
--- One charger, which each row fills afresh; the pass row last, since the pass charges every
--- charger. "full" holds cells as the game makes them full (their float reads just under 1).
-local CHARGER_ROWS = {
-    { name = "midnight", hour = MIDNIGHT, uses = 0 },
-    { name = "full", hour = NOON },
-    { name = "noon", hour = NOON, uses = 0, pass = true },
-}
-
--- Charges by day only, its rating in the sky the run had, in whole uses spread evenly, and the
--- pass over every charger as much again. Full cells take nothing and nothing is stored for later.
-test("renewable_energy_gadgets_solar_battery_charger_charges", {
-    instant = true,
-    run = function(self)
-        local charger = placeCharger(self)
-        if not charger then return end
-        for _, row in ipairs(CHARGER_ROWS) do
-            T.step(function() T.setTime(self, row.hour) end)
-            T.read(self, "cellCharge", T.at(charger,
-                { kind = "charger", count = SolarCellCharger.SLOTS, uses = row.uses, hours = CELL_HOURS, pass = row.pass }), row.name)
-        end
-    end,
-    validate = function(self)
-        local noon, midnight, full = self.reads.noon, self.reads.midnight, self.reads.full
         local useDelta = instanceItem(SolarCellCharger.BATTERY):getUseDelta()
         local useWh = useDelta * SolarCellCharger.BATTERY_WH
-        -- What the panel made goes into the cells in whole uses, and what is short of a use is kept.
-        expect(noon.added > 0, CELL_HOURS .. " hours of noon sun added nothing")
-        expectNear("Wh " .. CELL_HOURS .. " hours of noon sun put in the cells or kept", noon.added * useWh + noon.storedWh,
-            Sun.wattsFrom(SolarCellCharger.WATTS, noon.flat, 0) * CELL_HOURS, 0.001)
-        -- Each battery's uses, in the charger's order.
+        -- Each cell's whole uses, in the charger's order.
         local function uses(items)
             local list = {}
             for i, item in ipairs(items) do
-                list[i] = item.uses
+                list[i] = math.floor(item.uses / useDelta + 0.5)
             end
             return list
         end
-        local after, afterPass = uses(noon.after), uses(noon.afterPass)
-        local low, high = math.min(unpack(after)), math.max(unpack(after))
-        expect(high - low <= useDelta + 1e-6, "the batteries charged unevenly, from " .. low .. " to " .. high)
-        -- The pass gets the same sun for as long, plus what the first run kept toward a use.
-        local passUses = 0
-        for i, charge in ipairs(afterPass) do
-            passUses = passUses + (charge - after[i]) / useDelta
+        local function expectUses(what, items, expected)
+            local got = uses(items)
+            for i = 1, SolarCellCharger.SLOTS do
+                expectEqual("uses of cell " .. i .. " " .. what, got[i], expected[i])
+            end
         end
-        expectNear("uses the charger pass as long again added", passUses, noon.added, 1.01)
-        expect(midnight.added == 0 and math.max(unpack(uses(midnight.after))) == 0, CELL_HOURS .. " hours of night charged "
-            .. midnight.added .. " uses")
+        local midnight, full, indoors, noon = self.reads.midnight, self.reads.full, self.reads.indoors, self.reads.noon
+        expectEqual("uses " .. CELL_HOURS .. " hours of night added", midnight.added, 0)
+        expectUses("after a night", midnight.after, spread(0))
         expectEqual("uses full cells took at noon", full.added, 0)
         expectEqual("whether full cells read all full", full.full, true)
         expectEqual("Wh the charger kept from full cells", full.storedWh, 0)
+        expectEqual("uses " .. CELL_HOURS .. " hours of noon under a roof added", indoors.added, 0)
+        expectEqual("Wh the charger under a roof kept", indoors.storedWh, 0)
+        if not expect(noon.flat > 0, "no sun at noon") then return end
+        -- The run puts whole uses in the cells and keeps the rest; the pass, under the same sky as
+        -- long again, adds to what was kept, so the two make whole uses of twice the Wh.
+        local wh = chargerWh(noon.flat, CELL_HOURS)
+        local added = math.floor(wh / useWh)
+        expectEqual("uses " .. CELL_HOURS .. " hours of noon sun added", noon.added, added)
+        expectNear("Wh kept toward the next use", noon.storedWh, wh - added * useWh, 1e-6)
+        expectUses("after " .. CELL_HOURS .. " hours of noon sun", noon.after, spread(added))
+        expectUses("after the charger pass as long again", noon.afterPass, spread(math.floor(2 * wh / useWh)))
     end,
 })
 
@@ -317,7 +362,8 @@ test("renewable_energy_gadgets_deep_cycle_battery_installs_from_mechanics_menu",
     end,
 })
 
--- What a car battery's charge over a deep cycle battery's comes to for the same watt-hours.
+-- What a car battery's charge over a deep cycle battery's comes to for the same watt-hours, from
+-- their Specs capacities: 600 / 1260 = 0.476.
 local function capacityRatio()
     return Specs.batteries[T.CAR_BATTERY].wh / Specs.batteries[VehicleBattery.ITEM].wh
 end

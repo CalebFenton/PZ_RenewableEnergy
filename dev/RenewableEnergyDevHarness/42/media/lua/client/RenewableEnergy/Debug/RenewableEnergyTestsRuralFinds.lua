@@ -170,17 +170,27 @@ test("renewable_energy_world_rural_finds_real_buildings", {
     end,
 })
 
--- At 0 the Solar Sites option leaves rural buildings without finds: every find has chance 0, and
--- the building near the start, rolled for every find with the lowest roll there is, gets none.
-test("renewable_energy_world_rural_finds_option_zero", {
-    sandbox = { SolarSites = 0 },
-    run = function(self) T.server(self, "ruralFindsRoll", {}) end,
-    validate = function(self)
-        local answer = self.server.ruralFindsRoll
-        for kind, chance in pairs(answer.chances) do
-            T.expectEqual("the " .. kind .. "'s chance with the option at 0", chance, 0)
+-- A find's chance follows the Solar Sites option, at whose default of 75 each find's odds are 1 in
+-- its `odds`: the building near the start, rolled for one find at a time with Solar Sites at its
+-- highest, 100, gets it on a roll just under 100 / 75 / odds and not at it (the handler works the
+-- edge out from the odds alone, not the mod's chance). At 0 the option leaves rural buildings
+-- without finds, even on the lowest roll there is.
+test("renewable_energy_world_rural_finds_chance_follows_option", {
+    run = function(self)
+        local trials = {}
+        for _, find in ipairs(FINDS) do
+            table.insert(trials, { kind = find.kind, option = 100, roll = "under", finds = 1 })
+            table.insert(trials, { kind = find.kind, option = 100, roll = "at", finds = 0 })
+            table.insert(trials, { kind = find.kind, option = 0, roll = 0, finds = 0 })
         end
-        T.expectEqual("finds the roll placed with the option at 0", answer.placed, 0)
+        self.trials = trials
+        T.read(self, "ruralFindsEdges", { trials = trials }, "edges")
+    end,
+    validate = function(self)
+        for i, trial in ipairs(self.trials) do
+            T.expectEqual(string.format("%s finds with Solar Sites at %d on a roll %s", trial.kind, trial.option,
+                type(trial.roll) == "string" and trial.roll .. " its chance" or "of " .. trial.roll), self.reads.edges.placed[i], trial.finds)
+        end
     end,
 })
 

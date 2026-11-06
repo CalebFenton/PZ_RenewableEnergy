@@ -257,4 +257,44 @@ function T.isStalled(read)
     return not read.running and read.state ~= nil and read.state.stalled == true
 end
 
+-- Saves -------------------------------------------------------------------------------------------
+
+--- Queues setting the record `handle`'s saved fields `fields`, then the record saved and loaded
+--- again (T.reloadRecord), with its reads before and after in self.reads[label].
+function T.saveAndLoad(self, handle, fields, label)
+    T.batch(function()
+        T.setRecord(self, handle, fields)
+        T.reloadRecord(self, handle, label, { record = { name = "PZHarness.readRecord", args = T.at(handle, { kind = handle.kind }) } })
+    end)
+end
+
+local function sortedOverlays(read)
+    local list = {}
+    for _, overlay in ipairs(read.overlays or {}) do
+        table.insert(list, overlay)
+    end
+    table.sort(list)
+    return table.concat(list, ", ")
+end
+
+--- Expects the record T.saveAndLoad saved as `label` to hold each of `fields` before the save and
+--- after it, and to show the same overlays after it as before.
+function T.expectKeptThroughSave(self, label, fields)
+    local saved = self.reads[label] or {}
+    local before, after = saved.before and saved.before.record, saved.after and saved.after.record
+    if not T.expect(before ~= nil and after ~= nil, "no reads of the record around the save") then return end
+    T.expect(after.loaded, "the record's tile wasn't loaded after the save")
+    for name, value in pairs(fields) do
+        for _, read in ipairs({ { "before", before }, { "after", after } }) do
+            local what = name .. " " .. read[1] .. " the save"
+            if type(value) == "number" then
+                T.expectNear(what, read[2][name], value, 1e-9)
+            else
+                T.expectEqual(what, read[2][name], value)
+            end
+        end
+    end
+    T.expectEqual("overlays after the save", sortedOverlays(after), sortedOverlays(before))
+end
+
 return T

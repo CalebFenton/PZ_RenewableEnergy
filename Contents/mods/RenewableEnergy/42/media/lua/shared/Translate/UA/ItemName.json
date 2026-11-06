@@ -54,12 +54,12 @@
     "RenewableEnergy.FemaPamphlet": "Креслення FEMA: генератор на деревному газі",
     "RenewableEnergy.TreadmillMotor": "Двигун бігової доріжки",
     "RenewableEnergy.HomesteadPowerMag4": "Журнал: Homestead Power #4 — Пустити вітер",
-    "RenewableEnergy.WoodenBlades": "Дерев'яний комплект лопатей",
+    "RenewableEnergy.WoodenBlades": "Комплект дерев'яних лопатей",
     "RenewableEnergy.PipeBlades": "Комплект лопатей із пластикової труби",
-    "RenewableEnergy.SteelBlades": "Сталевий комплект лопатей",
-    "RenewableEnergy.BrokenWoodenBlades": "Зламаний дерев'яний комплект лопатей",
+    "RenewableEnergy.SteelBlades": "Комплект сталевих лопатей",
+    "RenewableEnergy.BrokenWoodenBlades": "Зламаний комплект дерев'яних лопатей",
     "RenewableEnergy.BrokenPipeBlades": "Зламаний комплект лопатей із пластикової труби",
-    "RenewableEnergy.BrokenSteelBlades": "Зламаний сталевий комплект лопатей",
+    "RenewableEnergy.BrokenSteelBlades": "Зламаний комплект сталевих лопатей",
     "RenewableEnergy.HomemadeAlternator": "Саморобний генератор змінного струму",
     "RenewableEnergy.CarAlternator": "Автомобільний генератор"
 }

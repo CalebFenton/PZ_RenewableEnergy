@@ -99,6 +99,14 @@ handler("skyFollowsClock", function()
     return { follows = day:getHour() == time:getHour() and day:getMinutes() == time:getMinutes() }
 end)
 
+-- The garden light on the square at `args` as the server holds it: whether the square is loaded
+-- here, and the light's tile and bulb, both nil for no light.
+handler("gardenLightAt", function(_, args)
+    local square = getSquare(args.x, args.y, args.z)
+    local light = square and SolarGardenLight.findOn(square)
+    return { loaded = square ~= nil, sprite = light and light:getTextureName(), bulb = light and SolarGardenLight.getBulb(light) }
+end)
+
 -- Vehicles ----------------------------------------------------------------------------------------
 
 local function batteryOf(vehicle)
@@ -145,13 +153,14 @@ handler("oldMaintainerMark", function(_, args)
     return { state = Kinds.vehicleState(vehicle) }
 end)
 
--- The gadget pass over every loaded vehicle (GadgetCharging.chargeVehicles) for `args.hours`: the
--- vehicle's battery charge before and after.
+-- The gadget pass over every loaded vehicle (GadgetCharging.chargeVehicles) for `args.hours` under
+-- the sky of the moment: the vehicle's battery charge before and after, and `flat`, the light the
+-- sky gave (Sun.skyNow).
 handler("chargeVehicles", function(_, args)
     local _, battery = batteryOf(PZHarness.vehicleAt(args))
-    local before = battery:getCurrentUsesFloat()
-    GadgetCharging.chargeVehicles(args.hours, Sun.skyNow())
-    return { before = before, after = battery:getCurrentUsesFloat() }
+    local before, sky = battery:getCurrentUsesFloat(), Sun.skyNow()
+    GadgetCharging.chargeVehicles(args.hours, sky)
+    return { before = before, after = battery:getCurrentUsesFloat(), flat = sky.flat }
 end)
 
 -- Runs `update(part)` of the vehicle's battery part from a battery at `args.uses`, with its lights

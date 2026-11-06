@@ -11,7 +11,7 @@ local Kinds = require "RenewableEnergy/Debug/RenewableEnergyTestKinds"
 local BuildingWatch = require "RenewableEnergy/World/BuildingWatch"
 local RuralFinds = require "RenewableEnergy/World/RuralFinds"
 
-local handler, need = PZHarness.serverHandler, PZHarness.need
+local handler, need, saveOptions = PZHarness.serverHandler, PZHarness.need, PZHarness.Fixtures.saveOptions
 
 -- Forgets the building's rural find roll so that it can be rolled again, and when the test ends
 -- puts the roll back and takes out the reading the test's rolls left (the gasifier's pamphlet,
@@ -94,26 +94,49 @@ handler("ruralFindAt", function(_, args, testDefer)
     return answer
 end)
 
--- The building near the character, its roll forgotten, is rolled for the finds `args.kinds`
--- (default every find) the way the world rolls it, then again, every roll at 0, which hits any
--- chance above 0. Answers each find's chance, where each find the first roll placed stands and how
--- many it placed, which finds the roll kept, and how many finds the second roll placed.
-handler("ruralFindsRoll", function(player, args, defer)
-    local def = need(PZHarness.Fixtures.buildingNear(math.floor(player:getX()), math.floor(player:getY()), 60),
+-- The building near the character on the server.
+local function buildingNear(player)
+    return need(PZHarness.Fixtures.buildingNear(math.floor(player:getX()), math.floor(player:getY()), 60),
         "a building near the character on the server")
+end
+
+-- The building near the character, its roll forgotten, is rolled for the finds `args.kinds` the
+-- way the world rolls it, then again, every roll at 0, which hits any chance above 0. Answers
+-- where each find the first roll placed stands, which finds the roll kept, and how many finds the
+-- second roll placed.
+handler("ruralFindsRoll", function(player, args, defer)
+    local def = buildingNear(player)
     forgetRoll(def, defer)
-    local kinds, chances = args.kinds or {}, {}
-    for kind in pairs(RuralFinds.FINDS) do
-        chances[kind] = RuralFinds.chanceFor(kind)
-        if not args.kinds then
-            table.insert(kinds, kind)
+    local found, again = PZHarness.Rolls.with(defer, 0, function()
+        return track(RuralFinds.roll(def, args.kinds), defer, def), track(RuralFinds.roll(def, args.kinds), defer, def)
+    end)
+    return { found = found, kept = Helpers.buildingRoll(RuralFinds.MOD_DATA, def), again = Kinds.count(again) }
+end)
+
+-- The Solar Sites value at which a find's chance is 1 in its `odds` (the option's default).
+local SITES_AT_ODDS = 75
+
+-- For each of `args.trials` ({ kind, option, roll }), the building near the character, its roll
+-- forgotten, rolled for the one find `kind` with Solar Sites at `option` and every roll at `roll`:
+-- a number, or "under" or "at" option / SITES_AT_ODDS / the find's odds, worked out here rather
+-- than by the mod's chanceFor. Answers how many finds each trial placed, each taken away before
+-- the next.
+handler("ruralFindsEdges", function(player, args, defer)
+    local def = buildingNear(player)
+    local restoreOptions = saveOptions(defer, { "SolarSites" })
+    local placed = {}
+    for i, trial in ipairs(args.trials) do
+        forgetRoll(def, defer)
+        SandboxVars.RenewableEnergy.SolarSites = trial.option
+        local edge = trial.option / SITES_AT_ODDS / RuralFinds.FINDS[trial.kind].odds
+        local found = PZHarness.Rolls.with(defer, PZHarness.Rolls.trialRoll(trial.roll, edge), RuralFinds.roll, def, { trial.kind })
+        placed[i] = Kinds.count(found)
+        for _, object in pairs(found) do
+            PZHarness.Fixtures.removePlaced(object)
         end
     end
-    local found, again = PZHarness.Rolls.with(defer, 0, function()
-        return track(RuralFinds.roll(def, kinds), defer, def), track(RuralFinds.roll(def, kinds), defer, def)
-    end)
-    return { chances = chances, found = found, placed = Kinds.count(found), kept = Helpers.buildingRoll(RuralFinds.MOD_DATA, def),
-        again = Kinds.count(again) }
+    restoreOptions()
+    return { placed = placed }
 end)
 
 -- How many times the Java list holds `item`.

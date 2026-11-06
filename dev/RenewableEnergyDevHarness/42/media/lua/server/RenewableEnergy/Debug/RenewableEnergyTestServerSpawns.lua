@@ -103,13 +103,13 @@ local function tilesOn(square)
 end
 
 -- Fires OnSeeNewRoom, as the game does for a room seen for the first time (IsoCell.ProcessSpottedRooms),
--- for each trial { room, setting, roll, edge }: a room named `room` whose free squares are all the
--- square at `args`, Battery Bank Spawn at `setting`, and every roll at `roll`, a number, or "under"
--- or "at" one in BANK_ROOMS odds (`edge` "bank") or CRATE_ROOMS odds (`edge` "crate") × the
--- setting's RARITY. Answers, for each, the tiles it placed on the square and the modules it laid
--- around it, all removed before the next.
+-- for each trial { room, setting, roll, edge, outdoors }: a room named `room` whose free squares are
+-- all the square at `args` (with `outdoors`, the open-air square at `args.outdoor`), Battery Bank
+-- Spawn at `setting`, and every roll at `roll`, a number, or "under" or "at" one in BANK_ROOMS odds
+-- (`edge` "bank") or CRATE_ROOMS odds (`edge` "crate") × the setting's RARITY. Answers, for each,
+-- the tiles it placed on the square and the modules it laid around it, all removed before the next.
 handler("seenRoom", function(_, args, defer)
-    local square = PZHarness.squareAt(args)
+    local indoor, outdoor = PZHarness.squareAt(args), args.outdoor and PZHarness.squareAt(args.outdoor)
     local restoreOptions = saveOptions(defer, { "BatteryBankSpawn" })
     local function rollOf(trial)
         if not trial.edge then
@@ -120,6 +120,7 @@ handler("seenRoom", function(_, args, defer)
     end
     local results = PZHarness.Rolls.eachTrial(defer, args.trials, rollOf, function(trial)
         SandboxVars.RenewableEnergy.BatteryBankSpawn = trial.setting
+        local square = trial.outdoors and outdoor or indoor
         -- No squares to walk, so the mod's finds leave the test's square alone.
         local room = PZHarness.Fixtures.fakeRoom(trial.room, {}, { square })
         local tilesBefore, itemsBefore = tilesOn(square), PZHarness.Fixtures.worldItems(squaresAround(square))
@@ -368,9 +369,9 @@ local function expectConditionRanges(expect)
 end
 
 -- Farm storage shelves get a cracked module, at a cracked condition, when the roll comes in under
--- their chance and not at it; a bedroom's furniture and a garage's fridge never do. The chance
--- follows the Solar Panels loot option. Each container is filled as the game hands a fill to the
--- mod, by OnFillContainer.
+-- their chance and not at it, at the Solar Panels loot option 1 and 2, and none at 0; a bedroom's
+-- furniture and a garage's fridge never do. Each container is filled as the game hands a fill to
+-- the mod, by OnFillContainer.
 check("crackedModules", function(expect, _, expectEqual, _, _, defer)
     local container = PZHarness.Loot.scratchContainer(nil)
     local function modulesAt(roomName, containerType, roll)
@@ -382,24 +383,27 @@ check("crackedModules", function(expect, _, expectEqual, _, _, defer)
     end
     local options = SandboxVars.RenewableEnergy
     local restoreOptions = saveOptions(defer, { "LRMSolarPanels" })
-    options.LRMSolarPanels = 1
-    local rooms = Finds.CRACKED_MODULE_ROOMS
-    local chance = Finds.crackedModuleChance(rooms.farmstorage)
-    local under, at = modulesAt("farmstorage", "metal_shelves", chance - UNDER), modulesAt("farmstorage", "metal_shelves", chance)
-    expect(#under == 1 and #at == 0, string.format("a farm storage shelf got %d cracked modules with a roll just under its chance %s and %d at it",
-        #under, chance, #at))
-    if under[1] then
-        expect(inRange(under[1], Finds.CRACKED), "a cracked module is at condition " .. under[1])
+    -- The chance is a loot weight: the room's weight × the game's loot setting for the module's
+    -- category × the option, in hundredths.
+    local weight, loot = Finds.CRACKED_MODULE_ROOMS.farmstorage, ItemPickerJava.getLootModifier(MODULE)
+    for _, option in ipairs({ 1, 2 }) do
+        options.LRMSolarPanels = option
+        local chance = weight * loot * option / 100
+        local under, at = modulesAt("farmstorage", "metal_shelves", chance - UNDER), modulesAt("farmstorage", "metal_shelves", chance)
+        expect(#under == 1 and #at == 0, string.format(
+            "at Solar Panels %d a farm storage shelf got %d cracked modules with a roll just under %s and %d at it",
+            option, #under, chance, #at))
+        if under[1] then
+            expect(inRange(under[1], Finds.CRACKED), "a cracked module is at condition " .. under[1])
+        end
     end
+    options.LRMSolarPanels = 0
+    expectEqual("cracked modules on a farm storage shelf with Solar Panels at 0, on the lowest roll",
+        #modulesAt("farmstorage", "metal_shelves", 0), 0)
+    options.LRMSolarPanels = 1
     local elsewhere = #modulesAt("bedroom", "wardrobe", 0) + #modulesAt("garage", "fridge", 0)
     expectEqual("modules in a bedroom wardrobe and a garage fridge", elsewhere, 0)
-    options.LRMSolarPanels = 2
-    local doubled = Finds.crackedModuleChance(rooms.farmstorage)
-    options.LRMSolarPanels = 0
-    local none = Finds.crackedModuleChance(rooms.farmstorage)
     restoreOptions()
-    expect(math.abs(doubled - 2 * chance) < 1e-12 and none == 0,
-        "a farm storage shelf's chance is " .. chance .. ", " .. doubled .. " at twice the option and " .. none .. " at 0")
     expectConditionRanges(expect)
 end)
 

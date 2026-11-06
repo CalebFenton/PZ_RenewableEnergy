@@ -27,7 +27,7 @@
     "Sandbox_RenewableEnergy_ChargeFreq": "Frequência de Carga",
     "Sandbox_RenewableEnergy_ChargeFreq_tooltip": "Com que frequência os bancos de baterias calculam sua carga e consumo.<br>A Cada Dez Minutos: a energia cortada por sobrecarga ou banco vazio volta minutos depois de resolvido o problema.<br>A Cada Hora: mais leve num servidor movimentado com muitos bancos, mas um corte pode durar até uma hora.",
     "Sandbox_RenewableEnergy_BatteryBankSpawn": "Bancos de Baterias no Mundo",
-    "Sandbox_RenewableEnergy_BatteryBankSpawn_tooltip": "Com que frequência depósitos de fazenda, celeiros e galpões, e de vez em quando garagens e guarda-volumes, têm uma caixa ou estante de baterias abastecida, e garagens e guarda-volumes uma caixa de equipamento solar de trailer, na primeira vez que alguém os vê.<br>Eles dão um começo adiantado sem habilidade nem revista. Nenhum deixa você construir ou encontrar tudo por conta própria.",
+    "Sandbox_RenewableEnergy_BatteryBankSpawn_tooltip": "Com que frequência depósitos de fazenda, celeiros e galpões, e de vez em quando garagens e guarda-volumes, têm uma caixa ou estante de baterias abastecida, e garagens e guarda-volumes uma caixa de equipamento solar de trailer, na primeira vez que alguém os vê.<br>Eles dão um começo adiantado sem habilidade nem revista. Com Nenhum, você precisa construir ou encontrar tudo.",
     "Sandbox_RenewableEnergy_BatteryBankSpawn_option1": "Nenhum",
     "Sandbox_RenewableEnergy_BatteryBankSpawn_option2": "Muito Raros",
     "Sandbox_RenewableEnergy_BatteryBankSpawn_option3": "Raros",

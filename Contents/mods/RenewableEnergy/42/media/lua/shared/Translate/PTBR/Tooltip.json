@@ -157,7 +157,7 @@
     "Tooltip_RenewableEnergy_TreadmillNoPower": "Não há energia para o motor. Conecte-a a um banco de baterias e correr nela passa a gerar energia.",
     "Tooltip_RenewableEnergy_RunOnTreadmill": "Meia hora de corrida. Conectada a um banco de baterias, carrega o banco; caso contrário, a esteira consome energia como qualquer eletrodoméstico.",
     "Tooltip_RenewableEnergy_ConnectTreadmill": "Muda a fiação do motor para gerar energia em vez de consumi-la e conecta a esteira a este banco, para que correr nela carregue as baterias do banco. Usa uma das entradas do banco.",
-    "Tooltip_RenewableEnergy_UnwireTreadmill": "Volta a fiação do motor para consumir energia como qualquer eletrodoméstico e tira a esteira do banco. O fio é devolvido.",
+    "Tooltip_RenewableEnergy_UnwireTreadmill": "Volta a fiação do motor para consumir energia como qualquer eletrodoméstico e tira a esteira do banco. O arame é devolvido.",
     "Tooltip_RenewableEnergy_ConnectSource": "Conecta-o a este banco, para que o que ele produz carregue as baterias do banco. Um painel, rotor de conchas ou esteira usa uma das entradas do banco; os outros carregadores eólicos usam três.",
     "Tooltip_RenewableEnergy_DisconnectSource": "Desconecta-o do banco, que deixa de receber sua energia.",
     "Tooltip_RenewableEnergy_Brake": "Para as pás, para que uma ventania não as quebre. Um carregador freado não produz nada.",

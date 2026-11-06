@@ -72,12 +72,14 @@ test("renewable_energy_gasline_kit_install_and_remove", {
         T.expect(removed.state == nil, "the kit is still fitted")
         T.expect(not T.hasOverlay(removed, kit), "the removed kit still shows")
         T.expectEqual("kits after removing it", self.counts.afterRemove[GasKit.ITEM], 1)
+        T.expectNear("fuel once the kit is off", removed.fuel, self.fuel, 0.01)
     end,
 })
 
 -- A kitted generator's menu has the kit's jobs and not Install, which the job refuses as it has a
--- kit, and refuses Take Generator, as the client's action does; its info window shows the real
--- tank, not the fuel the gas line shows.
+-- kit, and refuses Take Generator, as the client's action does and the authority's complete() too,
+-- which a client that skips the check reaches; its info window shows the real tank, not the fuel
+-- the gas line shows.
 test("renewable_energy_gasline_kit_menu", {
     instant = true,
     run = function(self)
@@ -90,6 +92,7 @@ test("renewable_energy_gasline_kit_menu", {
             local state = GasKit.stateOf(generator.object)
             return state ~= nil and state.onGas == true and generator.object:getFuel() > 0
         end, "this client's copy of the generator on gas")
+        T.server(self, "takeGenerator", T.at(generator))
     end,
     validate = function(self)
         local generator = self.generator.object
@@ -105,6 +108,8 @@ test("renewable_energy_gasline_kit_menu", {
             T.expect(not T.offered(options.take), "Take Generator is offered on a kitted generator")
         end
         T.expect(not ISTakeGenerator:new(T.player(), generator):isValid(), "the client lets a kitted generator be taken")
+        local taken = self.server.takeGenerator
+        T.expect(not taken.done and taken.kept, "the authority let a kitted generator be taken")
         local text = ISGeneratorInfoWindow.getRichText(generator, true)
         local shown = getText("IGUI_Generator_FuelAmount", math.ceil(generator:getFuelPercentage()))
         T.expect(text:find(getText("IGUI_Generator_FuelAmount", 0), 1, true) ~= nil, "the info window doesn't show the empty tank")
@@ -199,7 +204,7 @@ test("renewable_energy_gasline_generator_runs_on_gas", {
             hoses = material.item == GasKit.HOSE and material.need or hoses
         end
         T.expect(connected.state and connected.state.connected, "the gas line isn't connected")
-        T.expect(connected.fuel >= GasKit.PHANTOM_FUEL - 0.01, "on gas, the generator shows " .. connected.fuel .. " L, too little to start")
+        T.expectNear("fuel an empty-tanked generator shows on gas", connected.fuel, GasKit.PHANTOM_FUEL, 0.001)
         T.expectEqual("hoses left after connecting the line", self.counts.connected[GasKit.HOSE], 1)
         T.expect(running.running, "the generator didn't keep running on gas")
         T.expectNear("fuel shown on gas once the pass paid what vanilla billed", running.fuel, GasKit.PHANTOM_FUEL, 0.01)

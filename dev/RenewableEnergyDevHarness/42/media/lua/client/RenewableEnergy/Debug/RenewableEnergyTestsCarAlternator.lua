@@ -10,7 +10,7 @@ local VehicleJobs = require "RenewableEnergy/Gadgets/VehicleJobs"
 -- them through the job's action and T.server, and check this client's copies.
 
 local T = RenewableEnergyTest
-local test, expect, expectEqual = T.test, T.expect, T.expectEqual
+local test, expect, expectNear, expectEqual = T.test, T.expect, T.expectNear, T.expectEqual
 
 local CAR = "Base.CarNormal"
 
@@ -38,11 +38,12 @@ local function alternatorJob(self, car, job, out)
         "this client's car with its alternator " .. (out and "out" or "back in"))
 end
 
--- The engine's menu offers Take Out Alternator; taking it out gives one alternator and marks the
--- car on the server and this client. Then the menu offers only Put Back, the job is refused, the
--- authority gives no second alternator, and an hour of the running engine's battery update (the
--- alternatorCharge handler, RenewableEnergyTestServerGadgets.lua) adds nothing to the battery.
--- Putting it back takes it from the inventory and the battery charges again.
+-- The engine's menu offers Take Out Alternator; taking it out gives one alternator, teaches
+-- Mechanics and marks the car on the server and this client. Then the menu offers only Put Back,
+-- the job is refused, the authority gives no second alternator, and an hour of the running
+-- engine's battery update (the alternatorCharge handler, RenewableEnergyTestServerGadgets.lua)
+-- adds nothing to the battery. Putting it back takes it from the inventory and the battery charges
+-- again; taking it out of the same car once more teaches nothing.
 test("renewable_energy_gadgets_car_alternator_take_out_and_put_back", {
     instant = true,
     run = function(self)
@@ -57,7 +58,9 @@ test("renewable_energy_gadgets_car_alternator_take_out_and_put_back", {
             T.noteOption(self, "Take Out Alternator", option)
             if context then context:closeAll() end
         end)
+        T.read(self, "mechanicsXp", {}, "xpBefore")
         alternatorJob(self, car, VehicleJobs.TAKE_OUT_ALTERNATOR, true)
+        T.read(self, "mechanicsXp", {}, "xpTakenOut")
         T.onVehicle(self, car, "vehicleState", nil, "takenOut")
         T.count(self, "takenOut", { CarAlternator.ITEM })
         T.step(function()
@@ -73,20 +76,29 @@ test("renewable_energy_gadgets_car_alternator_take_out_and_put_back", {
         alternatorJob(self, car, VehicleJobs.PUT_BACK_ALTERNATOR, false)
         T.count(self, "putBack", { CarAlternator.ITEM })
         charge("with")
+        T.onVehicle(self, car, "takeOutAlternatorAgain", nil, "outOnceMore")
     end,
     validate = function(self)
         T.expectOffered(self, "Take Out Alternator")
         expect(self.reads.takenOut.state.alternatorOut, "the server's car doesn't show its alternator out")
         expectEqual("alternators taking it out gave", self.counts.takenOut[CarAlternator.ITEM], 1)
+        -- The mod gives CarAlternator.XP; vanilla's XP boosts and the sandbox's multiplier scale it.
+        local taught = self.reads.xpTakenOut.xp - self.reads.xpBefore.xp
+        expect(taught > 0, "taking the alternator out taught " .. taught .. " Mechanics XP")
         expectEqual("the menu's option with the alternator out", self.secondOption,
             getText("IGUI_RenewableEnergy_PutBackAlternator"))
         expect(not self.canTakeTwice, "the job would take a second alternator out of the car")
         expect(not self.reads.again.gave, "the authority gave a second alternator")
+        expectEqual("Mechanics XP the refused second try taught", self.reads.again.xp, 0)
         expectEqual("alternators after a second try", self.counts.afterSecond[CarAlternator.ITEM], 1)
         local without, with = self.reads.without, self.reads.with
-        expect(math.abs(without.gain) < 1e-6, "a car without its alternator gained " .. without.gain .. " of a charge")
+        -- Less than a use: the gain is the charge read back less the one set, both 32-bit floats.
+        expectNear("charge a car without its alternator gained in an hour", without.gain, 0, 1e-6)
         expectEqual("alternators left in the inventory once put back", self.counts.putBack[CarAlternator.ITEM], 0)
+        -- Vanilla's own charge rate, which the mod leaves alone for a car battery.
         expect(with.gain > 0, "the car didn't charge once its alternator was back")
+        expect(self.reads.outOnceMore.gave, "the alternator put back didn't come out again")
+        expectEqual("Mechanics XP taking the same car's alternator out again taught", self.reads.outOnceMore.xp, 0)
     end,
 })
 
@@ -96,8 +108,7 @@ test("renewable_energy_gadgets_car_alternator_take_out_and_put_back", {
 -- two rolls, each 1 in (25 less the lower of Mechanics and Metalworking). At Mechanics and
 -- Metalworking 0 that is 1 - (24/25)^10 = 0.33517; at Mechanics 3 and Metalworking 8 it is
 -- 1 - (21/22)^16 = 0.52494 (with the two skills swapped it would be 0.37199). Each roll lies within
--- 0.0001 of its chance. One test per pair of skills, which a test sets once: on a multiplayer
--- client T.setPerk holds its level until the test ends.
+-- 0.0001 of its chance. A later T.setPerk of a perk replaces the level the test holds.
 local SMASHED, BURNT = "Base.CarNormalSmashedFront", "Base.CarNormalBurnt"
 local SCRAPS = {
     { skill = "unskilled", mechanics = 0, metalworking = 0, rows = {
@@ -110,26 +121,32 @@ local SCRAPS = {
         { what = "miss", script = SMASHED, roll = 0.525, alternators = 0 },
     } },
 }
--- Each wreck goes before the next is placed, so every one lands on open ground.
-for _, scraps in ipairs(SCRAPS) do
-    test("renewable_energy_gadgets_car_alternator_scrap_" .. scraps.skill, {
-        run = function(self)
-            T.setPerk(self, Perks.Mechanics, scraps.mechanics)
-            T.setPerk(self, Perks.MetalWelding, scraps.metalworking)
+-- Each wreck goes before the next is placed, so every one lands on open ground. The skills are
+-- set in their turn: single player sets a perk at once, when it is queued.
+test("renewable_energy_gadgets_car_alternator_scrap", {
+    run = function(self)
+        for _, scraps in ipairs(SCRAPS) do
+            T.step(function()
+                T.setPerk(self, Perks.Mechanics, scraps.mechanics)
+                T.setPerk(self, Perks.MetalWelding, scraps.metalworking)
+            end)
             for _, row in ipairs(scraps.rows) do
                 local wreck = T.placeVehicle(self, row.script)
                 if not wreck then return end
-                T.onVehicle(self, wreck, "scrapWreck", { roll = row.roll }, row.what)
+                T.onVehicle(self, wreck, "scrapWreck", { roll = row.roll }, scraps.skill .. " " .. row.what)
             end
-        end,
-        validate = function(self)
+        end
+    end,
+    validate = function(self)
+        for _, scraps in ipairs(SCRAPS) do
             for _, row in ipairs(scraps.rows) do
-                local scrap = self.reads[row.what]
-                if expect(scrap.done and scrap.removed, "the " .. row.what .. "'s wreck was never scrapped") then
-                    expectEqual("alternators the " .. row.what .. " dropped at a roll of " .. row.roll, scrap.alternators,
+                local what = scraps.skill .. " " .. row.what
+                local scrap = self.reads[what]
+                if expect(scrap.done and scrap.removed, "the " .. what .. "'s wreck was never scrapped") then
+                    expectEqual("alternators the " .. what .. " dropped at a roll of " .. row.roll, scrap.alternators,
                         row.alternators)
                 end
             end
-        end,
-    })
-end
+        end
+    end,
+})

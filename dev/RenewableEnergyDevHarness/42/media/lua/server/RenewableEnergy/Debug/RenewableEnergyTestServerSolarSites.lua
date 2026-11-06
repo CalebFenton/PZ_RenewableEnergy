@@ -405,18 +405,20 @@ end)
 
 -- A world saved while every site was rolled at once (`rolled` true) rolls a site added since,
 -- once, and none of the sites it rolled then; a site the world has rolled is never rolled again,
--- `always` or not; and the option at 0 keeps a new `always` site out while marking it rolled. The
--- sites are stock tank pumps whose spots wait on the outdoor squares `args.squares`; their spots
--- and the world's rolls are put back when the test ends.
+-- `always` or not; the option at 0 keeps a new `always` site out while marking it rolled; and a
+-- site that isn't `always` comes in on a roll just under the option's percentage and not at it.
+-- The sites are stock tank pumps whose spots wait on the outdoor squares `args.squares`; their
+-- spots and the world's rolls are put back when the test ends.
 check("siteRolledOnce", function(expect, _, _, _, args, defer)
     local modData = sitesSystem():getModData()
     local saved = modData.rolled
     defer(function() modData.rolled = saved end)
     local sites = {}
-    -- One of the sites a world rolled at once, and two added since.
-    for i, name in ipairs({ "Pasture north of Rosewood", "test site added later", "test site added with the option at 0" }) do
+    -- One of the sites a world rolled at once, two added since, and two left to the option.
+    for i, name in ipairs({ "Pasture north of Rosewood", "test site added later", "test site added with the option at 0",
+        "test site rolled just under the option", "test site rolled at the option" }) do
         local square = args.squares[i]
-        sites[i] = { kind = "stockTank", name = name, always = true, panels = { { square.x, square.y, square.z, "rackMetal", "S" } } }
+        sites[i] = { kind = "stockTank", name = name, always = i <= 3, panels = { { square.x, square.y, square.z, "rackMetal", "S" } } }
         defer(function() forgetSpot(square.x, square.y, square.z) end)
     end
     local function waits(i)
@@ -436,9 +438,16 @@ check("siteRolledOnce", function(expect, _, _, _, args, defer)
     local restore = saveOptions(defer, { "SolarSites" })
     SandboxVars.RenewableEnergy.SolarSites = 0
     SolarSites.rollNew({ sites[3] })
-    restore()
     expect(not waits(3), "with the option at 0 a new always site was rolled in")
     expect(modData.rolled[sites[3].name], "with the option at 0 a new site wasn't marked rolled")
+    -- 40 percent: a chance of 40 / 100 = 0.4.
+    SandboxVars.RenewableEnergy.SolarSites = 40
+    PZHarness.Rolls.with(defer, 0.4 - PZHarness.Rolls.UNDER, SolarSites.rollNew, { sites[4] })
+    PZHarness.Rolls.with(defer, 0.4, SolarSites.rollNew, { sites[5] })
+    restore()
+    expect(waits(4), "with Solar Sites at 40 a site wasn't rolled in on a roll just under 0.4")
+    expect(not waits(5) and modData.rolled[sites[5].name], "with Solar Sites at 40 a site rolled at 0.4 came in "
+        .. tostring(waits(5)) .. ", marked rolled " .. tostring(modData.rolled[sites[5].name]))
 end)
 
 -- Real sites ------------------------------------------------------------------------------------

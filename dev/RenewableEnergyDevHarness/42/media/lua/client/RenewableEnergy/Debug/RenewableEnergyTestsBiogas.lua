@@ -3,7 +3,7 @@ local Fixtures = require "RenewableEnergy/Debug/RenewableEnergyFixtures"
 local Digester = require "RenewableEnergy/Biogas/Digester"
 local DigesterJobs = require "RenewableEnergy/Biogas/DigesterJobs"
 local DigesterWindow = require "RenewableEnergy/UI/DigesterWindow"
-local GasHeater = require "RenewableEnergy/Biogas/GasHeater"
+local GasKit = require "RenewableEnergy/GasLine/GasKit"
 local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
 local Sprites = require "RenewableEnergy/Sprites"
 
@@ -17,10 +17,12 @@ local test = T.test
 
 
 local FEED = "Base.Dung_Cow"
+-- What a cow pat puts in the tank (Digester's FEEDS): its potential, in m³, and the startup hours
+-- its manure saves.
+local COW_POTENTIAL, COW_SEED_HOURS = 1.0, 24
 
--- A stink score smells like no corpses just below the first of Digester.SMELL_SCORES, then like
--- each smell level's corpses from its edge up to just below the next.
-T.serverCheck("renewable_energy_biogas_digester_stink_score_edges", "digesterCorpsesFor")
+-- The stink score of each state of a digester, and the corpses each score smells like.
+T.serverCheck("renewable_energy_biogas_digester_stink_score", "digesterStink")
 
 -- How strongly a digester stinks, as the smell moodle of the character standing at it: a mature
 -- barrel at the first smell level, a sour one at the second; an unfed one not at all; the Brick
@@ -62,9 +64,11 @@ test("renewable_energy_biogas_digester_stink_levels", {
 -- Digestion --------------------------------------------------------------------------------------
 
 -- No gas until the startup's warm hours are done: at STARTUP_MIN_TEMP the hours count and a degree
--- below they don't; it starts at exactly the hours needed, and makes gas after. Manure's head start
--- shortens it by at most its share.
+-- below they don't; it starts at exactly the hours needed, and digests from the next hour: at
+-- 35 °C (k = 1/15 a day) its 5 m³ of potential give 5 × (1 − e^(−1/360)) m³ in that hour. Manure's
+-- head start shortens it by at most its share.
 test("renewable_energy_biogas_digester_startup_then_gas", {
+    sandbox = { BiogasMultiplier = 1 },
     run = function(self)
         local handle = T.placeRecord(self, "digester", "barrel.MetalDrum")
         if not handle then return end
@@ -89,7 +93,8 @@ test("renewable_energy_biogas_digester_startup_then_gas", {
             T.readRecord(self, handle, "before")
             T.runDigester(self, handle, 1, edge)
             T.readRecord(self, handle, "at")
-            T.runDigester(self, handle, 1, 30)
+            T.setRecord(self, handle, { temp = 35 })
+            T.runDigester(self, handle, 1, 35)
             T.readRecord(self, handle, "after")
             fresh({ temp = 30, seedHours = needed })
             T.runDigester(self, handle, seededWait - 1, 30)
@@ -103,71 +108,83 @@ test("renewable_energy_biogas_digester_startup_then_gas", {
         T.expect(not reads.cold.started, "it started below " .. Digester.STARTUP_MIN_TEMP .. " °C")
         T.expect(not reads.before.started and reads.before.gas == 0, "it started, or made gas, an hour before the startup ended")
         T.expect(reads.at.started, "it didn't start once the startup's hours were done at " .. Digester.STARTUP_MIN_TEMP .. " °C")
-        T.expect(reads.after.gas > 0, "no gas after the startup")
+        T.expectNear("m³ of gas in the first hour after the startup", reads.after.gas, 5 * (1 - math.exp(-1 / 360)), 1e-8)
         T.expect(not reads.seededBefore.started, "manure's head start covered more than its share")
         T.expect(reads.seededAfter.started, "manure's head start didn't shorten the startup")
     end,
 })
 
--- Digestion follows temperature: none at the coldest and hottest edges, some a degree inside each,
--- the same along the best stretch. The barrel follows the air with a time constant of its tier's
--- `days` (Digester.TIERS.barrel.days = 1): three days from 30 °C in 0 °C air leave 30·e^−3.
-test("renewable_energy_biogas_digester_temperature", {
+-- An hour's gas from a mature barrel, its 5 m³ of potential digesting at the rate k a day that
+-- Digester.K_BY_TEMP gives its temperature, in straight lines between its rows {10, 0}, {15, 0.01},
+-- {25, 1/30}, {35, 1/15}, {40, 1/15} and {50, 0}: 5 × (1 − e^(−k/24)) m³. Sour, it digests at 0.15
+-- of that (DigesterObject's SOUR_K); past SLUDGE_SLOW (80 %) of sludge, at SLUDGE_K, and at exactly
+-- 80 % at the full rate. Each case's temperature is the air's too, so it holds through the hour.
+local K_BEST = 1 / 15
+local GAS_HOURS = {
+    { what = "at 10 °C, the cold end", temp = 10, k = 0 },
+    { what = "at 11 °C, a fifth of the way from 10 °C to 15 °C", temp = 11, k = 0.01 / 5 },
+    { what = "at 20 °C, halfway from 15 °C to 25 °C", temp = 20, k = (0.01 + 1 / 30) / 2 },
+    { what = "at 35 °C", temp = 35, k = K_BEST },
+    { what = "at 40 °C", temp = 40, k = K_BEST },
+    { what = "at 49 °C, a tenth of the way back from 50 °C", temp = 49, k = K_BEST / 10 },
+    { what = "at 50 °C, the hot end", temp = 50, k = 0 },
+    { what = "sour, at 35 °C", temp = 35, sour = true, k = K_BEST * 0.15 },
+    { what = "with 80 % sludge, at 35 °C", temp = 35, sludge = 80, k = K_BEST },
+    { what = "with 81 % sludge, at 35 °C", temp = 35, sludge = 81, k = K_BEST * Digester.SLUDGE_K },
+}
+
+local function barrelHour(k)
+    return Digester.TIERS.barrel.potentialCap * (1 - math.exp(-k / 24))
+end
+
+-- The gas of GAS_HOURS; the Biogas Multiplier scales it in proportion. The barrel follows the air
+-- with a time constant of its tier's `days` (1): three days from 30 °C in 0 °C air leave 30·e^−3.
+test("renewable_energy_biogas_digester_gas_rate", {
+    sandbox = { BiogasMultiplier = 1 },
     run = function(self)
         local handle = T.placeRecord(self, "digester", "barrel.MetalDrum")
         if not handle then return end
-        local rows = Digester.K_BY_TEMP
-        local best = 0
-        for _, row in ipairs(rows) do
-            best = math.max(best, row[2])
-        end
-        self.plateau = {}
-        for _, row in ipairs(rows) do
-            if row[2] == best then
-                table.insert(self.plateau, row[1])
-            end
-        end
-        local coldest, hottest = rows[1][1], rows[#rows][1]
-        self.none = { coldest, hottest }
-        self.some = { coldest + 1, hottest - 1 }
-        local temps = { coldest, coldest + 1, hottest - 1, hottest, self.plateau[1], self.plateau[#self.plateau] }
         T.batch(function()
-            for _, temp in ipairs(temps) do
-                T.setRecord(self, handle, Fixtures.matureDigester("barrel", { temp = temp, gas = 0 }))
-                T.runDigester(self, handle, 1, temp)
-                T.readRecord(self, handle, "at" .. temp)
+            for i, case in ipairs(GAS_HOURS) do
+                local fields = { temp = case.temp, gas = 0, sludge = case.sludge or 0 }
+                T.setRecord(self, handle, case.sour and T.sourDigester("barrel", fields) or Fixtures.matureDigester("barrel", fields))
+                T.runDigester(self, handle, 1, case.temp)
+                T.readRecord(self, handle, "hour" .. i)
             end
-            T.setRecord(self, handle, Fixtures.matureDigester("barrel"))
+            T.setRecord(self, handle, Fixtures.matureDigester("barrel", { temp = 30 }))
             T.runDigester(self, handle, 72, 0)
             T.readRecord(self, handle, "cooled")
+        end)
+        T.step(function() T.setSandbox(self, "BiogasMultiplier", 2) end)
+        T.batch(function()
+            T.setRecord(self, handle, Fixtures.matureDigester("barrel", { temp = 35, gas = 0 }))
+            T.runDigester(self, handle, 1, 35)
+            T.readRecord(self, handle, "doubled")
         end)
     end,
     validate = function(self)
         local reads = self.reads
-        for _, temp in ipairs(self.none) do
-            T.expect(reads["at" .. temp].gas == 0, "it made gas at " .. temp .. " °C")
+        for i, case in ipairs(GAS_HOURS) do
+            T.expectNear("m³ of gas a mature barrel made in an hour " .. case.what, reads["hour" .. i].gas, barrelHour(case.k), 1e-8)
         end
-        for _, temp in ipairs(self.some) do
-            T.expect(reads["at" .. temp].gas > 0, "it made no gas at " .. temp .. " °C")
-        end
-        local first, last = self.plateau[1], self.plateau[#self.plateau]
-        T.expectNear("gas at " .. last .. " °C against " .. first, reads["at" .. last].gas, reads["at" .. first].gas, 1e-6)
-        local start = Fixtures.matureDigester("barrel").temp
-        T.expectNear("°C three days at 0 °C left the barrel at", reads.cooled.temp,
-            start * math.exp(-72 / (Digester.TIERS.barrel.days * 24)), 0.05)
+        T.expectNear("m³ of gas in an hour at 35 °C at a Biogas Multiplier of 2", reads.doubled.gas, 2 * barrelHour(K_BEST), 1e-8)
+        T.expectNear("°C three days at 0 °C left the barrel at", reads.cooled.temp, 30 * math.exp(-3), 1e-6)
     end,
 })
 
--- The Brick Dome, started and holding gas, burns a gas heater's rate (GasHeater.m3PerHour) to keep
--- at its warmTo (20 °C) in freezing air, and the hour its gas runs short it burns the rest and
--- still keeps warm. With none left it cools, buried, toward the ground's 12 °C, not the air's,
--- with its tier's time constant (days = 8): 12 + 8·e^(−23/192) after the 23 hours past that.
--- Nothing to digest (potential 0), so all the gas it loses is what it burned.
+-- The Brick Dome, started and holding gas, burns a gas heater's rate to keep at its warmTo (20 °C)
+-- in freezing air, and the hour its gas runs short it burns the rest and still keeps warm. With
+-- none left it cools, buried, toward the ground's 12 °C, not the air's, with its tier's time
+-- constant (days = 8): 12 + 8·e^(−23/192) after the 23 hours past that. Nothing to digest
+-- (potential 0), so all the gas it loses is what it burned.
 test("renewable_energy_biogas_dome_burns_gas_to_keep_warm", {
+    sandbox = { GeneratorFuelConsumption = 1 },
     run = function(self)
         local handle = T.placeRecord(self, "digester", "dome")
         if not handle then return end
-        self.rate = GasHeater.m3PerHour()
+        -- A heater burns an idling generator's bill: IDLE_FUEL litres an hour at the option's 1,
+        -- M3_PER_LITRE m³ of gas each.
+        self.rate = GasKit.IDLE_FUEL * 1 * GasKit.M3_PER_LITRE
         T.batch(function()
             T.setRecord(self, handle, Fixtures.matureDigester("dome", { temp = 20, gas = 2.5 * self.rate, potential = 0 }))
             T.runDigester(self, handle, 2, -5)
@@ -179,33 +196,9 @@ test("renewable_energy_biogas_dome_burns_gas_to_keep_warm", {
     validate = function(self)
         local warm, cold = self.reads.warm, self.reads.cold
         T.expectNear("°C of the dome after two hours in −5 °C air with gas to burn", warm.temp, 20, 1e-6)
-        T.expectNear("m³ of gas the dome kept after burning two hours' worth", warm.gas, 0.5 * self.rate, 1e-6)
+        T.expectNear("m³ of gas the dome kept after burning two hours' worth", warm.gas, 0.5 * self.rate, 1e-8)
         T.expectEqual("m³ of gas left once the dome burned it all", cold.gas, 0)
-        T.expectNear("°C of the dome 23 hours after its gas ran out", cold.temp, 12 + 8 * math.exp(-23 / 192), 0.05)
-    end,
-})
-
--- The Biogas Multiplier scales the gas a digester makes in proportion.
-test("renewable_energy_biogas_digester_multiplier_scales_gas", {
-    run = function(self)
-        local handle = T.placeRecord(self, "digester", "barrel.MetalDrum")
-        if not handle then return end
-        local function runAt(multiplier, label)
-            T.step(function() T.setSandbox(self, "BiogasMultiplier", multiplier) end)
-            T.batch(function()
-                local state = Fixtures.matureDigester("barrel", { gas = 0 })
-                T.setRecord(self, handle, state)
-                T.runDigester(self, handle, 2, state.temp)
-                T.readRecord(self, handle, label)
-            end)
-        end
-        runAt(1, "single")
-        runAt(2, "double")
-    end,
-    validate = function(self)
-        local single, double = self.reads.single.gas, self.reads.double.gas
-        if not T.expect(single > 0, "a mature digester made no gas in two hours") then return end
-        T.expectNear("gas at a Biogas Multiplier of 2 over the same run at 1", double / single, 2, 0.01)
+        T.expectNear("°C of the dome 23 hours after its gas ran out", cold.temp, 12 + 8 * math.exp(-23 / 192), 1e-6)
     end,
 })
 
@@ -265,23 +258,23 @@ test("renewable_energy_biogas_digester_sour_and_fix", {
 -- Feed -------------------------------------------------------------------------------------------
 
 -- The hopper takes manure, alkalis and food however fresh, but not a worm, on this client's copy as
--- in the loot window. Feed goes into the tank by weight: a dome takes a day's worth of cow pats in
--- a day, and a barrel a pat short of its cap takes that one and no more. Manure eaten brings its
--- head start.
+-- in the loot window. Feed goes into the tank by weight: a dome takes its kgPerDay of cow pats in a
+-- day, and a barrel half a pat short of its cap takes that one pat and no more, ending half a pat
+-- past its cap. Manure eaten brings its head start.
 test("renewable_energy_biogas_digester_hopper_meters", {
     run = function(self)
         local barrel = T.placeRecord(self, "digester", "barrel.MetalDrum")
         local dome = barrel and T.placeRecord(self, "digester", "dome")
         if not dome then return end
         self.barrel = barrel
-        self.cow = Digester.feedOf(instanceItem(FEED))
-        self.domeDay = Digester.TIERS.dome.kgPerDay / self.cow.kg
+        -- Pats by the game's weight of one.
+        self.domeDay = Digester.TIERS.dome.kgPerDay / instanceItem(FEED):getActualWeight()
         self.domeCount = self.domeDay + 3
         self.barrelCount = 3
         T.batch(function()
             -- Cold, so it never starts and nothing in the tank digests.
             T.setRecord(self, barrel, { fed = true, started = false, startupHours = 0, seedHours = 0, temp = 0,
-                potential = Digester.TIERS.barrel.potentialCap - self.cow.potential / 2 })
+                potential = Digester.TIERS.barrel.potentialCap - COW_POTENTIAL / 2 })
             T.fillRecord(self, barrel, { hopper = { { type = FEED, count = self.barrelCount } } })
             T.runDigester(self, barrel, 48, 0)
             T.readRecord(self, barrel, "barrel")
@@ -296,8 +289,9 @@ test("renewable_energy_biogas_digester_hopper_meters", {
         local barrel, dome = self.reads.barrel, self.reads.dome
         T.expectEqual("cow pats the dome took in a day", self.domeCount - dome.hopperItems, self.domeDay)
         T.expectEqual("cow pats the barrel took a pat short of its cap", self.barrelCount - barrel.hopperItems, 1)
-        T.expect(barrel.potential >= Digester.TIERS.barrel.potentialCap, "the barrel stopped short of its cap")
-        T.expectNear("startup the manure seeded", barrel.seedHours, self.cow.seedHours, 0.001)
+        T.expectNear("m³ of potential in the barrel's tank", barrel.potential, Digester.TIERS.barrel.potentialCap + COW_POTENTIAL / 2,
+            1e-9)
+        T.expectNear("startup the manure seeded", barrel.seedHours, COW_SEED_HOURS, 1e-9)
         local container = self.barrel.object:getContainer()
         local function allowed(fullType)
             return container:isItemAllowed(instanceItem(fullType))
@@ -476,6 +470,8 @@ test("renewable_energy_biogas_digester_upgrade", {
             T.readRecord(self, handle, "after")
             T.countMaterials(self, "left", self.upgrade)
             T.readCharacter(self, "xpAfter", { perks = { "Woodwork" } })
+            -- What the job's award gives at this level, read after: it adds to the character's XP.
+            T.xpAward(self, "Woodwork", DigesterJobs.JOBS[DigesterJobs.UPGRADE].xp.amount, "award")
         end)
         T.waitFor(self, function()
             local container = handle.object:getContainer()
@@ -496,8 +492,9 @@ test("renewable_energy_biogas_digester_upgrade", {
         T.expectEqual("manures in the hopper", after.hopperItems, self.dung)
         T.expectNear("potential kept", after.potential, Digester.TIERS.barrel.potentialCap, 0.01)
         T.expectMaterialsUsed(self, "left", self.upgrade, "Upgrade")
-        local xpBefore, xpAfter = self.reads.xpBefore.xp.Woodwork, self.reads.xpAfter.xp.Woodwork
-        T.expect(xpAfter > xpBefore, "upgrading gave no Woodwork XP: " .. xpBefore .. " before, " .. xpAfter .. " after")
+        local gained = self.reads.xpAfter.xp.Woodwork - self.reads.xpBefore.xp.Woodwork
+        T.expect(self.reads.award.gained > 0, "the Upgrade's award gives no Woodwork XP, so the XP check proves nothing")
+        T.expectNear("Woodwork XP from upgrading", gained, self.reads.award.gained, 0.01)
     end,
 })
 
@@ -608,12 +605,31 @@ test("renewable_energy_biogas_barrel_digester_reloads_whole", {
     end,
     validate = function(self)
         local away = self.reads.away
-        local cow = Digester.feedOf(instanceItem(FEED))
         T.expect(not away.loaded, "the digester's tile stayed loaded")
         T.expectEqual("items eaten while unloaded", away.eaten, 2)
         T.expectEqual("items left in the unloaded hopper's snapshot", away.snapshot, 1)
-        T.expectNear("potential in the tank", away.potential, 3 * cow.potential, 0.001)
+        T.expectNear("potential in the tank", away.potential, 3 * COW_POTENTIAL, 0.001)
         expectBarrelDigester(self, "reloaded", 1)
+    end,
+})
+
+-- What a working barrel holds survives the world saved and loaded again, which keeps only its saved
+-- fields: its holder and its wear, the gas, the tank, the startup and the souring, the scrubber and
+-- the compressor; loading shows them again, the holder's fill, the foam and the scrubber.
+local SAVED_DIGESTER = {
+    holder = "tarp", holderCondition = 60, gas = 0.4, potential = 3, temp = 17, fed = true, started = true,
+    startupHours = 100, seedHours = 12, gasHours = 50, sludge = 30, acid = 4.5, sour = true, intakeKg = 0.05,
+    madePerDay = 0.3, scrubber = true, scrubCO2 = 12, scrubWool = 7, scrubSponge = 3, compressor = true,
+}
+
+test("renewable_energy_biogas_digester_kept_through_save", {
+    run = function(self)
+        local handle = T.placeRecord(self, "digester", "barrel.MetalDrum")
+        if not handle then return end
+        T.saveAndLoad(self, handle, SAVED_DIGESTER, "saved")
+    end,
+    validate = function(self)
+        T.expectKeptThroughSave(self, "saved", SAVED_DIGESTER)
     end,
 })
 

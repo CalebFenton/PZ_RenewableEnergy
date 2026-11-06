@@ -14,6 +14,7 @@ local Battery = require "RenewableEnergy/PowerBank/Battery"
 local Finds = require "RenewableEnergy/Items/Finds"
 local Specs = require "RenewableEnergy/Specs"
 local Sun = require "RenewableEnergy/Sun"
+local GadgetCharging = require "RenewableEnergy/Gadgets/GadgetCharging"
 
 local handler = PZHarness.serverHandler
 local Rolls = PZHarness.Rolls
@@ -139,8 +140,10 @@ end)
 
 -- ArrowBoard[args.call] on the trailer with the arguments `args.with`, as the clock, the switch
 -- action, a storm or a crash runs it; the charging calls take the sky after them, as the clock's
--- pass gives it. Answers what it returned, the panels' rating before it, what a flat watt of panel
--- makes in an hour under that sky, and the trailer's state.
+-- pass gives it. `gadgetPass` runs the clock's own charge pass over every loaded vehicle
+-- (GadgetCharging.chargeVehicles) for `args.with[1]` hours instead. Answers what it returned, the
+-- panels' rating before it, what a flat watt of panel makes in an hour under that sky, and the
+-- trailer's state.
 local TAKES_SKY = { charge = true, update = true }
 handler("arrowBoardRun", function(_, args)
     local vehicle = PZHarness.vehicleAt(args)
@@ -150,8 +153,54 @@ handler("arrowBoardRun", function(_, args)
     if TAKES_SKY[args.call] then
         with = { with[1], sky }
     end
-    local result = ArrowBoard[args.call](vehicle, unpack(with))
+    local result
+    if args.call == "gadgetPass" then
+        GadgetCharging.chargeVehicles(with[1], sky)
+    else
+        result = ArrowBoard[args.call](vehicle, unpack(with))
+    end
     return { result = result, watts = watts, flatWh = Sun.wattsFrom(1, sky.flat), state = vehicleState(vehicle) }
+end)
+
+-- The authority's trailers before a chunk reload trip, by place, so that the one found after it
+-- tells whether the authority's chunk went too.
+local beforeReload = {}
+
+local function placeKey(at)
+    return at.x .. "," .. at.y .. "," .. at.z
+end
+
+-- How far from its spawn square a trailer is looked for once its chunk is back.
+local RELOAD_SEARCH = 4
+
+-- Notes the trailer `args` names as it stands before its chunk goes.
+handler("arrowBoardBeforeReload", function(_, args, defer)
+    local key = placeKey(args)
+    beforeReload[key] = PZHarness.vehicleAt(args)
+    defer(function() beforeReload[key] = nil end)
+    return {}
+end)
+
+-- The arrow board near `args` once its chunk is back: its id (nil while none stands there yet), its
+-- state, and whether it is a new object, loaded from the save. A new one is removed when the test
+-- ends, since the fixture's removal takes only the object it placed.
+handler("arrowBoardAfterReload", function(_, args, defer)
+    local key = placeKey(args)
+    for dx = -RELOAD_SEARCH, RELOAD_SEARCH do
+        for dy = -RELOAD_SEARCH, RELOAD_SEARCH do
+            local square = getSquare(args.x + dx, args.y + dy, args.z)
+            local vehicle = square and square:getVehicleContainer()
+            if ArrowBoard.isTrailer(vehicle) and not vehicle:isRemovedFromWorld() then
+                local fresh = vehicle ~= beforeReload[key]
+                if fresh then
+                    beforeReload[key] = vehicle
+                    defer(function() PZHarness.Fixtures.removePlaced(vehicle) end)
+                end
+                return { id = vehicle:getId(), fresh = fresh, state = vehicleState(vehicle) }
+            end
+        end
+    end
+    return {}
 end)
 
 -- Rolls the trailer's switch as stocking does for each trial { was, roll }: the switch at `was`

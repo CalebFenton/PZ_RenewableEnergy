@@ -6,7 +6,9 @@ Keep the lights on after the grid and the gas are gone, with what a Kentucky far
 
 **Build 42.20 or newer.** Single player and multiplayer. Fine to add to a save in progress. Requires **cf_commonlib**.
 
-**[The player's guide](docs/player-guide.md)** explains every system: sizing a bank, placing a wind charger, feeding a digester, fixing a panel that goes quiet, and where to look.
+**Languages:** English, Català, Čeština, Dansk, Deutsch, Español (España, México, Chile, Argentina), Suomi, Français, Magyar, Bahasa Indonesia, Italiano, 日本語, 한국어, Nederlands, Norsk, Polski, Português (Portugal, Brasil), Română, Русский, ไทย, Türkçe, Українська, 简体中文, 繁體中文.
+
+**[The player's guide](docs/player-guide.md)** (in English) explains every system, from sizing a bank to fixing a panel that goes quiet.
 
 ## Questions
 
@@ -15,7 +17,6 @@ Keep the lights on after the grid and the gas are gone, with what a Kentucky far
 - **Can I make it easier, or harder?** Yes, on the **Renewable Energy** sandbox page; each option says what it changes. Start with **Sunlight Multiplier**, **Battery Wear** and **Storm Damage**.
 - **Why isn't my panel making power?** Open **Status** on its bank: a source short for a reason you can fix gets a red row saying why.
 - **Does it work before the power goes out?** The bank stands by while the grid is on, filling its batteries, and takes over within minutes of the shutoff.
-- **Does it work in my language?** Every text it shows is in each language the game offers, in the game's own words for items and skills. The guide stays English.
 
 ## How it plays
 
@@ -58,7 +59,7 @@ The bank powers everything a generator in its spot would, the neighbours' fridge
 
 Build them from **Welding**, or three in wood from **Carpentry**. A scoop rotor turns in any breeze and can't break. A treadmill motor, car alternator or homemade one makes real power, most in winter, via a charge controller. Set them high, clear of trees and buildings, 4 squares apart, or they rob each other's wind.
 
-When a gale sets the blades creaking and rattling, **Set the Brake** or you'll be replacing them: carved, cut from plastic pipe, or forged steel that breaks last.
+When a gale sets the blades creaking, **Set the Brake** or replace them: wood, plastic pipe, or forged steel that breaks last.
 
 ## Treadmills
 
@@ -70,7 +71,7 @@ No sun, no wind? **Connect to a Battery Bank** from the treadmill's menu, then *
 
 ![Two barrel digesters, an insulated digester and a brick dome by a kitted generator, a gas heater, and the dome's status window](art/promo/images/biogas.png)
 
-Feed a digester manure and scraps, keep it above 10 °C, and it makes gas. Overfeed it and it sours until you add wood ash or baking soda; indoors, it can poison the house, and it stinks. **Install Gas Conversion Kit** on a generator, **Connect Gas Line** with a rubber hose for every five squares, and **Run on Gas**: its tank stays as it was. A tire pump or a fridge compressor bottles the gas for propane tanks.
+Feed a digester manure and scraps, keep it above 10 °C, and it makes gas. Overfeed it and it sours until you add wood ash or baking soda; indoors, it can poison the house, and it stinks. **Install Gas Conversion Kit** on a generator, **Connect Gas Line** with a rubber hose for every five squares, and **Run on Gas**: its tank stays as it was. A tire pump or a fridge compressor bottles it.
 
 ## Wood gas
 
@@ -80,13 +81,13 @@ FEMA's 1989 plans run an engine on wood: a gasifier from a trash can, a steel dr
 
 ## Crafting
 
-Learn recipes from the Homestead Power magazines and FEMA's plans, by levelling the skills they use, or by researching a part you found. Most need a table and enough light; battery rebuilds need a furnace, a hand press and a kiln. A makeshift inverter does until you find a real one. Every recipe is on [one sheet](art/promo/images/recipes.png).
+Learn recipes from the Homestead Power magazines and FEMA's plans, by levelling their skills, or by researching a part you found. Most need a table and light; battery rebuilds need a furnace, a press and a kiln. A makeshift inverter does until you find a real one. Every recipe is on [one sheet](art/promo/images/recipes.png).
 
 ## Where to look
 
-Think about who had this in 1993: campers and boaters, farmers, electricians, the phone and power companies, road crews and preppers, and who sold it: electronics and camping stores. Cracked modules are common, good ones aren't. Some places come already set up, panels usually up on the roof, so bring a way up. Now and then a barn or a hunting shack has something out back, worn and needing repair.
+Think about who had this in 1993: campers and boaters, farmers, electricians, the phone and power companies, road crews and preppers, and who sold it: electronics and camping stores. Cracked modules are common, good ones aren't. Some places come already set up, panels usually on the roof, so bring a way up. Barns and hunting shacks sometimes hide worn gear out back.
 
-The easiest start is on the road. Road crews, army checkpoints and traffic jams left solar arrow boards behind, still flashing, with batteries in the box and panels on top:
+The easiest start is on the road: road crews, army checkpoints and traffic jams left solar arrow boards behind, still flashing, with batteries and panels aboard:
 
 ![The orange solar arrow board trailer, its arrow lit and two panels on top, hitched behind a car](art/promo/images/trailer.png)
 

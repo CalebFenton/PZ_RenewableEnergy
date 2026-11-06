@@ -110,13 +110,13 @@ handler("removeAt", function(player, args)
 end)
 
 -- A Base.Generator plugged in on the square at `args`, fuelled with `args.fuel` litres (full
--- unless given), started as a player starts one if `args.running`, with a failsafe tile on its
--- square if `args.failsafe`. Both are removed when the test ends by what is new on the square, so
--- a chunk reload's fresh objects go too.
+-- unless given) at `args.condition` (new unless given), started as a player starts one if
+-- `args.running`, with a failsafe tile on its square if `args.failsafe`. Both are removed when the
+-- test ends by what is new on the square, so a chunk reload's fresh objects go too.
 handler("placeGenerator", function(player, args, defer)
     local square = PZHarness.squareAt(args)
     PZHarness.trackSquare(defer, player, args)
-    local generator = SolarSites.placeGenerator(square, 100, args.fuel or 10)
+    local generator = SolarSites.placeGenerator(square, args.condition or 100, args.fuel or 10)
     if args.failsafe then
         Fixtures.newTile(square, Sprites.failsafe)
     end

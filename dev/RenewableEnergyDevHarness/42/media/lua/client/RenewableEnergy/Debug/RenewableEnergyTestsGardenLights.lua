@@ -10,15 +10,17 @@ local test, expect, expectNear, expectEqual = T.test, T.expect, T.expectNear, T.
 
 -- The house near the start, rolled when its chunk loaded, is rolled again on either side of its
 -- chance: with the Garden Lights option at 0 its chance is 0 and even the lowest roll gives none;
--- at 100, a roll just under its chance gives it lights standing outdoors on the ground near the
--- house, charged, which players see, and a second roll gives none. Either way the roll is kept.
--- The option goes up last: at 100 a house whose surroundings load meanwhile can grow lights.
+-- at 50 its chance is half its neighbourhood's (0.4 rich, 0.15 ordinary, 0.04 poor, times 50 /
+-- 100), and a roll just under it gives it lights standing outdoors on the ground near the house,
+-- charged, which players see, and a second roll gives none. Either way the roll is kept. The
+-- option goes up last: above 0 a house whose surroundings load meanwhile can grow lights.
+local OPTION = 50
 test("renewable_energy_world_garden_lights_rolled_once_per_house", {
     sandbox = { GardenLights = 0 },
     run = function(self)
         T.read(self, "gardenLightsRoll", { roll = 0 }, "off")
         -- In its turn: single player sets an option at once, when it is queued.
-        T.step(function() T.setSandbox(self, "GardenLights", 100) end)
+        T.step(function() T.setSandbox(self, "GardenLights", OPTION) end)
         T.read(self, "gardenLightsRoll", { roll = "under" }, "hit")
         T.waitFor(self, function()
             for _, light in ipairs(self.reads.hit.lights) do
@@ -36,7 +38,11 @@ test("renewable_energy_world_garden_lights_rolled_once_per_house", {
         expectEqual("lights the lowest roll placed with the option at 0", off.first, 0)
         expectEqual("lights standing around the house with the option at 0", #off.lights, 0)
         expect(off.rolled, "the house's roll with the option at 0 wasn't kept")
-        expect(hit.chance > 0, "the house's chance of lights with the option at 100 is " .. hit.chance)
+        if not expect(hit.neighbourhoodChance ~= nil, "the house's neighbourhood " .. tostring(hit.neighbourhood) .. " has no chance") then
+            return
+        end
+        expectNear("the " .. hit.neighbourhood .. " house's chance of lights with the option at " .. OPTION, hit.chance,
+            hit.neighbourhoodChance * OPTION / 100, 1e-9)
         expect(T.inRange(hit.first, hit.count), "a roll under the chance gave the house " .. hit.first .. " lights")
         expect(hit.rolled, "the house's roll was not kept")
         expectEqual("lights rolling the house again gave", hit.second, 0)

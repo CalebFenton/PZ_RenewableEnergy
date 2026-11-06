@@ -286,8 +286,8 @@ test("renewable_energy_bank_empty_pass_bills_what_it_carried", {
     end,
 })
 
--- A sledgehammer brings the bank up to now first: its batteries land with the inverter's idle
--- draw since the last pass taken, and no more than the destroy's own few minutes on top.
+-- A sledgehammer brings the bank up to now first: its batteries land with the hour's draw since the
+-- last pass taken, and no more than the destroy's own few minutes on top.
 test("renewable_energy_bank_sledgehammer_settles_batteries", {
     instant = true,
     run = function(self)
@@ -304,10 +304,11 @@ test("renewable_energy_bank_sledgehammer_settles_batteries", {
     validate = function(self)
         local battery, before = T.findIn(self.reads.floor.items, "type", T.CAR_BATTERY), self.reads.before
         if not expect(battery, "the destroyed bank left no battery on the floor") then return end
-        local most = before.charge - Specs.inverters[T.INVERTER_CHARGER].idle / before.nominalWh
-        local least = before.charge - 2 * before.drawW / before.nominalWh
-        expect(battery.uses <= most + 1e-4 and battery.uses >= least, "the battery left the destroyed bank at "
-            .. battery.uses .. " after an hour on since its last pass at " .. before.charge
+        -- The hour the read rewound, at the draw the bank had, and at most six minutes more.
+        local perHour = before.drawW / before.nominalWh
+        local most, least = before.charge - perHour, before.charge - 1.1 * perHour
+        expect(before.drawW > 0 and battery.uses <= most + 1e-4 and battery.uses >= least, "the battery left the destroyed bank at "
+            .. battery.uses .. " after an hour drawing " .. before.drawW .. " W since its last pass at " .. before.charge
             .. ", expected between " .. least .. " and " .. most)
     end,
 })
@@ -434,9 +435,13 @@ test("renewable_energy_bank_unloaded_bank_carries_on_and_writes_back_on_load", {
             "on the grid the bank reads %s and measures %.1f W with a fridge on", tostring(onGrid.status.state), onGrid.status.loadW))
         expectEqual("the state of the bank away with the grid gone", away.status.state, "on")
         expectEqual("the load the bank carries away, against the one it measured on the grid", away.status.loadW, onGrid.status.loadW)
-        expect(away.drawW > onGrid.status.loadW, string.format("away the bank draws %.1f W for a load of %.1f W",
-            away.drawW, onGrid.status.loadW))
-        expect(away.charge < left.charge, "away with the grid gone the bank's charge didn't fall")
+        local inverter = Specs.inverters[T.INVERTER_CHARGER]
+        expectNear("the bank's draw away", away.drawW, onGrid.status.loadW / inverter.efficiency + inverter.idle, 1e-6)
+        -- The test's pass of AWAY_HOURS, after what the clock's own passes took from the evening to just past
+        -- midnight, under an hour.
+        local drainedHours = (left.storedWh - away.storedWh) / away.drawW
+        expect(drainedHours >= AWAY_HOURS - 0.01 and drainedHours <= AWAY_HOURS + 1, string.format(
+            "away the batteries gave %.2f hours of the bank's draw, expected %d to %d", drainedHours, AWAY_HOURS, AWAY_HOURS + 1))
         expect(away.status.chargeSource == nil, "away with the grid gone the chargers charge from " .. tostring(away.status.chargeSource))
         expectEqual("the inverter's condition as the bank left, which the hours away must wear", T.stateCondition(left, T.INVERTER_CHARGER), 100)
         local cameBack = {

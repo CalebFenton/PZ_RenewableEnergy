@@ -122,9 +122,11 @@ test("renewable_energy_solar_menu_panel_wired_to", {
     end,
 })
 
--- The queued connection completes on the authority and reaches this client's bank state.
--- The mod's duration/skill rule is checked separately, without timing the game's action runner.
-test("renewable_energy_solar_connect_panel", {
+-- The queued connection completes on the authority and reaches this client's bank state, after
+-- which the panel can't be connected to that bank again; Disconnect, chosen from the connected
+-- panel's menu, then takes it off the bank on the server and in this client's copy. The mod's
+-- duration/skill rule is checked separately, without timing the game's action runner.
+test("renewable_energy_solar_connect_and_disconnect_panel", {
     instant = true,
     run = function(self)
         self.bank = T.bank(self, "batteryBankWood", {}, { outdoors = true })
@@ -139,36 +141,21 @@ test("renewable_energy_solar_connect_panel", {
         T.waitFor(self, function()
             return Squares.samePosition(PowerBank.connectedBank(self.panel.object), self.bank)
         end, "this client's copy of the connection")
-        T.readRecord(self, self.bank)
-        T.step(function() self.again = connect():canPerform() end)
-    end,
-    validate = function(self)
-        expect(self.valid, "connecting a panel next to a bank is refused")
-        expectEqual("panels the server's bank lists", self.bank.state.sources, 1)
-        expect(Squares.samePosition(PowerBank.connectedBank(self.panel.object), self.bank),
-            "this client's status of the bank does not list the connected panel")
-        expect(not self.again, "a panel already on this bank can be connected again")
-    end,
-})
-
--- Disconnect, chosen from a connected panel's menu, takes the panel off the bank on the server and
--- in this client's copy.
-test("renewable_energy_solar_disconnect_panel", {
-    instant = true,
-    run = function(self)
-        self.bank = T.bank(self, "batteryBankWood", {}, { outdoors = true })
-        self.panel = self.bank and T.panel(self, Sprites.wall.wood.S, { near = self.bank, connect = true })
-        if not self.panel then return end
+        T.readRecord(self, self.bank, "connected")
         T.step(function()
+            self.again = connect():canPerform()
             local option = T.menuOption(SourceMenu.addSourceOptions, self.panel.object, getText("ContextMenu_RenewableEnergy_DisconnectSource"))
             if not T.chooseOption(self, "Disconnect", option, self.panel.square) then return end
             T.waitFor(self, function() return PowerBank.connectedBank(self.panel.object) == nil end, "this client's copy of the disconnection")
-            T.readRecord(self, self.bank)
+            T.readRecord(self, self.bank, "disconnected")
         end)
     end,
     validate = function(self)
-        if not (T.expectConnected(self.panel) and T.expectOffered(self, "Disconnect")) then return end
-        expectEqual("panels the server's bank lists after disconnecting", self.bank.state.sources, 0)
+        expect(self.valid, "connecting a panel next to a bank is refused")
+        expectEqual("panels the server's bank lists", self.reads.connected.sources, 1)
+        expect(not self.again, "a panel already on this bank can be connected again")
+        if not T.expectOffered(self, "Disconnect") then return end
+        expectEqual("panels the server's bank lists after disconnecting", self.reads.disconnected.sources, 0)
         expect(PowerBank.connectedBank(self.panel.object) == nil, "this client still sees the panel connected after disconnecting it")
     end,
 })
@@ -216,11 +203,13 @@ test("renewable_energy_solar_seal_module_in_place", {
         expect(not self.wholeOffered, "the whole module is offered a seal")
         if not T.expectOffered(self, "Seal Cracked Module") then return end
         local modules = self.reads.panel.modules
-        local condition, seals = ModuleRepair.sealed(self.cracked.type, self.cracked.condition, self.cracked.repaired)
+        -- Its second seal: min(80 - 10, 60 + 15) = 70, the once-sealed cap.
+        local condition = 70
         expectEqual("the whole module's condition", modules[1].condition, 100)
         expectEqual("the sealed module's condition", modules[2].condition, condition)
-        expectEqual("the sealed module's seals", modules[2].repaired, seals)
-        expect(#self.reads.panel.overlays > 0, "the sealed module shows whole")
+        expectEqual("the sealed module's seals", modules[2].repaired, 2)
+        -- 70 of 100 is under Specs.crackLooks' lightBelow: light cracks over the rack's second slot.
+        expectEqual("the sealed rack's overlays", table.concat(self.reads.panel.overlays, ","), Sprites.cracks.light.rack.wood.S[2])
         local listed = self.bank.state.status.sources[1]
         expectEqual("the bank's record of the sealed module", listed and listed.modules[2] and listed.modules[2].condition, condition)
         -- One full tube of each was given; T.readCarried's `uses` is the fraction of it left.
@@ -522,9 +511,9 @@ test("renewable_energy_solar_window_highlights_panel", {
     end,
 })
 
--- A connect job takes ConnectPanelMin minutes at Electricity 3 and the same share of them less for
--- each level above, more for each below (RenewableEnergyAction's skillFactor). Catches skill left
--- out, counted the wrong way, anchored at another level, or not by equal steps.
+-- A connect job takes ConnectPanelMin minutes at Electricity 3 and 9.5% of them less for each
+-- level above, more for each below (Wiring.skillFactor). Catches skill left out, counted the wrong
+-- way, anchored at another level, or not by equal steps.
 test("renewable_energy_solar_connect_time_by_electricity", {
     sandbox = { ConnectPanelMin = 10 },
     run = function(self)
@@ -538,11 +527,10 @@ test("renewable_energy_solar_connect_time_by_electricity", {
         end)
     end,
     validate = function(self)
-        local unskilled, base, master = self.minutes[0], self.minutes[3], self.minutes[10]
-        expectNear("connect minutes at Electricity 3", base, 10, 1e-6)
-        expect(unskilled > base and base > master and master > 0, string.format(
-            "connecting takes %g minutes at Electricity 0, %g at 3, %g at 10", unskilled, base, master))
-        expectNear("minutes saved by a level above 3 against those lost by a level below", (base - master) / 7,
-            (unskilled - base) / 3, 1e-6)
+        expectNear("connect minutes at Electricity 3", self.minutes[3], 10, 1e-6)
+        -- 10 × (1 + 3 × 0.095) = 12.85.
+        expectNear("connect minutes at Electricity 0", self.minutes[0], 12.85, 1e-6)
+        -- 10 × (1 - 7 × 0.095) = 3.35.
+        expectNear("connect minutes at Electricity 10", self.minutes[10], 3.35, 1e-6)
     end,
 })

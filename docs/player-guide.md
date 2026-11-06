@@ -401,9 +401,9 @@ A charger makes nothing below its starting speed, and output climbs with the cub
 
 | Wind | Scoop | Treadmill | Car alternator | Turbine |
 |---|---|---|---|---|
-| 20 km/h | 10 W | 22 W | 30 W | 72 W |
+| 20 km/h | 10 W | 22 W | 30 W | 71 W |
 | 25 km/h | 29 W | 75 W | 100 W | 220 W |
-| 30 km/h | 63 W | 178 W | 237 W | 498 W |
+| 30 km/h | 63 W | 178 W | 237 W | 497 W |
 | 35 km/h | 117 W | 347 W | 463 W | 944 W |
 | 40 km/h | 194 W | 600 W | 800 W | 1600 W |
 

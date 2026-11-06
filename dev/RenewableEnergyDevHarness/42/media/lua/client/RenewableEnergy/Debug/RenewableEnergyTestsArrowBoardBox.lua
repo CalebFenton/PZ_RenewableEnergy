@@ -167,6 +167,7 @@ test("renewable_energy_world_arrow_board_locked_box_opens_with_the_lid_off", {
     validate = function(self)
         expect(not self.knewRecipe, "the character knows Basic Mechanics, so the lid coming off proves nothing")
         expect(not self.lockedAccess, "the padlocked box opens with its lid on")
+        expect(self.canTakeOff, "the mechanics window won't take the padlocked lid off")
         expect(not self.reads.lidOff.state.lid.installed, "the lid is still on the server's trailer")
         expect(self.openAccess, "the box doesn't open with its lid off")
         expect(self.lidOffPose == nil, "the lid taken off is still drawn, " .. describeLid(self.lidOffPose))

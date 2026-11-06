@@ -52,7 +52,7 @@
     "RenewableEnergy_SewTarpGasBag": "Ušít plynový vak z plachty",
     "RenewableEnergy_MakeIronSponge": "Vyrobit železnou houbu",
     "RenewableEnergy_AirOutIronSponge": "Vyvětrat železnou houbu",
-    "RenewableEnergy_RefillPropaneBottle": "Doplnit propanovou láhev",
+    "RenewableEnergy_RefillPropaneBottle": "Doplnit láhev do propanové lampy",
     "RenewableEnergy_PrimitiveGasifier": "Primitivní zplyňovač",
     "RenewableEnergy_Gasifier": "Zplyňovač",
     "RenewableEnergy_AdvancedGasifier": "Pokročilý zplyňovač",
@@ -66,8 +66,8 @@
     "RenewableEnergy_TimberPropellerWood": "Větrná nabíječka z běžeckého pásu na stožáru z klád",
     "RenewableEnergy_TimberCarAlternatorWood": "Větrná nabíječka s alternátorem z auta na stožáru z klád",
     "RenewableEnergy_TurbineWood": "Podomácku vyrobená větrná turbína",
-    "RenewableEnergy_CarveWoodenBlades": "Vyřezat dřevěnou sadu lopatek",
+    "RenewableEnergy_CarveWoodenBlades": "Vyřezat sadu dřevěných lopatek",
     "RenewableEnergy_CutPipeBlades": "Nařezat sadu lopatek z plastové trubky",
-    "RenewableEnergy_ForgeSteelBlades": "Ukout ocelovou sadu lopatek",
+    "RenewableEnergy_ForgeSteelBlades": "Ukout sadu ocelových lopatek",
     "RenewableEnergy_MakeHomemadeAlternator": "Sestavit podomácku vyrobený alternátor"
 }

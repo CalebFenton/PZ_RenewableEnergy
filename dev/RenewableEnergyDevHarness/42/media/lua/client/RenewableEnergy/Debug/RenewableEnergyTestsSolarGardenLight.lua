@@ -15,21 +15,27 @@ local test, expect, expectNear, expectEqual = T.test, T.expect, T.expectNear, T.
 local NOON, MIDNIGHT = 12, 0
 
 -- A garden light holding `charge` Wh and `bulb` (default: the plain bulb) that the character
--- places on a free outdoor square; see T.placeAsPlayer.
-local function placeGardenLight(self, charge, bulb)
+-- places on a free outdoor square; see T.placeAsPlayer. With `reloads`, the server removes
+-- whatever stands on the square when the test ends (T.trackSquare), as a chunk that loads again
+-- brings a new copy of the light.
+local function placeGardenLight(self, charge, bulb, reloads)
     local square = T.square(self, { bare = true }, "a free outdoor square")
+    if square and reloads then
+        T.trackSquare(self, square)
+    end
     return square and T.placeAsPlayer(self, square, SolarGardenLight.ITEM, Sprites.gardenLight.off,
         { [SolarGardenLight.CHARGE_KEY] = charge, [SolarGardenLight.BULB_KEY] = bulb })
 end
 
--- The lamp this client draws on `square`, or nil.
-local function lampAt(square)
-    return getCell():getLightSourceAt(square:getX(), square:getY(), square:getZ())
+-- The lamp this client draws at the place of `at` (a handle), or nil. By place, since a square
+-- object goes with its chunk.
+local function lampAt(at)
+    return getCell():getLightSourceAt(at.x, at.y, at.z)
 end
 
--- Whether this client draws a lamp on `square`.
-local function lampOn(square)
-    return lampAt(square) ~= nil
+-- Whether this client draws a lamp at the place of `at` (a handle).
+local function lampOn(at)
+    return lampAt(at) ~= nil
 end
 
 -- The colour the lamp shows: the native lighting doubles a lamp's colour and clips it at 1.
@@ -51,9 +57,10 @@ local function describeColour(colour)
     return colour and string.format("(%.2f, %.2f, %.2f)", colour.r, colour.g, colour.b) or "none"
 end
 
--- Whether this client draws a lamp on `square` that shines the colour of the bulb `fullType`.
-local function lampShines(square, fullType)
-    local lamp = lampAt(square)
+-- Whether this client draws a lamp at the place of `at` (a handle) that shines the colour of the
+-- bulb `fullType`.
+local function lampShines(at, fullType)
+    local lamp = lampAt(at)
     return lamp ~= nil and sameColour(shownColour(lamp), bulbColour(fullType))
 end
 
@@ -64,7 +71,7 @@ local function runLight(self, light, charge, hours, label)
     T.read(self, "gardenLightUpdate", T.at(light, { kind = "light", charge = charge, hours = hours }), label)
     T.waitFor(self, function()
         local reply = self.server.gardenLightUpdate
-        return light.object:getTextureName() == reply.sprite and lampOn(light.square) == reply.lit
+        return light.object:getTextureName() == reply.sprite and lampOn(light) == reply.lit
     end, "this client's garden light showing what the server's does")
 end
 
@@ -131,7 +138,7 @@ test("renewable_energy_gadgets_garden_light_update", {
             T.serverUntil(self, "skyFollowsClock", {}, function(reply) return reply.follows end)
             runLight(self, light, row.charge, resolve(row.hours, hour), row.what)
             T.step(function()
-                self.copies[row.what] = { sprite = light.object:getTextureName(), lamp = lampOn(light.square) }
+                self.copies[row.what] = { sprite = light.object:getTextureName(), lamp = lampOn(light) }
             end)
         end
     end,
@@ -146,6 +153,9 @@ test("renewable_energy_gadgets_garden_light_update", {
             local after = row.after
             if row.sunlit then
                 expect(reply.flat > 0, "no sun for a light " .. row.what)
+                -- Its 1 W cell times the 0.8 system efficiency times the Sunlight Multiplier
+                -- (T.fullSunW), times flat over the 1000 W/m² it is rated in, times the hours: at
+                -- multiplier 1 and full sun an hour from empty is 1 x 0.8 x 1 = 0.8 Wh of its 3.
                 after = T.fullSunW(SPEC.watts) * reply.flat / Sun.FULL_SUN * row.hours
             end
             expectNear("charge of a light " .. row.what, reply.charge, after)
@@ -189,13 +199,15 @@ end
 -- Queues a wait until this client's copy of the light shows the unlit tile and draws no lamp.
 local function waitForDark(self, light)
     T.waitFor(self, function()
-        return light.object:getTextureName() == Sprites.gardenLight.off and not lampOn(light.square)
+        return light.object:getTextureName() == Sprites.gardenLight.off and not lampOn(light)
     end, "this client's garden light dark")
 end
 
--- The plain bulb shines warm. Taking it out of the lit light puts its lamp out within the minute
--- and gives the bulb back; the light then stays dark at night without draining, and offers only
--- to take a bulb. Putting a red one in through the menu takes it and shines red.
+-- The plain bulb shines the warm white of a 1993 incandescent garden light, (1, 0.8, 0.55) as the
+-- lamp shows it, not the white its script gives. Taking it out of the lit light puts its lamp out
+-- within the minute and gives the bulb back; the light then stays dark at night without draining,
+-- and offers only to take a bulb. Putting a red one in through the menu takes it and shines red.
+local WARM_WHITE = { r = 1, g = 0.8, b = 0.55 }
 test("renewable_energy_gadgets_garden_light_bulb_swap", {
     hour = MIDNIGHT,
     instant = true,
@@ -204,7 +216,7 @@ test("renewable_energy_gadgets_garden_light_bulb_swap", {
         if not light then return end
         runLight(self, light, LIT_WH, NIGHT_HOURS)
         T.step(function()
-            local lamp = lampAt(light.square)
+            local lamp = lampAt(light)
             self.plain = lamp and shownColour(lamp)
         end)
         startOfMinute(self)
@@ -215,7 +227,7 @@ test("renewable_energy_gadgets_garden_light_bulb_swap", {
         runLight(self, light, LIT_WH, 1, "night")
         T.waitForCarried(self, SolarGardenLight.PLAIN_BULB, "this client's copy of the bulb taken out")
         T.step(function()
-            self.copyDarkAtNight = light.object:getTextureName() == Sprites.gardenLight.off and not lampOn(light.square)
+            self.copyDarkAtNight = light.object:getTextureName() == Sprites.gardenLight.off and not lampOn(light)
             local context, add, remove = bulbMenu(light)
             local plain = add and add:getOptionFromName(getItemName(SolarGardenLight.PLAIN_BULB))
             self.offersPlain, self.offersRemove = T.offered(plain), remove ~= nil
@@ -223,15 +235,15 @@ test("renewable_energy_gadgets_garden_light_bulb_swap", {
         end)
         T.give(self, "red", { { type = RED } })
         chooseBulbOption(self, light, RED)
-        T.waitFor(self, function() return lampShines(light.square, RED) end, "this client's lamp shining red")
+        T.waitFor(self, function() return lampShines(light, RED) end, "this client's lamp shining red")
         T.count(self, "added", { RED })
         T.step(function() self.copyLit = light.object:getTextureName() == Sprites.gardenLight.lit end)
     end,
     validate = function(self)
         local plain = self.plain
         if not expect(plain ~= nil, "the light never lit with its plain bulb") then return end
-        expect(plain.b < plain.r and not sameColour(plain, { r = 1, g = 1, b = 1 }),
-            "the plain bulb's lamp shines " .. describeColour(plain) .. ", not a warm white")
+        expect(sameColour(plain, WARM_WHITE), "the plain bulb's lamp shines " .. describeColour(plain) .. ", not the warm white "
+            .. describeColour(WARM_WHITE))
         expect(self.darkMinute == self.minute, "this client's lamp went out only at a later game minute")
         expectEqual("light bulbs taking the bulb out gave", self.counts.removed[SolarGardenLight.PLAIN_BULB], 1)
         expect(not self.reads.night.lit and self.copyDarkAtNight, "the light without a bulb lit at night")
@@ -252,9 +264,9 @@ test("renewable_energy_gadgets_garden_light_pick_up_keeps_bulb", {
         local light = placeGardenLight(self, LIT_WH, GREEN)
         if not light then return end
         runLight(self, light, LIT_WH, NIGHT_HOURS)
-        T.waitFor(self, function() return lampShines(light.square, GREEN) end, "this client's lamp shining green")
+        T.waitFor(self, function() return lampShines(light, GREEN) end, "this client's lamp shining green")
         T.pickUpAsPlayer(self, light, Sprites.gardenLight.lit)
-        T.waitFor(self, function() return not lampOn(light.square) end, "this client's lamp going with the light")
+        T.waitFor(self, function() return not lampOn(light) end, "this client's lamp going with the light")
         T.readCarried(self, { SolarGardenLight.ITEM })
         T.step(function()
             local item = T.carriedFirst(self, SolarGardenLight.ITEM)
@@ -263,10 +275,43 @@ test("renewable_energy_gadgets_garden_light_pick_up_keeps_bulb", {
         -- As the lit tile it was picked up as, which the moveables cursor places it as.
         local placed = T.placeAsPlayer(self, light.square, SolarGardenLight.ITEM, Sprites.gardenLight.lit, nil, true)
         runLight(self, placed, nil, NIGHT_HOURS)
-        T.waitFor(self, function() return lampShines(light.square, GREEN) end, "this client's lamp shining green placed again")
+        T.waitFor(self, function() return lampShines(light, GREEN) end, "this client's lamp shining green placed again")
     end,
     validate = function(self)
         expectEqual("the picked-up light's bulb", self.carriedBulb, GREEN)
+    end,
+})
+
+-- A lit light whose chunk unloads and loads again, as when the character walks away and comes
+-- back, is drawn lit again in its bulb's colour: its tile and bulb come back with the chunk, on
+-- the authority and this client, and this client gives the reloaded tile a lamp of its own once
+-- more.
+test("renewable_energy_gadgets_garden_light_lamp_after_chunk_reload", {
+    timeoutSeconds = T.CHUNK_RELOAD_SECONDS,
+    hour = MIDNIGHT,
+    instant = true,
+    run = function(self)
+        local light = placeGardenLight(self, LIT_WH, GREEN, true)
+        if not light then return end
+        runLight(self, light, LIT_WH, NIGHT_HOURS)
+        T.waitFor(self, function() return lampShines(light, GREEN) end, "this client's lamp shining green")
+        T.reloadChunk(self, light)
+        T.waitFor(self, function() return lampShines(light, GREEN) end, "this client's lamp shining green once its chunk loaded again")
+        T.step(function()
+            local copy = PZHarness.Fixtures.objectWithSprite(getSquare(light.x, light.y, light.z), Sprites.gardenLight.lit)
+            self.copyBulb = copy and SolarGardenLight.getBulb(copy)
+        end)
+        -- A multiplayer server can unload the chunk too once the character is away, and load it
+        -- again after this client has it back. The test ends once the server holds the light
+        -- again: the square's undo (T.trackSquare) then finds the reloaded copy, where it would
+        -- miss a square still unloaded and leave the light for later tests.
+        T.serverUntil(self, "gardenLightAt", T.at(light), function(reply) return reply.sprite ~= nil end)
+    end,
+    validate = function(self)
+        expectEqual("the bulb of this client's reloaded light", self.copyBulb, GREEN)
+        local server = self.server.gardenLightAt
+        expectEqual("the server's tile of the reloaded light", server.sprite, Sprites.gardenLight.lit)
+        expectEqual("the bulb of the server's reloaded light", server.bulb, GREEN)
     end,
 })
 

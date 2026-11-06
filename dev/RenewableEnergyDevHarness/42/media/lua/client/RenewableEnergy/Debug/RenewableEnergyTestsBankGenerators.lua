@@ -54,56 +54,36 @@ local function chargerBankWatts()
     return 2 * Specs.chargerWatts + Specs.inverters[T.INVERTER_CHARGER].chargerWatts
 end
 
--- Chargers charge only from the grid or a running generator other than the bank itself, at their
--- full watts while the batteries have room.
-test("renewable_energy_bank_chargers_charge_only_from_grid_or_generator", {
-    sandbox = { GeneratorFuelConsumption = 0.1 },
-    run = function(self)
-        local charge = 0.2
-        local bank, backup = chargerBank(self, { charge = charge })
-        if not bank then return end
-        -- For half the time the room left in the batteries takes to fill.
-        self.chargersW = chargerBankWatts()
-        local roomWh = (1 - charge) * 2 * Specs.batteries[T.CAR_BATTERY].wh
-        self.hours = roomWh / 2 / self.chargersW
-        T.switchOn(self, bank)
-        T.batch(function()
-            T.bankPass(self, bank, 0, { label = "alone" })
-            T.generator(self, { square = backup, running = true })
-            T.setCharge(self, bank, charge)
-            T.bankPass(self, bank, 0, { hours = self.hours, label = "generator" })
-        end)
-    end,
-    validate = function(self)
-        local alone, status = self.reads.alone, self.reads.generator.status
-        expectEqual("charger watts with no grid or generator" .. (alone.activated and " while the bank powers itself" or ""),
-            alone.status.chargerW, 0)
-        expectEqual("charger watts from a running generator", status.chargerW, self.chargersW)
-        expectEqual("what a charger charges from", status.chargers[1] and status.chargers[1].charging, "generator")
-    end,
-})
-
--- A running generator's bill, which vanilla burns at the hour and its window shows, counts the
--- chargers charging from it for what the batteries take: nothing for a full bank or one without
--- batteries, the room's watts for one with room, also after vanilla rebuilds the bill.
+-- Chargers charge only from the grid or a running generator other than the bank itself: a bank
+-- powering its area from its own batteries charges nothing. A running generator's bill, which
+-- vanilla burns at the hour and its window shows, counts the chargers charging from it for what the
+-- batteries take: nothing for a full bank or one without batteries, their full watts while the
+-- room outlasts the pass, also after vanilla rebuilds the bill.
 test("renewable_energy_bank_generator_bills_chargers_by_battery_room", {
     sandbox = { GeneratorFuelConsumption = 0.1 },
     run = function(self)
-        local bank, backup = chargerBank(self)
+        self.low = 0.2
+        local bank, backup = chargerBank(self, { charge = self.low })
         if not bank then return end
         self.bank = bank
         self.chargersW = chargerBankWatts()
-        self.low = 0.2
-        local function pass(key)
-            T.bankPass(self, bank, 0, { label = key .. "Bank" })
+        -- Half the time the room takes to fill at the chargers' watts.
+        self.roomHours = (1 - self.low) * 2 * Specs.batteries[T.CAR_BATTERY].wh / 2 / self.chargersW
+        local function pass(key, hours)
+            T.bankPass(self, bank, 0, { hours = hours, label = key .. "Bank" })
             T.readGenerator(self, backup, key)
         end
+        T.switchOn(self, bank)
         -- The bank stays out: its copy waits for every part, and the batteries leave.
         T.batch(function()
+            -- Short, so the area's load can't run the low batteries empty and switch the bank off.
+            T.bankPass(self, bank, 0, { hours = 0.01, label = "alone" })
+            T.job(self, "bank", BankJobs.TURN_OFF, bank)
+            T.setCharge(self, bank, 1)
             local generator = T.generator(self, { square = backup, running = true })
             pass("full")
             T.setCharge(self, bank, self.low)
-            pass("room")
+            pass("room", self.roomHours)
             T.setGenerator(self, generator, { rebuild = true })
             T.readGenerator(self, backup, "rebuilt")
             T.server(self, "bankPart", T.at(bank, { type = T.CAR_BATTERY, remove = true }))
@@ -113,19 +93,22 @@ test("renewable_energy_bank_generator_bills_chargers_by_battery_room", {
     end,
     validate = function(self)
         local reads = self.reads
+        local alone = reads.alone
+        expect(alone.activated, "the switched-on bank with room in its batteries didn't power its area by itself: "
+            .. tostring(alone.status.state))
+        expectEqual("charger watts of the bank powering its area with no grid or generator", alone.status.chargerW, 0)
         for _, key in ipairs({ "full", "room", "empty" }) do
             expectEqual("what the " .. key .. " bank's chargers charge from", reads[key .. "Bank"].status.chargeSource, "generator")
         end
         local full, room, empty = reads.fullBank, reads.roomBank, reads.emptyBank
         expectEqual("charger watts into a full bank", full.status.chargerW, 0)
-        -- A bank pass lasts an hour unless told otherwise, so the room's Wh are the watts it takes.
-        local roomWh = (1 - self.low) * room.nominalWh
-        local filledW = math.min(self.chargersW, roomWh)
-        expect(roomWh > 0, "the bank has no room in its batteries")
+        expectEqual("charger watts into a bank with room", room.status.chargerW, self.chargersW)
+        expectEqual("what a charger charges from", room.status.chargers[1] and room.status.chargers[1].charging, "generator")
         expectNear("fuel an hour the chargers added to the generator's bill", reads.room.bill - reads.full.bill,
-            T.fuelPerHour(filledW), 0.0001)
+            T.fuelPerHour(self.chargersW), 0.0001)
         expectNear("the generator's bill after vanilla rebuilt it", reads.rebuilt.bill, reads.room.bill, 0.0001)
-        expectNear("the bank's charge after the chargers filled it", room.charge, self.low + filledW / room.nominalWh, 0.0001)
+        -- Half the room: 0.2 + (1 - 0.2) / 2.
+        expectNear("the bank's charge after the chargers filled it", room.charge, self.low + (1 - self.low) / 2, 0.0001)
         expectEqual("batteries left in the bank", empty.batteries, 0)
         expectNear("fuel an hour a bank without batteries left on the generator's bill", reads.empty.bill - reads.full.bill, 0, 0.0001)
         expectEqual("charger watts into a bank without batteries", empty.status.chargerW, 0)
@@ -231,15 +214,22 @@ test("renewable_energy_bank_charging_generator_kept_through_save", {
 
 -- Failsafe -------------------------------------------------------------------------------------
 
+-- The condition at and below which a running vanilla generator may catch fire, which a failsafe,
+-- with nobody standing by, never starts (Backup.lua).
+local FIRE_CONDITION = 20
+
 -- The failsafe starts its generator below FailsafeStartCharge and stops it at FailsafeStopCharge,
--- checked at each and a percent below it.
+-- checked at each and a percent below it. It starts one a point above the condition that may catch
+-- fire, and leaves one at that condition, and one without fuel, stopped.
 test("renewable_energy_bank_failsafe_starts_generator", {
     sandbox = { FailsafeStartCharge = 20, FailsafeStopCharge = 80 },
     run = function(self)
         T.setGrid(self, false)
         local bank = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY, T.PLUG_IN_INVERTER })
         local backup = bank and backupSquare(self, bank.square, BACKUP_REACH)
-        if not backup then return end
+        local worn = backup and backupSquare(self, bank.square, BACKUP_REACH)
+        local dry = worn and backupSquare(self, bank.square, BACKUP_REACH)
+        if not dry then return end
         local start, stop = SandboxVars.RenewableEnergy.FailsafeStartCharge / 100, SandboxVars.RenewableEnergy.FailsafeStopCharge / 100
         -- The failsafe acts on the charge before the pass's own drain, which the next setCharge undoes.
         local function at(key, charge)
@@ -252,10 +242,14 @@ test("renewable_energy_bank_failsafe_starts_generator", {
             T.readGenerator(self, backup, key)
         end
         T.batch(function()
-            T.generator(self, { square = backup, failsafe = true })
+            T.generator(self, { square = backup, failsafe = true, condition = FIRE_CONDITION + 1 })
+            T.generator(self, { square = worn, failsafe = true, condition = FIRE_CONDITION })
+            T.generator(self, { square = dry, failsafe = true, fuel = 0 })
             T.job(self, "bank", BankJobs.TURN_ON, bank)
             at("atStart", start)
             at("belowStart", start - 0.01)
+            T.readGenerator(self, worn, "worn")
+            T.readGenerator(self, dry, "dry")
             at("belowStop", stop - 0.01)
             at("atStop", stop)
         end)
@@ -264,7 +258,10 @@ test("renewable_energy_bank_failsafe_starts_generator", {
         if not expect(self.found, "the bank didn't find the failsafe generator") then return end
         local reads = self.reads
         expect(not reads.atStart.running, "the failsafe started the generator at exactly its start charge")
-        expect(reads.belowStart.running, "the failsafe didn't start the generator a percent below its start charge")
+        expect(reads.belowStart.running, "the failsafe didn't start the generator a percent below its start charge, a point"
+            .. " above the condition that may catch fire")
+        expect(not reads.worn.running, "the failsafe started a generator at the condition that may catch fire")
+        expect(not reads.dry.running, "the failsafe started a generator without fuel")
         expect(reads.belowStop.running, "the failsafe stopped the generator a percent below its stop charge")
         expect(not reads.atStop.running, "the failsafe didn't stop the generator at exactly its stop charge")
     end,
@@ -322,43 +319,7 @@ test("renewable_energy_bank_failsafe_waits_for_a_working_bank", {
     end,
 })
 
--- Two banks have one failsafe generator in backup reach: it answers to the nearer, so the farther,
--- run low, doesn't start it while the nearer is full, and its status says another bank runs it.
-test("renewable_energy_bank_failsafe_answers_to_nearest_bank", {
-    run = function(self)
-        T.setGrid(self, false)
-        local parts = { T.CAR_BATTERY, T.PLUG_IN_INVERTER }
-        local first = T.bank(self, "batteryBoxWood", parts)
-        local backup = first and backupSquare(self, first.square, BACKUP_REACH)
-        local otherSquare = backup and T.square(self, { indoors = true, near = backup }, "a free indoor square for a second bank")
-        if not otherSquare then return end
-        local dFirst, dOther = distanceSquared(first.square, backup), distanceSquared(otherSquare, backup)
-        if not T.need(self, inBackupReach(otherSquare, backup) and dFirst ~= dOther,
-            "a second bank square in the generator's backup reach, nearer or farther than the first") then return end
-        local second = T.bank(self, "batteryBoxWood", parts, { square = otherSquare })
-        if not second then return end
-        local near, far = first, second
-        if dOther < dFirst then near, far = second, first end
-        self.nearBank, self.farBank = near, far
-        T.batch(function()
-            T.generator(self, { square = backup, failsafe = true })
-            T.job(self, "bank", BankJobs.TURN_ON, near)
-            T.job(self, "bank", BankJobs.TURN_ON, far)
-            T.setCharge(self, far, belowFailsafeStart())
-            T.bankPass(self, near, 0, { hours = 0.01, label = "nearBank" })
-            T.bankPass(self, far, 0, { hours = 0.01, label = "farBank" })
-            T.readGenerator(self, backup, "after")
-        end)
-    end,
-    validate = function(self)
-        expect(not self.reads.after.running, "the farther bank started the failsafe generator the nearer bank keeps stopped")
-        expectEqual("the nearer bank's failsafe row", failsafeRow(self.reads.nearBank.status, self.nearBank), failsafeRange())
-        expectEqual("the farther bank's failsafe row", failsafeRow(self.reads.farBank.status, self.farBank),
-            getText("IGUI_RenewableEnergy_FailsafeOtherBank"))
-    end,
-})
-
--- Squares in a line for the relay test, every one free: a bank B, failsafe generators one and two
+-- Squares in a line for the nearest-bank test, every one free: a bank B, failsafe generators one and two
 -- squares on from it, and a bank A three squares past the farther. B and A stand indoors. Both
 -- generators are nearer B than A, the farther one is in A's backup reach and the nearer isn't.
 -- Nil, and missing, without such a line near the character.
@@ -388,9 +349,10 @@ local function relayLine(self)
     return T.need(self, nil, "a line of free squares for two banks and two failsafe generators")
 end
 
--- Two failsafe generators both answer to the bank nearer them, B, which runs both once it runs low;
--- a bank A that has only the farther one in reach says another bank runs it.
-test("renewable_energy_bank_failsafe_runs_every_relay_answering_to_it", {
+-- A failsafe answers to the nearest bank with its generator in backup reach. Two failsafe
+-- generators both answer to B, nearer them: a bank A with only the farther one in reach, run low,
+-- doesn't start it while B is full, and says another bank runs it; once B runs low, it runs both.
+test("renewable_energy_bank_failsafe_answers_to_nearest_bank", {
     run = function(self)
         T.setGrid(self, false)
         local line = relayLine(self)
@@ -400,24 +362,32 @@ test("renewable_energy_bank_failsafe_runs_every_relay_answering_to_it", {
         local a = b and T.bank(self, "batteryBoxWood", parts, { square = line.a })
         if not a then return end
         self.bankB, self.bankA = b, a
+        local function passes(key)
+            T.bankPass(self, b, 0, { hours = 0.01, label = key .. "B" })
+            T.bankPass(self, a, 0, { hours = 0.01, label = key .. "A" })
+            T.readGenerator(self, line.near, key .. "Near")
+            T.readGenerator(self, line.far, key .. "Far")
+        end
         T.batch(function()
             T.generator(self, { square = line.near, failsafe = true })
             T.generator(self, { square = line.far, failsafe = true })
             T.job(self, "bank", BankJobs.TURN_ON, b)
             T.job(self, "bank", BankJobs.TURN_ON, a)
+            T.setCharge(self, a, belowFailsafeStart())
+            passes("aLow")
             T.setCharge(self, b, belowFailsafeStart())
-            T.bankPass(self, b, 0, { hours = 0.01, label = "bankB" })
-            T.bankPass(self, a, 0, { hours = 0.01, label = "bankA" })
-            T.readGenerator(self, line.near, "near")
-            T.readGenerator(self, line.far, "far")
+            passes("bLow")
         end)
     end,
     validate = function(self)
-        expect(self.reads.near.running, "the low bank didn't start the failsafe generator beside it")
-        expect(self.reads.far.running, "the low bank didn't start the farther failsafe generator, which answers to it")
-        expectEqual("the low bank's failsafe row", failsafeRow(self.reads.bankB.status, self.bankB), failsafeRange())
-        expectEqual("the other bank's failsafe row", failsafeRow(self.reads.bankA.status, self.bankA),
-            getText("IGUI_RenewableEnergy_FailsafeOtherBank"))
+        local reads, otherBank = self.reads, getText("IGUI_RenewableEnergy_FailsafeOtherBank")
+        expect(not reads.aLowFar.running, "the farther bank started the failsafe generator the full nearer bank keeps stopped")
+        expectEqual("the full bank's failsafe row", failsafeRow(reads.aLowB.status, self.bankB), failsafeRange())
+        expectEqual("the low farther bank's failsafe row", failsafeRow(reads.aLowA.status, self.bankA), otherBank)
+        expect(reads.bLowNear.running, "the low bank didn't start the failsafe generator beside it")
+        expect(reads.bLowFar.running, "the low bank didn't start the farther failsafe generator, which answers to it")
+        expectEqual("the low bank's failsafe row", failsafeRow(reads.bLowB.status, self.bankB), failsafeRange())
+        expectEqual("the other bank's failsafe row", failsafeRow(reads.bLowA.status, self.bankA), otherBank)
     end,
 })
 
@@ -477,39 +447,11 @@ test("renewable_energy_bank_failsafe_start_moves_appliance_to_its_generator", {
     end,
 })
 
--- While a backup generator carries a switched-on bank's load, the bank's day figure counts none of
--- it, the generator's share is kept apart, and the batteries keep their charge.
+-- While a running generator in backup reach carries a switched-on bank's load, the bank's day
+-- figure counts none of it, the generator's share is kept apart, and the batteries keep their
+-- charge, even beside a stopped generator whose failsafe answers to the bank.
 local BACKUP_HOURS = 1
 test("renewable_energy_bank_backup_load_kept_apart", {
-    run = function(self)
-        T.setGrid(self, false)
-        local bank = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY, T.PLUG_IN_INVERTER })
-        local fridge = bank and T.square(self, { indoors = true, near = bank }, "a free indoor square for a fridge")
-        local backup = fridge and backupSquare(self, bank.square, BACKUP_REACH)
-        if not backup then return end
-        T.placeTile(self, fridge, T.MINI_FRIDGE)
-        T.generator(self, { square = backup, running = true })
-        T.batch(function()
-            T.job(self, "bank", BankJobs.TURN_ON, bank, nil, "switched")
-            T.readRecord(self, bank, "before")
-            T.bankPass(self, bank, 0, { hours = BACKUP_HOURS, label = "after" })
-        end)
-    end,
-    validate = function(self)
-        local reads = self.reads
-        if not T.expectOk(reads.switched, "switching the bank on") then return end
-        local before, after = reads.before, reads.after
-        expectEqual("load Wh the bank carried while the generator ran", after.loadWhToday - before.loadWhToday, 0)
-        local backupWh = (after.status.backupWhToday or 0) - (before.status.backupWhToday or 0)
-        expect(after.status.loadW > 0, "the bank measured no load for the generator to carry")
-        expectNear("Wh the generator carried", backupWh, after.status.loadW * BACKUP_HOURS, 0.01)
-        expectNear("Wh in the batteries while the generator carried the load", after.storedWh, before.storedWh, 0.01)
-    end,
-})
-
--- A running plain generator in backup reach carries the load even beside a stopped one whose
--- failsafe answers to the bank: the batteries keep their charge.
-test("renewable_energy_bank_running_generator_carries_load_beside_stopped_failsafe", {
     run = function(self)
         T.setGrid(self, false)
         local bank = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY, T.PLUG_IN_INVERTER })
@@ -525,7 +467,7 @@ test("renewable_energy_bank_running_generator_carries_load_beside_stopped_failsa
             -- Between the failsafe's start and stop charges, so it leaves its generator stopped.
             T.setCharge(self, bank, 0.5)
             T.readRecord(self, bank, "before")
-            T.bankPass(self, bank, 0, { label = "after" })
+            T.bankPass(self, bank, 0, { hours = BACKUP_HOURS, label = "after" })
             T.readGenerator(self, failsafe, "failsafe")
         end)
     end,
@@ -534,8 +476,13 @@ test("renewable_energy_bank_running_generator_carries_load_beside_stopped_failsa
         if not T.expectOk(reads.switched, "switching the bank on") then return end
         if not expect(not reads.failsafe.running, "the failsafe started its generator at half charge") then return end
         local before, after = reads.before, reads.after
-        expectEqual("load Wh the bank carried beside the running generator", after.loadWhToday - before.loadWhToday, 0)
-        expectNear("Wh in the batteries beside the running generator", after.storedWh, before.storedWh, 0.01)
+        local shown = after.status.generator
+        expect(shown and shown.running and not shown.failsafe, "the bank's backup isn't the running generator")
+        expectEqual("load Wh the bank carried while the generator ran", after.loadWhToday - before.loadWhToday, 0)
+        local backupWh = (after.status.backupWhToday or 0) - (before.status.backupWhToday or 0)
+        expect(after.status.loadW > 0, "the bank measured no load for the generator to carry")
+        expectNear("Wh the generator carried", backupWh, after.status.loadW * BACKUP_HOURS, 0.01)
+        expectNear("Wh in the batteries while the generator carried the load", after.storedWh, before.storedWh, 0.01)
     end,
 })
 
@@ -682,7 +629,9 @@ test("renewable_energy_bank_overloaded_bank_hands_load_to_one_with_room", {
         expect(nearNow.status.loadW <= nearNow.status.limitW, "the nearer bank carries " .. nearNow.status.loadW
             .. " W, beyond its inverter's " .. nearNow.status.limitW .. " W")
         local farGained = farNow.status.loadW - reads.beforeFar.status.loadW
-        expect(farGained > 0, "the farther bank took none of the fridges")
+        -- The nearer carries one fridge at most, so the farther takes at least the other two.
+        expect(farGained >= 2 * T.fridgeW() - 0.01, string.format("the farther bank took %.1f W of the fridges, less than"
+            .. " the two the nearer can't carry, %.1f W", farGained, 2 * T.fridgeW()))
         expectNear("watts the three fridges added to the two banks together",
             nearNow.status.loadW - reads.beforeNear.status.loadW + farGained, 3 * T.fridgeW(), 0.01)
     end,

@@ -9,9 +9,9 @@
     "Metal_Battery_Rack": "Scaffale per batterie in metallo",
     "Wooden_Battery_Bank": "Armadietto per batterie in legno",
     "Metal_Battery_Bank": "Armadietto per batterie in metallo",
-    "Solar_Battery_Charger": "Caricabatterie solare",
+    "Solar_Battery_Charger": "Caricabatteria solare",
     "Solar_Garden_Light": "Lampada solare da giardino",
-    "Solar_Box": "Cassetta solare",
+    "Solar_Box": "Cassa di materiale solare",
     "Barrel_Digester": "Digestore a barile",
     "Insulated_Digester": "Digestore isolato",
     "Brick_Dome_Digester": "Digestore a cupola in mattoni",
@@ -22,8 +22,8 @@
     "Scoop_Rotor_Wind_Charger": "Caricatore eolico a rotore a tazze",
     "Scoop_Rotor_Wind_Charger_on_a_Wooden_Frame": "Caricatore eolico a rotore a tazze su telaio di legno",
     "Treadmill_Wind_Charger": "Caricatore eolico a tapis roulant",
-    "Car_Alternator_Wind_Charger": "Caricatore eolico ad alternatore",
+    "Car_Alternator_Wind_Charger": "Caricatore eolico ad alternatore d'auto",
     "Treadmill_Wind_Charger_on_a_Timber_Mast": "Caricatore eolico a tapis roulant su traliccio di tronchi",
-    "Car_Alternator_Wind_Charger_on_a_Timber_Mast": "Caricatore eolico ad alternatore su traliccio di tronchi",
+    "Car_Alternator_Wind_Charger_on_a_Timber_Mast": "Caricatore eolico ad alternatore d'auto su traliccio di tronchi",
     "Homebuilt_Wind_Turbine": "Turbina eolica artigianale"
 }

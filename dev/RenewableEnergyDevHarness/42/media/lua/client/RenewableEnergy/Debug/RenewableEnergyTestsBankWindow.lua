@@ -1,5 +1,6 @@
 require "RenewableEnergy/Debug/RenewableEnergyTestLib"
 local Specs = require "RenewableEnergy/Specs"
+local Sun = require "RenewableEnergy/Sun"
 local BankJobs = require "RenewableEnergy/PowerBank/BankJobs"
 local Format = require "RenewableEnergy/UI/Format"
 local StatusRows = require "RenewableEnergy/UI/StatusRows"
@@ -50,8 +51,6 @@ test("renewable_energy_bank_window_closes_once_walked_away", {
             PZHarness.Fixtures.teleportToMiddle(player(), square:getX() + 8, square:getY(), square:getZ())
         end)
         T.waitFor(self, function() return not isOpen() end, "the status window closing once the character walked away")
-        -- Back beside the bank, so the next test starts where this one did.
-        T.step(function() T.standNextTo(self.bank.square) end)
     end,
     validate = function(self)
         expect(self.openAtBank, "the status window closed with the character beside the bank")
@@ -102,6 +101,58 @@ test("renewable_energy_bank_window_shows_grid_power", {
         expectEqual("the grid row of a bank charging from the grid", charging and charging.value,
             getText("IGUI_RenewableEnergy_GridCharging", Format.watts(Specs.chargerWatts)))
         expect(gridRow("off") == nil, "the grid row stays once the grid is off")
+    end,
+})
+
+-- Waits until this client's status of each bank in `banks` has what the server's last answer gave.
+local function waitForCharge(self, banks)
+    for _, bank in ipairs(banks) do
+        T.waitForStatus(self, bank, function(status)
+            return status.storedWh == bank.state.status.storedWh and status.solarW == bank.state.status.solarW
+        end, "this client's status with the charge the server's pass left")
+    end
+end
+
+-- The charge a car battery starts at below, and the hour of full sun it then takes in.
+local START_CHARGE, SUN_HOURS = 0.25, 1
+
+-- The summary says how long the batteries take to fill at what comes in, and once they are full
+-- how much of it goes spare. Catches a time to full counted from the wrong end or at the wrong
+-- watts, or a full bank shown as charging.
+test("renewable_energy_bank_window_says_time_to_full", {
+    run = function(self)
+        T.setGrid(self, false)
+        local charging = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY }, { charge = START_CHARGE })
+        local full = charging and T.bank(self, "batteryBoxWood", { T.CAR_BATTERY }, { charge = 1 })
+        self.chargingPanel = full and T.panel(self, Sprites.flat, { near = charging, connect = true })
+        self.fullPanel = self.chargingPanel and T.panel(self, Sprites.flat, { near = full, connect = true })
+        if not self.fullPanel then return end
+        self.charging, self.full = charging, full
+        T.watch(self, charging)
+        T.watch(self, full)
+        T.batch(function()
+            T.bankPass(self, charging, Sun.FULL_SUN, { hours = SUN_HOURS })
+            T.bankPass(self, full, Sun.FULL_SUN, { hours = SUN_HOURS })
+        end)
+        waitForCharge(self, { charging, full })
+    end,
+    validate = function(self)
+        if not (T.expectConnected(self.chargingPanel) and T.expectConnected(self.fullPanel)) then return end
+        local panelW = T.flatPanelW()
+        -- (600 Wh - 0.25 × 600 Wh - 320 W × 1 h) / 320 W = 0.40625 h at the default Sunlight
+        -- Multiplier: clear of a whole minute, so the line's rounding down can't tip.
+        local capacityWh = Specs.batteries[T.CAR_BATTERY].wh
+        local hours = (capacityWh * (1 - START_CHARGE) - panelW * SUN_HOURS) / panelW
+        local charging = T.clientStatus(self.charging)
+        expectNear("the hours the charging bank says it takes to fill", charging.charging.hours, hours, 0.001)
+        local line = StatusRows.summary(charging)[1]
+        expectEqual("the charging bank's first line", line.text,
+            getText("IGUI_RenewableEnergy_ChargingFullIn", Format.signedWatts(panelW), Format.duration(hours)))
+        expectEqual("the colour of the charging bank's first line", line.color, "good")
+        local full = T.clientStatus(self.full)
+        expect(full.charging.hours == nil, "the full bank says it fills in " .. tostring(full.charging.hours) .. " hours")
+        expectEqual("the full bank's first line", StatusRows.summary(full)[1].text,
+            getText("IGUI_RenewableEnergy_FullSpare", Format.watts(panelW)))
     end,
 })
 
@@ -253,6 +304,11 @@ test("renewable_energy_bank_window_lists_other_buildings_apart", {
     validate = function(self)
         local without, with = self.reads.without.status, self.reads.with.status
         local function elsewhereW(status) return status.loadElsewhere and status.loadElsewhere.watts or 0 end
+        -- The fridge-freezers the status lists in other buildings: other appliances may stand there.
+        local function elsewhereFridges(status)
+            local entry = status.loadElsewhere and T.findIn(status.loadElsewhere.byKind, "kind", "fridgeFreezer")
+            return entry and entry.count or 0
+        end
         local added = self.count * T.fridgeW()
         expect(with.overloaded, "fridges in another building didn't overload the bank")
         expectNear("the load the fridges in another building add", with.loadW - without.loadW, added, 0.01)
@@ -268,7 +324,8 @@ test("renewable_energy_bank_window_lists_other_buildings_apart", {
         local under = rowsUnder(left, getText("IGUI_RenewableEnergy_DrawingElsewhere", Format.away(self.bank, elsewhere)))
         if not expect(under ~= nil, "the window has no list for other buildings") then return end
         local fridges = T.findIn(elsewhere.byKind, "kind", "fridgeFreezer")
-        if not expect(fridges ~= nil and fridges.count >= self.count, "the status lists too few fridge-freezers in other buildings") then
+        if not expectEqual("fridge-freezers this client's status lists in other buildings", fridges and fridges.count,
+            elsewhereFridges(without) + self.count) then
             return
         end
         local name = getText("IGUI_RenewableEnergy_LoadFridgeFreezer")

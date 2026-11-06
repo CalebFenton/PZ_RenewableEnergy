@@ -75,7 +75,7 @@ end)
 -- ZombRandFloat vanilla's scrap draws (0 to 101 against a piece's chance) is that, as a bank's
 -- Material scrap rolls with no roll of the mod's. Answers whether every tile went,
 -- how many `args.type` it gave and how many of each type (`counts`), into the inventory or onto the
--- object's squares; what the dismantling gave and the tools go away.
+-- object's squares, the tools given left out; what the dismantling gave and the tools go away.
 handler("scrapItems", function(player, args, defer)
     local object = Kinds.find(args)
     local props = ISMoveableSpriteProps.fromObject(object)
@@ -94,12 +94,17 @@ handler("scrapItems", function(player, args, defer)
     end
     local before = held()
     local def = ISMoveableDefinitions:getInstance().getScrapDefinition(props.material)
+    -- The tools given, which aren't what the dismantling gave.
+    local tools = {}
     for _, second in ipairs({ false, true }) do
-        local tools = def and (second and def.tools2 or def.tools) or {}
+        local needed = def and (second and def.tools2 or def.tools) or {}
         if not props:hasScrapTool(player, second) then
-            for _, tool in ipairs(tools) do
+            for _, tool in ipairs(needed) do
                 if not tool:find("^Tag%.") then
-                    Items.addItem(inventory, tool)
+                    local given = Items.addItem(inventory, tool)
+                    if given then
+                        tools[given] = true
+                    end
                     break
                 end
             end
@@ -128,8 +133,10 @@ handler("scrapItems", function(player, args, defer)
     for _, new in ipairs(PZHarness.Fixtures.newSince(before, held())) do
         local onFloor = instanceof(new, "IsoWorldInventoryObject")
         local fullType = (onFloor and new:getItem() or new):getFullType()
-        count = count + (fullType == args.type and 1 or 0)
-        counts[fullType] = (counts[fullType] or 0) + 1
+        if not tools[new] then
+            count = count + (fullType == args.type and 1 or 0)
+            counts[fullType] = (counts[fullType] or 0) + 1
+        end
         if onFloor then
             Fixtures.removePlaced(new)
         else

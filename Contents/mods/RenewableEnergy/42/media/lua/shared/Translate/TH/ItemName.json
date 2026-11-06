@@ -1,6 +1,6 @@
 {
     "RenewableEnergy.SolarModule": "โมดูลโซลาร์",
-    "RenewableEnergy.HomemadeSolarModule": "โมดูลโซลาร์แบบประยุกต์",
+    "RenewableEnergy.HomemadeSolarModule": "โมดูลโซลาร์แบบทำมือ",
     "RenewableEnergy.SolarCells": "เซลล์แสงอาทิตย์",
     "RenewableEnergy.SolarFlat": "แผงโซลาร์แบบวางราบ",
     "RenewableEnergy.SolarWallWood": "แผงโซลาร์ติดผนังแบบไม้",
@@ -16,8 +16,8 @@
     "RenewableEnergy.PlugInInverter": "อินเวอร์เตอร์แบบเสียบปลั๊ก",
     "RenewableEnergy.PowerInverter": "อินเวอร์เตอร์กำลังสูง",
     "RenewableEnergy.InverterCharger": "อินเวอร์เตอร์/ชาร์จเจอร์",
-    "RenewableEnergy.MakeshiftInverter": "อินเวอร์เตอร์แบบเสียบปลั๊กแบบประยุกต์",
-    "RenewableEnergy.HomemadeInverter": "อินเวอร์เตอร์กำลังสูงแบบประยุกต์",
+    "RenewableEnergy.MakeshiftInverter": "อินเวอร์เตอร์เสียบปลั๊กแบบทำมือ",
+    "RenewableEnergy.HomemadeInverter": "อินเวอร์เตอร์กำลังสูงแบบทำมือ",
     "RenewableEnergy.MicrowaveTransformer": "หม้อแปลงไมโครเวฟ",
     "RenewableEnergy.ChargeController": "ตัวควบคุมการชาร์จ",
     "RenewableEnergy.SolarFailsafe": "สวิตช์สำรองโซลาร์",
@@ -30,7 +30,7 @@
     "RenewableEnergy.WornBatteryPlates": "แผ่นธาตุแบตเตอรี่เสื่อมสภาพ",
     "RenewableEnergy.BatteryPlates": "แผ่นธาตุแบตเตอรี่",
     "RenewableEnergy.LeadDross": "กากตะกั่ว",
-    "RenewableEnergy.WoodenBatteryPlatePattern": "แม่แบบไม้แผ่นธาตุแบตเตอรี่",
+    "RenewableEnergy.WoodenBatteryPlatePattern": "แม่แบบไม้สำหรับแผ่นธาตุแบตเตอรี่",
     "RenewableEnergy.BatteryPlateMoldUnfired": "แม่พิมพ์แผ่นธาตุแบตเตอรี่ (ยังไม่เผา)",
     "RenewableEnergy.BatteryPlateMold": "แม่พิมพ์แผ่นธาตุแบตเตอรี่",
     "RenewableEnergy.BatteryElectrolyte": "น้ำกรดแบตเตอรี่",
@@ -60,6 +60,6 @@
     "RenewableEnergy.BrokenWoodenBlades": "ชุดใบพัดไม้ที่หัก",
     "RenewableEnergy.BrokenPipeBlades": "ชุดใบพัดท่อพลาสติกที่หัก",
     "RenewableEnergy.BrokenSteelBlades": "ชุดใบพัดเหล็กกล้าที่หัก",
-    "RenewableEnergy.HomemadeAlternator": "ไดชาร์จแบบทำเอง",
+    "RenewableEnergy.HomemadeAlternator": "ไดชาร์จโฮมเมด",
     "RenewableEnergy.CarAlternator": "ไดชาร์จรถยนต์"
 }

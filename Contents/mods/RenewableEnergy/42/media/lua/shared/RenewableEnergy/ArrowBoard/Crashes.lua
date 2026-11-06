@@ -108,9 +108,11 @@ function ArrowBoard.sampleCrash(watch, now, x, y, atRest)
     return newCrash
 end
 
--- The physics' x and z are the ground's.
+-- The physics' x and z are the ground's. A trailer whose physics isn't running can't move, and its
+-- velocity then holds whatever the physics last left there: a reloaded trailer has been seen
+-- reading millions of m/s in a frame before its physics started, which cracked its panels.
 local function sampleVelocity(vehicle, watch, now)
-    if vehicle:isAtRest() then
+    if vehicle:isAtRest() or not vehicle:isPhysicsActive() then
         return ArrowBoard.sampleCrash(watch, now, 0, 0, true)
     end
     vehicle:getLinearVelocity(velocity)

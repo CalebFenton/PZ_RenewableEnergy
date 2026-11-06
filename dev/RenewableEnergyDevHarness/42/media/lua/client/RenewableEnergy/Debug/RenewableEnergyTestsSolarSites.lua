@@ -95,10 +95,10 @@ serverCheck("renewable_energy_world_sites_placed_sensibly", "sitesPlacedSensibly
 
 -- A world rolls each site once by its name: a world saved while every site was rolled at once
 -- gets a site added since, once, and never those it rolled then; the option at 0 still keeps a new
--- site out.
+-- site out; and a site that isn't certain comes in on a roll under the option's percentage.
 test("renewable_energy_world_site_rolled_once", {
     run = function(self)
-        local squares = T.need(self, T.squares(self, 3), "free outdoor squares for the sites' spots")
+        local squares = T.need(self, T.squares(self, 5), "free outdoor squares for the sites' spots")
         if not squares then return end
         local at = {}
         for i, square in ipairs(squares) do

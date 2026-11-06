@@ -79,22 +79,59 @@ handler("freezeClock", function(player, args, defer)
     return {}
 end)
 
--- The stink score's edges (Digester.SMELL_SCORES): none just below the first, then each smell
--- level's corpses from its edge up to just below the next.
-PZHarness.checkHandler("digesterCorpsesFor", function(expect)
+-- The stink score (DigesterObject:stinkScore) of a digester in each state, against the sums of its
+-- constants, and the corpses a score smells like (DigesterObject.corpsesFor): none just below the
+-- first of Digester.SMELL_SCORES, each smell level's first count at its score, and one short of the
+-- next level's count just below the next score.
+PZHarness.checkHandler("digesterStink", function(_, expectNear, expectEqual)
+    local needed = getSandboxOptions():getCompostHours()
+    -- A record of `tier`, mature (14 days of gas), fed to its cap, outdoors, with `fields` over that;
+    -- stinkScore reads only its fields and its tier.
+    local function score(tier, fields)
+        local state = { luaSystem = { owner = Digester }, tier = tier, fed = true, started = true, gasHours = 14 * 24,
+            startupHours = 0, seedHours = 0, potential = Digester.TIERS[tier].potentialCap, sludge = 0, sour = false,
+            indoors = false }
+        for key, value in pairs(fields) do
+            state[key] = value
+        end
+        return setmetatable(state, { __index = DigesterObject }):stinkScore()
+    end
+    -- DigesterObject's constants: a startup stinks 1.0, plus 0.5 at its middle (a sine); gas brings
+    -- it from 0.8 to 0.4 over 14 days; full sludge adds 0.8 and souring 1.5; a part-filled one
+    -- stinks 0.5 + 0.5 × its fill of that; indoors twice that; all times its tier's stink (barrel 1,
+    -- insulated 0.6, dome 0.3, which stops at 0.99).
+    for _, case in ipairs({
+        { "an unfed barrel", "barrel", { fed = false }, 0 },
+        { "a barrel just fed", "barrel", { started = false }, 1.0 },
+        { "a barrel halfway through its startup", "barrel", { started = false, startupHours = needed / 2 }, 1.5 },
+        { "a barrel with its first gas", "barrel", { gasHours = 0 }, 0.8 },
+        { "a barrel a week into its gas", "barrel", { gasHours = 7 * 24 }, 0.6 },
+        { "a mature barrel", "barrel", {}, 0.4 },
+        { "a mature barrel half full of sludge", "barrel", { sludge = 50 }, 0.4 + 0.8 * 0.5 },
+        { "a sour mature barrel", "barrel", { sour = true }, 0.4 + 1.5 },
+        { "a mature barrel fed to half its cap", "barrel", { potential = 2.5 }, 0.4 * (0.5 + 0.5 * 0.5) },
+        { "a mature barrel with nothing left to digest", "barrel", { potential = 0 }, 0.4 * 0.5 },
+        { "a mature barrel indoors", "barrel", { indoors = true }, 0.4 * 2 },
+        { "a mature insulated digester", "insulated", {}, 0.4 * 0.6 },
+        { "a mature brick dome", "dome", {}, 0.4 * 0.3 },
+        -- (1.5 + 0.8 + 1.5) × 0.3 = 1.14, past the dome's cap.
+        { "a sour brick dome full of sludge mid-startup", "dome",
+            { started = false, startupHours = needed / 2, sour = true, sludge = 100 }, 0.99 },
+    }) do
+        expectNear("the stink score of " .. case[1], score(case[2], case[3]), case[4], 1e-9)
+    end
+
     local corpsesFor = DigesterObject.corpsesFor
     local levels, scores = Stink.LEVEL_CORPSES, Digester.SMELL_SCORES
     local below = 0.001
-    local function band(score, lowest, under)
-        local corpses = corpsesFor(score)
-        expect(corpses >= lowest and (not under or corpses < under),
-            "a stink score of " .. score .. " smells like " .. corpses .. " corpses")
+    local function smells(score, corpses)
+        expectEqual("corpses a stink score of " .. score .. " smells like", corpsesFor(score), corpses)
     end
-    band(scores[1] - below, 0, 1)
+    smells(scores[1] - below, 0)
     for i, score in ipairs(scores) do
-        band(score, levels[i], levels[i + 1])
+        smells(score, levels[i])
         if scores[i + 1] then
-            band(scores[i + 1] - below, levels[i], levels[i + 1])
+            smells(scores[i + 1] - below, levels[i + 1] - 1)
         end
     end
 end)

@@ -62,40 +62,38 @@ end
 
 -- Stink ------------------------------------------------------------------------------------------
 
--- Ghosts outdoors smell like corpses to a character outdoors nearby: each smell level starts at
--- its corpse count and not one below, the moodle reaches this client, and the ghosts leave nothing
--- on their square; taking them away clears the smell.
+-- Ghosts outdoors smell like exactly their count of corpses to a character outdoors nearby, spread
+-- over the source's square and the ring of chunks around it (Stink.spread): one short of the top
+-- smell level's count smells a level lower, that count at the top. The moodle reaches this client,
+-- and the ghosts leave nothing on their square; taking them away clears the smell. Where the
+-- game's other levels start isn't the mod's to test: the digester's stink tests read through them.
 test("renewable_energy_biogas_stink_outdoors", {
     run = function(self)
         self.moodle = {}
         local _, source = standNearSource(self)
         if not source then return end
         withLevels(self, source, function(levels)
-            for i, count in ipairs(levels) do
-                stink(self, source, count - 1)
-                T.waitForAuthoritySmell(self, source, i - 1, "below" .. i)
-                stink(self, source, count)
-                T.waitForAuthoritySmell(self, source, i, "at" .. i)
-            end
-            waitForClientSmell(self, #levels, "top")
+            local top = #levels
+            stink(self, source, levels[top] - 1)
+            T.waitForAuthoritySmell(self, source, top - 1, "below")
+            stink(self, source, levels[top])
+            T.waitForAuthoritySmell(self, source, top, "top")
+            waitForClientSmell(self, top, "top")
             stink(self, source, 0)
             T.waitForAuthoritySmell(self, source, 0, "none")
             waitForClientSmell(self, 0, "none")
         end)
     end,
     validate = function(self)
-        local reads = self.reads
-        for i, count in ipairs(self.levels) do
-            local below, at = reads["below" .. i], reads["at" .. i]
-            T.expectEqual("the smell level of " .. (count - 1) .. " ghosts", below and below.level, i - 1)
-            T.expectEqual("the smell level of " .. count .. " ghosts", at and at.level, i)
+        local reads, top = self.reads, #self.levels
+        local count = self.levels[top]
+        T.expectEqual("the smell level of " .. (count - 1) .. " ghosts", reads.below and reads.below.level, top - 1)
+        T.expectEqual("the smell level of " .. count .. " ghosts", reads.top and reads.top.level, top)
+        if T.expect(reads.top ~= nil, "no read at the top smell level") then
+            T.expectEqual("corpses on the source's square", reads.top.bodies, 0)
+            T.expectEqual("moving objects on the source's square", reads.top.objects, 0)
         end
-        local top = reads["at" .. #self.levels]
-        if T.expect(top ~= nil, "no read at the top smell level") then
-            T.expectEqual("corpses on the source's square", top.bodies, 0)
-            T.expectEqual("moving objects on the source's square", top.objects, 0)
-        end
-        T.expectEqual("this client's moodle level at the top", self.moodle.top, #self.levels)
+        T.expectEqual("this client's moodle level at the top", self.moodle.top, top)
         T.expectEqual("the smell level with the ghosts gone", reads.none and reads.none.level, 0)
         T.expectEqual("this client's moodle level with the ghosts gone", self.moodle.none, 0)
     end,

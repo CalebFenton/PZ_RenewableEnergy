@@ -29,10 +29,17 @@ handler("openCarHood", function(_, args)
     return {}
 end)
 
+-- The server's character's Mechanics XP.
+handler("mechanicsXp", function(player)
+    return { xp = player:getXp():getXP(Perks.Mechanics) }
+end)
+
 -- Takes the alternator out for the player straight away, as the job's complete() would; answers
--- whether it gave one, which it mustn't once the alternator is out.
+-- whether it gave one, which it mustn't once the alternator is out, and the Mechanics XP it gave.
 handler("takeOutAlternatorAgain", function(player, args)
-    return { gave = CarAlternator.takeOut(player, PZHarness.vehicleAt(args)) }
+    local before = player:getXp():getXP(Perks.Mechanics)
+    local gave = CarAlternator.takeOut(player, PZHarness.vehicleAt(args))
+    return { gave = gave, xp = player:getXp():getXP(Perks.Mechanics) - before }
 end)
 
 -- Scraps the wreck as vanilla's blowtorch job completes it (ISRemoveBurntVehicle:complete), the

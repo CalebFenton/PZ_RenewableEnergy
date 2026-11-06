@@ -38,6 +38,23 @@ test("renewable_energy_woodgas_build_gasifier", {
     end,
 })
 
+-- A lit gasifier's fire, ash, tar, condensate and pipe survive the world saved and loaded again,
+-- which keeps only its saved fields; loading shows the fire and the pipe again.
+local SAVED_GASIFIER = { lit = true, fireKg = 1.5, ash = 40, tarKg = 0.3, condensate = 1.2, pipe = "E" }
+
+test("renewable_energy_woodgas_gasifier_kept_through_save", {
+    run = function(self)
+        local gasifier = T.placeRecord(self, "gasifier", "standard")
+        if not gasifier then return end
+        T.saveAndLoad(self, gasifier, SAVED_GASIFIER, "saved")
+    end,
+    validate = function(self)
+        T.expectKeptThroughSave(self, "saved", SAVED_GASIFIER)
+        local after = self.reads.saved and self.reads.saved.after
+        T.expect(T.hasOverlay(after and after.record, Sprites.gasifierLit.standard), "the loaded gasifier shows no fire")
+    end,
+})
+
 -- Feeding a generator -----------------------------------------------------------------------------
 
 -- Lit and piped to a kitted generator beside it, a gasifier runs it with an empty tank, burning
@@ -299,7 +316,9 @@ test("renewable_energy_woodgas_cold_gasifier_needs_bellows", {
 -- Ash, tar and condensate ---------------------------------------------------------------------------
 
 -- Burning fills the ash pit by the tier's ashPerKg and tars one packing item for each tarKgPerItem
--- burned, leaving the rest clean.
+-- burned, leaving the rest clean. A filter whose drain is full (CONDENSATE_MAX) tars it
+-- CONDENSATE_TAR times as fast: the half item's worth of tar left over and a quarter item's wood
+-- burned undrained make a whole item more, where drained they'd make three quarters.
 test("renewable_energy_woodgas_burning_fills_ash_and_tars_packing", {
     instant = true,
     run = function(self)
@@ -318,6 +337,9 @@ test("renewable_energy_woodgas_burning_fills_ash_and_tars_packing", {
                 T.burnGasifier(self, gasifier, self.kg)
             end
             T.readRecord(self, gasifier, "burned")
+            T.setRecord(self, gasifier, { condensate = Gasifier.CONDENSATE_MAX })
+            T.burnGasifier(self, gasifier, self.spec.tarKgPerItem / 4)
+            T.readRecord(self, gasifier, "undrained")
         end)
     end,
     validate = function(self)
@@ -325,6 +347,10 @@ test("renewable_energy_woodgas_burning_fills_ash_and_tars_packing", {
         T.expectNear("ash after burning " .. kg .. " kg", burned.ash, math.min(Gasifier.ASH_FULL, kg * self.spec.ashPerKg), 0.05)
         T.expectEqual("tarry packing after burning " .. kg .. " kg", burned.tarry, self.tarred)
         T.expectEqual("clean packing after burning " .. kg .. " kg", burned.clean, self.packing - self.tarred)
+        local undrained = self.reads.undrained
+        T.expectEqual("tarry packing after a quarter item's wood more with the drain full", undrained.tarry, self.tarred + 1)
+        T.expectEqual("clean packing after a quarter item's wood more with the drain full", undrained.clean,
+            self.packing - self.tarred - 1)
     end,
 })
 

@@ -16,7 +16,8 @@ local BANK_RINGS = { 2, 4, 8 }
 
 -- A load past what the line carries stalls the generator, at exactly that it runs, and once the
 -- load fits again it starts by itself; this client's copy shows the stall, as its info window does.
--- Cutting the line while stalled forgets the stall, so a new line doesn't start it. The loads are
+-- Cutting the line while stalled forgets the stall, so a new line doesn't start it, and takes the
+-- fuel the gas line showed with it, leaving the empty tank. The loads are
 -- made up (gasLoad): no set of appliances adds up to exactly the cap;
 -- renewable_energy_gasline_generator_stalls_on_real_load measures a real one.
 test("renewable_energy_gasline_generator_stalls_over_cap", {
@@ -55,6 +56,7 @@ test("renewable_energy_gasline_generator_stalls_over_cap", {
         T.expect(fits.running and fits.state ~= nil and not fits.state.stalled, "the generator didn't start again once the load fit")
         T.expect(T.isStalled(reads.stalled), "a watt over its cap didn't stall it again")
         T.expect(reads.cut.state ~= nil and not reads.cut.state.stalled, "cutting the line left the generator stalled")
+        T.expectNear("fuel in the empty-tanked generator once its line is cut", reads.cut.fuel, 0, 0.001)
         T.expect(not reads.reconnected.running, "a new line started a generator stalled on the line before")
     end,
 })

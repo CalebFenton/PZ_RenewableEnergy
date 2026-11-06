@@ -3,7 +3,6 @@ local BankJobs = require "RenewableEnergy/PowerBank/BankJobs"
 local SourceJobs = require "RenewableEnergy/PowerBank/SourceJobs"
 local Wiring = require "RenewableEnergy/PowerBank/Wiring"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
-local Specs = require "RenewableEnergy/Specs"
 local Sprites = require "RenewableEnergy/Sprites"
 local Treadmill = require "RenewableEnergy/PowerBank/Treadmill"
 
@@ -17,6 +16,7 @@ local test, expect = T.test, T.expect
 local PASS_HOURS = 1 / 60
 -- A pass too short to pay out a whole run.
 local SHORT_PASS_HOURS = 1 / 6
+local CONTROLLER = "RenewableEnergy.ChargeController"
 
 -- The console tile of the west-facing treadmill whose rear tile is the handle `rear`: west of it
 -- (Sprites.treadmill).
@@ -52,14 +52,16 @@ local function restRunner(self)
         "this client's copy of the rested runner")
 end
 
--- Expects the restRunner's run, read into self.reads.afterRun, to have cost
--- endurance, made the runner thirsty and taught Fitness beyond self.reads.beforeRun.
+-- Expects the restRunner's whole run, read into self.reads.afterRun, to have cost its endurance and
+-- thirst, by Treadmill.SPEC an hour's 0.6 and 0.2 over half an hour (0.3 and 0.1; the game's own
+-- metabolism moves them a little more meanwhile), and taught Fitness beyond self.reads.beforeRun
+-- (by how much is vanilla's, through its XP multipliers).
 local function expectRunTrained(self)
     local character = self.reads.afterRun
     local stats = character and character.stats
     if expect(stats ~= nil, "no stats of the runner from the server") then
-        expect(stats.ENDURANCE < 0.99, "the run cost no endurance: " .. stats.ENDURANCE)
-        expect(stats.THIRST > 0.01, "the run made the runner no thirstier: " .. stats.THIRST)
+        T.expectNear("endurance the run cost", 1 - stats.ENDURANCE, 0.3, 0.02)
+        T.expectNear("thirst the run gave", stats.THIRST, 0.1, 0.01)
     end
     expect(character and character.xp.Fitness > self.reads.beforeRun.xp.Fitness, "the run taught no Fitness")
 end
@@ -191,8 +193,10 @@ test("renewable_energy_treadmill_menu_offers_run_and_connect", {
     end,
 })
 
--- A run on a wired treadmill banks its watt-hours, paid out over the passes after it rather than
--- in one go, into the batteries as the status says, and costs the runner sweat and trains Fitness.
+-- A run on a wired treadmill banks a run's 120 Wh (Treadmill.SPEC: 240 W for 30 minutes), paid out
+-- at no more than 240 W over the passes after it rather than in one go: 40 Wh in a sixth of an
+-- hour, the other 80 in the next, into the batteries as the status says; and it costs the runner
+-- sweat and trains Fitness.
 test("renewable_energy_treadmill_wired_run_pays_bank_over_passes", {
     instant = true,
     run = function(self)
@@ -218,84 +222,24 @@ test("renewable_energy_treadmill_wired_run_pays_bank_over_passes", {
         local short = T.findIn(self.reads.short.status.sources, "kind", "treadmill")
         local later = T.findIn(after.status.sources, "kind", "treadmill")
         if not expect(short ~= nil and later ~= nil, "the bank's status lists no treadmill") then return end
-        local banked = after.status.runWhToday
-        if not expect(banked > 0, "the run banked nothing") then return end
-        local shortWh, laterWh = short.watts * SHORT_PASS_HOURS, later.watts
-        expect(shortWh > 0 and shortWh < banked, "the short pass after the run paid out " .. shortWh .. " of its "
-            .. banked .. " Wh, not a part of it")
-        T.expectNear("Wh the two passes paid out of the run", shortWh + laterWh, banked, 0.01)
-        T.expectNear("Wh in the batteries against the run's Wh in the status",
-            after.status.storedWh - before.status.storedWh, banked, 1)
+        T.expectNear("Wh the run banked", after.status.runWhToday, 120, 0.01)
+        T.expectNear("Wh the sixth of an hour after the run paid out", short.watts * SHORT_PASS_HOURS, 40, 0.01)
+        T.expectNear("Wh the hour after that paid out", later.watts, 80, 0.01)
+        T.expectNear("Wh in the batteries after both passes", after.status.storedWh - before.status.storedWh, 120, 1)
         expectRunTrained(self)
     end,
 })
 
--- A run on a treadmill a bank of L-16s with an inverter-charger powers, the grid off: on an unwired
--- one it bills the treadmill's watts to that bank from when the authority starts it until it
--- settles, and banks nothing, and once the power goes out it can't go on; on one wired to that bank
--- it draws nothing. Catches a wired run billed as a load as well.
-test("renewable_energy_treadmill_run_draws_from_the_bank_only_unwired", {
-    run = function(self)
-        T.setGrid(self, false)
-        local bank = T.bank(self, "batteryRackWood", { T.L16, T.L16, T.INVERTER_CHARGER })
-        local squares = bank and T.squares(self, 2, { indoors = true, near = bank })
-        if not T.need(self, squares, "free indoor squares for two treadmills") then return end
-        local unwired = T.panel(self, Sprites.treadmill.N.console, { square = squares[1] })
-        local wired = T.panel(self, Sprites.treadmill.N.console, { square = squares[2], near = bank, connect = true, wired = true })
-        if not (unwired and wired) then return end
-        self.bank, self.wired = bank, wired
-        T.switchOn(self, bank)
-        T.waitFor(self, function() return unwired.square:haveElectricity() end,
-            "power from the switched-on bank on the treadmill's square here")
-        restRunner(self)
-        T.goNextTo(self, unwired.square)
-        T.step(function() self.goesOnPower = RenewableEnergyTreadmillAction:new(T.player(), unwired.object):isValid() end)
-        T.batch(function()
-            T.bankPass(self, bank, 0, { hours = PASS_HOURS, label = "before" })
-            T.server(self, "startTreadmillRun", T.at(unwired))
-            T.read(self, "scanLoad", T.at(bank), "unwiredLoad")
-            T.bankPass(self, bank, 0, { hours = PASS_HOURS, label = "during" })
-            T.read(self, "completeStartedTreadmillRun", T.at(unwired), "unwiredRun")
-            T.bankPass(self, bank, 0, { hours = PASS_HOURS, label = "after" })
-        end)
-        T.goNextTo(self, wired.square)
-        T.batch(function()
-            T.server(self, "startTreadmillRun", T.at(wired))
-            T.read(self, "scanLoad", T.at(bank), "wiredLoad")
-            T.read(self, "completeStartedTreadmillRun", T.at(wired), "wiredRun")
-        end)
-        T.job(self, "bank", BankJobs.TURN_OFF, bank)
-        T.waitFor(self, function() return not unwired.square:haveElectricity() end,
-            "this client's copy of the treadmill's square without power once the bank is off")
-        T.step(function()
-            self.goesWithoutPower = RenewableEnergyTreadmillAction:new(T.player(), unwired.object):isValid()
-        end)
-    end,
-    validate = function(self)
-        if not T.expectConnected(self.wired) then return end
-        local reads = self.reads
-        local before, during, after = reads.before.status, reads.during.status, reads.after.status
-        local watts = Specs.wattsFromFuel(Treadmill.SPEC.drawFuel)
-        T.expectNear("W the running treadmill added to the bank's load", during.loadW - before.loadW, watts, 0.01)
-        T.expectNear("W the batteries gave for the running treadmill", during.drawW - before.drawW,
-            watts / Specs.inverters[T.INVERTER_CHARGER].efficiency, 0.01)
-        T.expectNear("W of the bank's load after the run, against before it", after.loadW - before.loadW, 0, 0.01)
-        expect(reads.unwiredRun.done, "the authority settled nothing of a run on a powered, unwired treadmill")
-        T.expectEqual("Wh the unwired run banked", after.runWhToday, 0)
-        expect(self.goesOnPower, "a run on a powered, unwired treadmill can't go")
-        expect(not self.goesWithoutPower, "a run on an unwired treadmill goes on once its power is out")
-        T.expectEqual("treadmills the unwired run drew through", reads.unwiredLoad.counts.treadmill, 1)
-        T.expectEqual("treadmills the wired run drew from the bank it feeds", reads.wiredLoad.counts.treadmill or 0, 0)
-        expect(reads.wiredRun.done, "the bank took nothing of a run on a wired, connected treadmill")
-    end,
-})
-
--- Half a run, stopped as the server stops a client's action, settles half of one: on an unwired,
--- powered treadmill it costs half a run's endurance and its draw on the bank ends; on a wired one
--- it banks half a run's watt-hours as well. Treadmill.SPEC: 240 W, 0.6 endurance an hour, 30
--- minutes a run, so a quarter hour: 60 Wh and 0.15 endurance. Catches a part run paid in full or
--- not at all, and one that leaves the unwired treadmill drawing.
-test("renewable_energy_treadmill_half_run_settles_half", {
+-- Treadmills a bank of L-16s with an inverter-charger powers, the grid off. A run on an unwired one
+-- bills its motor to that bank from when the authority starts it until it settles, as vanilla bills
+-- a washer: 0.09 fuel an hour at 2000 W a unit (Specs.wattsPerFuel), 180 W of load and 200 W from
+-- the batteries through the inverter's 90%; once the power goes out a run can't go on. A run on one
+-- wired to that bank draws nothing. Each run is stopped halfway, as the server stops a client's
+-- action, and settles half of one (Treadmill.SPEC: 30 minutes, 0.6 endurance an hour, so 0.15):
+-- the unwired one's draw ends and it banks nothing; the wired one banks half a run's 120 Wh, which
+-- the next hour pays out at 60 W. Catches a wired run billed as a load, a part run paid in full or
+-- not at all, and a stopped run left drawing.
+test("renewable_energy_treadmill_runs_draw_unwired_and_settle_their_share", {
     run = function(self)
         T.setGrid(self, false)
         local bank = T.bank(self, "batteryRackWood", { T.L16, T.L16, T.INVERTER_CHARGER }, { charge = 0.5 })
@@ -310,32 +254,54 @@ test("renewable_energy_treadmill_half_run_settles_half", {
             "power from the switched-on bank on the treadmill's square here")
         restRunner(self)
         T.goNextTo(self, unwired.square)
+        T.step(function() self.goesOnPower = RenewableEnergyTreadmillAction:new(T.player(), unwired.object):isValid() end)
         T.batch(function()
+            T.bankPass(self, bank, 0, { hours = PASS_HOURS, label = "before" })
             T.server(self, "startTreadmillRun", T.at(unwired))
             T.read(self, "scanLoad", T.at(bank), "unwiredLoad")
+            T.bankPass(self, bank, 0, { hours = PASS_HOURS, label = "during" })
             T.read(self, "completeStartedTreadmillRun", T.at(unwired, { progress = 0.5 }), "unwiredRun")
             T.read(self, "scanLoad", T.at(bank), "stoppedLoad")
+            T.bankPass(self, bank, 0, { hours = PASS_HOURS, label = "after" })
         end)
         restRunner(self)
         T.goNextTo(self, wired.square)
         T.batch(function()
-            T.readRecord(self, bank, "before")
             T.server(self, "startTreadmillRun", T.at(wired))
+            T.read(self, "scanLoad", T.at(bank), "wiredLoad")
             T.read(self, "completeStartedTreadmillRun", T.at(wired, { progress = 0.5 }), "wiredRun")
             -- An hour: long enough to pay out all a half run banked.
-            T.bankPass(self, bank, 0, { label = "after" })
+            T.bankPass(self, bank, 0, { label = "paid" })
+        end)
+        T.job(self, "bank", BankJobs.TURN_OFF, bank)
+        T.waitFor(self, function() return not unwired.square:haveElectricity() end,
+            "this client's copy of the treadmill's square without power once the bank is off")
+        T.step(function()
+            self.goesWithoutPower = RenewableEnergyTreadmillAction:new(T.player(), unwired.object):isValid()
         end)
     end,
     validate = function(self)
         if not T.expectConnected(self.wired) then return end
         local reads = self.reads
-        T.expectEqual("treadmills the unwired run drew through while running", reads.unwiredLoad.counts.treadmill, 1)
+        local before, during, after, paid = reads.before.status, reads.during.status, reads.after.status, reads.paid.status
+        expect(self.goesOnPower, "a run on a powered, unwired treadmill can't go")
+        T.expectEqual("treadmills the unwired run drew through", reads.unwiredLoad.counts.treadmill, 1)
+        T.expectNear("W the running treadmill added to the bank's load", during.loadW - before.loadW, 180, 0.01)
+        T.expectNear("W the batteries gave for the running treadmill", during.drawW - before.drawW, 200, 0.01)
         T.expectEqual("treadmills drawing once the unwired run stopped", reads.stoppedLoad.counts.treadmill or 0, 0)
+        T.expectNear("W of the bank's load after the run, against before it", after.loadW - before.loadW, 0, 0.01)
+        T.expectEqual("Wh the unwired run banked", after.runWhToday, 0)
+        expect(not self.goesWithoutPower, "a run on an unwired treadmill goes on once its power is out")
+        T.expectEqual("treadmills the wired run drew from the bank it feeds", reads.wiredLoad.counts.treadmill or 0, 0)
         for _, name in ipairs({ "unwiredRun", "wiredRun" }) do
             local run = reads[name]
             T.expectNear("endurance half the " .. name .. " cost", run.enduranceBefore - run.enduranceAfter, 0.15, 0.001)
         end
-        T.expectNear("Wh half the wired run banked", reads.after.status.runWhToday - reads.before.status.runWhToday, 60, 0.5)
+        T.expectNear("Wh half the wired run banked", paid.runWhToday - after.runWhToday, 60, 0.01)
+        local treadmill = T.findIn(paid.sources, "kind", "treadmill")
+        if expect(treadmill ~= nil, "the bank's status lists no treadmill") then
+            T.expectNear("W the wired treadmill paid out over the hour after its half run", treadmill.watts, 60, 0.01)
+        end
     end,
 })
 
@@ -370,6 +336,51 @@ test("renewable_energy_treadmill_unconnected_run_gives_nothing", {
         T.expectEqual("Fitness XP from a run on a disconnected treadmill", idle.xpAfter - idle.xpBefore, 0)
         T.expectEqual("endurance a run on a disconnected treadmill cost", idle.enduranceBefore - idle.enduranceAfter, 0)
         expect(ran.done and ran.xpAfter > ran.xpBefore, "connected again, the authority's run settled nothing")
+        T.expectNear("endurance the run cost connected again", ran.enduranceBefore - ran.enduranceAfter, 0.3, 0.001)
+    end,
+})
+
+-- A run on a wired treadmill past its bank's inputs still tires the runner, but its watt-hours are
+-- lost rather than kept for later: a rack's controller takes a flat panel, a scoop rotor and the
+-- treadmill, and worn out it leaves the rack its 2 free slots, which the panel and the scoop,
+-- connected first, take. The run settles, costing its 0.3 endurance (Treadmill.SPEC: 0.6 an hour,
+-- 30 minutes), the next pass pays the treadmill nothing for want of an input, and once the
+-- controller is mended the pass after pays nothing of that run either.
+test("renewable_energy_treadmill_run_past_the_inputs_is_lost", {
+    run = function(self)
+        local bank = T.bank(self, "batteryRackWood", { T.CAR_BATTERY, T.PLUG_IN_INVERTER, CONTROLLER })
+        if not bank then return end
+        T.batch(function()
+            self.panel = T.panel(self, Sprites.flat, { near = bank, connect = true })
+            self.scoop = T.panel(self, Sprites.windScoop, { near = bank, connect = true })
+        end)
+        self.treadmill = T.panel(self, Sprites.treadmill.N.console, { near = bank, connect = true, wired = true })
+        if not (self.panel and self.scoop and self.treadmill) then return end
+        T.setStat(self, "ENDURANCE", 1)
+        T.goNextTo(self, self.treadmill.square)
+        T.batch(function()
+            T.bankPart(self, bank, CONTROLLER, { condition = 0, recount = true })
+            T.read(self, "completeTreadmillRun", T.at(self.treadmill), "run")
+            T.bankPass(self, bank, 0, { label = "starved" })
+            T.bankPart(self, bank, CONTROLLER, { condition = 100, recount = true })
+            T.bankPass(self, bank, 0, { label = "mended" })
+        end)
+    end,
+    validate = function(self)
+        for _, handle in ipairs({ self.panel, self.scoop, self.treadmill }) do
+            if not T.expectConnected(handle) then return end
+        end
+        local run = self.reads.run
+        expect(run.done, "the authority settled no run on a treadmill past its bank's inputs")
+        T.expectNear("endurance the run cost", run.enduranceBefore - run.enduranceAfter, 0.3, 0.001)
+        for label, reason in pairs({ starved = "noController", mended = "idle" }) do
+            local treadmill = T.stateSource(self.reads[label], self.treadmill)
+            if expect(treadmill ~= nil, "the bank's " .. label .. " status lists no treadmill") then
+                T.expectEqual("the treadmill's watts " .. label, treadmill.watts, 0)
+                T.expectEqual("the treadmill's reason " .. label, treadmill.reason, reason)
+                T.expectEqual("Wh the run banked " .. label, self.reads[label].status.runWhToday, 0)
+            end
+        end
     end,
 })
 
@@ -389,9 +400,10 @@ end
 
 -- What a run banked that the passes haven't paid out yet goes into the batteries when the treadmill
 -- is unwired or smashed: the same run on a treadmill unwired at once, on one smashed at once and
--- on one left wired, with the same passes after, stores the same. Smashing it leaves the wire its
--- wiring took on the floor. Catches unwiring or smashing a treadmill right after a run forfeiting
--- the run, at once or at the next pass, and a smash that loses the wire.
+-- on one left wired, with the same passes after, stores a whole run's 120 Wh (Treadmill.SPEC: 240 W
+-- for 30 minutes) each. Smashing it leaves the 2 wire its wiring took on the floor. Catches
+-- unwiring or smashing a treadmill right after a run forfeiting the run, at once or at the next
+-- pass, and a smash that loses the wire.
 test("renewable_energy_treadmill_unwire_keeps_the_run", {
     instant = true,
     run = function(self)
@@ -436,12 +448,11 @@ test("renewable_energy_treadmill_unwire_keeps_the_run", {
                 case.name == "kept" and 1 or 0)
         end
         T.expectOk(self.reads.unwired, "unwiring the treadmill")
-        if expect(stored.kept > 0, "the run on the treadmill left wired stored nothing") then
-            T.expectNear("Wh a run stored with the treadmill unwired at once, against left wired", stored.unwired, stored.kept, 0.5)
-            T.expectNear("Wh a run stored with the treadmill smashed at once, against left wired", stored.smashed, stored.kept, 0.5)
+        for _, name in ipairs({ "kept", "unwired", "smashed" }) do
+            T.expectNear("Wh the run on the " .. name .. " treadmill stored", stored[name], 120, 1)
         end
         local wire = wireAndWired(self.reads.floor.items)
-        T.expectEqual("wire the smash left on the floor, against what wiring takes", wire, Treadmill.SPEC.wiring.wire)
+        T.expectEqual("wire the smash left on the floor", wire, 2)
     end,
 })
 

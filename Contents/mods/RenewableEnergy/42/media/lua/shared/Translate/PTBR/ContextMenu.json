@@ -18,9 +18,9 @@
     "ContextMenu_RenewableEnergy_AttachMaintainer": "Prender Mantenedor Solar",
     "ContextMenu_RenewableEnergy_DetachMaintainer": "Soltar Mantenedor Solar",
     "ContextMenu_RenewableEnergy_RepairPanel": "Vedar Painel Rachado: %1 (%2)",
-    "ContextMenu_RenewableEnergy_SealModule": "Vedar Módulo Rachado %1 (%2)",
+    "ContextMenu_RenewableEnergy_SealModule": "Vedar Módulo Rachado: Posição %1 (%2)",
     "ContextMenu_RenewableEnergy_ReglazePanel": "Trocar o Vidro do Painel: %1 (%2)",
-    "ContextMenu_RenewableEnergy_ReglazeModule": "Trocar o Vidro do Módulo %1 (%2)",
+    "ContextMenu_RenewableEnergy_ReglazeModule": "Trocar o Vidro do Módulo: Posição %1 (%2)",
     "ContextMenu_RenewableEnergy_RepairFrame": "Reparar Estrutura: %1 (%2)",
     "ContextMenu_RenewableEnergy_TakeSludge": "Retirar Lodo",
     "ContextMenu_RenewableEnergy_VentGas": "Liberar Gás",
@@ -58,6 +58,6 @@
     "ContextMenu_RenewableEnergy_ReleaseBrake": "Soltar o Freio",
     "ContextMenu_RenewableEnergy_ConnectTreadmill": "Conectar a um Banco de Baterias",
     "ContextMenu_RenewableEnergy_RunOnTreadmill": "Correr na Esteira",
-    "ContextMenu_RenewableEnergy_UnwireTreadmill": "Desligar a Fiação do Motor",
+    "ContextMenu_RenewableEnergy_UnwireTreadmill": "Desfazer a Fiação do Motor",
     "ContextMenu_RenewableEnergy_ReplaceBlades": "Trocar as Pás"
 }

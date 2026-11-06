@@ -68,6 +68,50 @@ test("renewable_energy_world_arrow_board_crash_watch_tells_crashes", {
     end,
 })
 
+-- A stand-in trailer with what ArrowBoard.sampleTrailer reads of it: whether it is at rest, whether
+-- its physics runs, and its velocity.
+local function physicsTrailer()
+    local trailer = { atRest = false, active = true, vx = 0, vz = 0 }
+    function trailer:isAtRest() return self.atRest end
+    function trailer:isPhysicsActive() return self.active end
+    function trailer:getLinearVelocity(out) return out:set(self.vx, 0, self.vz) end
+    function trailer:getVehicleTowedBy() return nil end
+    return trailer
+end
+
+-- The watch reads a trailer's velocity only while its physics runs: a trailer coming back with its
+-- chunk reads a wild velocity for a frame before its physics starts, which cracked its panels, but
+-- a crash's jolt into it once its physics runs still cracks them.
+test("renewable_energy_world_arrow_board_crash_watch_reads_only_running_physics", {
+    spOnly = "a multiplayer client reports a crash to the server rather than cracking it (the crash command test)",
+    run = function(self)
+        self.cracks = 0
+        local realCrack = ArrowBoard.crashCrack
+        ArrowBoard.crashCrack = function() self.cracks = self.cracks + 1 end
+        T.defer(self, function() ArrowBoard.crashCrack = realCrack end)
+        local crashMs, frame = ArrowBoard.CRASH.kmh / 3.6, 16
+        -- In the cell already, so sampleTrailer doesn't look for the stand-in among the cell's vehicles.
+        local trailer, watch = physicsTrailer(), ArrowBoard.newCrashWatch()
+        watch.inCell = true
+        local now = getTimestampMs()
+        local function sample(state)
+            for key, value in pairs(state) do trailer[key] = value end
+            now = now + frame
+            ArrowBoard.sampleTrailer(trailer, watch, now)
+            return self.cracks
+        end
+        -- The wild velocity seen on a reloaded trailer, physics not yet running.
+        sample({ atRest = false, active = false, vx = 7483100, vz = 7414499 })
+        self.afterReload = sample({ atRest = false, active = false, vx = 0, vz = 0 })
+        sample({ atRest = true, active = true })
+        self.afterImpact = sample({ atRest = false, active = true, vx = 0, vz = -1.01 * crashMs })
+    end,
+    validate = function(self)
+        expectEqual("cracks from a velocity read with the physics stopped", self.afterReload, 0)
+        expectEqual("cracks from a crash's jolt into the parked trailer, physics running", self.afterImpact, 1)
+    end,
+})
+
 -- A world position as the game's getters answer it.
 local function worldPos(x, y)
     return { x = function() return x end, y = function() return y end }

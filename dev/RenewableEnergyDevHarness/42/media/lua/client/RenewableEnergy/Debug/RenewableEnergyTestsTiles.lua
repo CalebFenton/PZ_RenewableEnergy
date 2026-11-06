@@ -186,7 +186,8 @@ end
 
 -- Registers test `name`, dismantling in each case a new object as the server's character does,
 -- clicking its tile `case.sprite`, at `case.level` of `case.perk`, and expecting `case.gives`,
--- counts by full type. `case.place(self)` places it and returns its handle; without it the whole
+-- counts by full type, or a function that answers them; with `case.only`, nothing else. `case.place(self)`
+-- places it and returns its handle; without it the whole
 -- object of `case.sprite` goes on a square with room around it. Every roll is `case.roll`, or
 -- with `case.chanceOf`, a scrap material, just "under" or "at" the character's vanilla chance
 -- for that material, worked out on the authority; with `case.vanillaRoll`, every roll vanilla's
@@ -221,8 +222,14 @@ local function dismantleTest(name, cases, premise)
             for _, case in ipairs(cases) do
                 local result = self.reads[case.label]
                 expect(result.scrapped, case.label .. " wasn't dismantled")
-                for fullType, count in pairs(case.gives) do
+                local gives = type(case.gives) == "function" and case.gives() or case.gives
+                for fullType, count in pairs(gives) do
                     expectEqual(fullType .. " " .. case.label .. " gave", result.counts[fullType] or 0, count)
+                end
+                if case.only then
+                    for fullType, count in pairs(result.counts) do
+                        expect(gives[fullType] ~= nil, case.label .. " gave " .. count .. " " .. fullType .. " besides its own parts")
+                    end
                 end
             end
         end,
@@ -328,21 +335,31 @@ dismantleTest("renewable_energy_tiles_built_in_place_scraps_to_recipe", {
         } },
 })
 
--- Dismantling a bank, in any facing, gives back its Material's parts, every piece of them on the
--- luckiest roll: the counts are the mod's bank scrap table's (Moveables.lua).
-local function bankCase(field, facing, gives)
-    return { label = "a " .. field .. " facing " .. facing, sprite = Sprites[field][facing], perk = Perks.Electricity,
-        level = 10, roll = 0, vanillaRoll = 0, gives = gives }
+-- Dismantling a bank, in any facing, gives back the pieces of the scrap definition the mod registers
+-- for its tile's Material (Moveables.lua), every piece of them on the luckiest roll, and nothing
+-- else: the definition survives vanilla's reset of them at boot and its tiles name it. What the
+-- definition lists is the mod's balance, read rather than restated here.
+local function bankCase(field, facing)
+    local sprite = Sprites[field][facing]
+    return { label = "a " .. field .. " facing " .. facing, sprite = sprite, perk = Perks.Electricity,
+        level = 10, roll = 0, vanillaRoll = 0, only = true, gives = function()
+            local material = ISMoveableSpriteProps.new(sprite).material
+            local def = ISMoveableDefinitions:getInstance().getScrapDefinition(material)
+            local gives = {}
+            for _, piece in ipairs(def and def.returnItemsStatic or {}) do
+                gives[piece.returnItem] = (gives[piece.returnItem] or 0) + piece.maxAmount
+            end
+            expect(def ~= nil and #def.returnItemsStatic > 0, sprite .. "'s Material " .. tostring(material) .. " has no pieces to give")
+            return gives
+        end }
 end
 dismantleTest("renewable_energy_tiles_banks_scrap_to_parts", {
-    bankCase("batteryBoxWood", "S", { ["Base.Plank"] = 2, ["Base.Nails"] = 4, ["Base.ElectricWire"] = 1 }),
-    bankCase("batteryBoxMetal", "E", { ["Base.SmallSheetMetal"] = 1, ["Base.ElectricWire"] = 1 }),
-    bankCase("batteryRackWood", "N", { ["Base.Plank"] = 3, ["Base.Nails"] = 6, ["Base.ElectricWire"] = 2, ["Base.Screws"] = 2 }),
-    bankCase("batteryRackMetal", "W",
-        { ["Base.SmallSheetMetal"] = 2, ["Base.MetalBar"] = 1, ["Base.ElectricWire"] = 2, ["Base.Screws"] = 2 }),
-    bankCase("batteryBankWood", "S", { ["Base.Plank"] = 5, ["Base.Nails"] = 10, ["Base.ElectricWire"] = 3, ["Base.Screws"] = 4 }),
-    bankCase("batteryBankMetal", "E",
-        { ["Base.SheetMetal"] = 1, ["Base.MetalBar"] = 2, ["Base.ElectricWire"] = 3, ["Base.Screws"] = 4 }),
+    bankCase("batteryBoxWood", "S"),
+    bankCase("batteryBoxMetal", "E"),
+    bankCase("batteryRackWood", "N"),
+    bankCase("batteryRackMetal", "W"),
+    bankCase("batteryBankWood", "S"),
+    bankCase("batteryBankMetal", "E"),
 })
 
 -- The tiles' PickUpTool and PlaceTool, Electrician, are a screwdriver and some Electricity.

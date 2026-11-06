@@ -35,9 +35,10 @@ end
 -- The house near the character, its roll forgotten until the test ends, is rolled for garden
 -- lights the way the world rolls it, every roll at `args.roll`, a number or "under" for just under
 -- the house's chance, then again. Answers whether it was rolled before (its chunk loading rolls
--- it), its chance, how many lights each roll gave, whether the first roll was kept, the range of
--- lights a roll gives, and the new lights: their squares, whether each stands outdoors on the
--- ground, and their charge. They are removed when the test ends.
+-- it), its chance, its neighbourhood's chance before the Garden Lights option (GardenLights.CHANCE,
+-- the neighbourhood at its middle), how many lights each roll gave, whether the first roll was
+-- kept, the range of lights a roll gives, and the new lights: their squares, whether each stands
+-- outdoors on the ground, and their charge. They are removed when the test ends.
 handler("gardenLightsRoll", function(player, args, defer)
     local def = need(PZHarness.Fixtures.buildingNear(math.floor(player:getX()), math.floor(player:getY()), 60, isHouse),
         "a house near the character on the server")
@@ -45,8 +46,11 @@ handler("gardenLightsRoll", function(player, args, defer)
     Helpers.forgetBuildingRoll(GardenLights.MOD_DATA, def, defer)
     local before = lightsAround(def)
     local chance = GardenLights.chanceFor(def)
+    local neighbourhood = GardenLights.neighbourhood(math.floor((def:getX() + def:getX2()) / 2),
+        math.floor((def:getY() + def:getY2()) / 2))
     local first = PZHarness.Rolls.with(defer, PZHarness.Rolls.trialRoll(args.roll, chance), GardenLights.roll, def)
-    local answer = { rolledBefore = rolledBefore, chance = chance, first = first, rolled = GardenLights.isRolled(def),
+    local answer = { rolledBefore = rolledBefore, chance = chance, neighbourhood = neighbourhood,
+        neighbourhoodChance = GardenLights.CHANCE[neighbourhood], first = first, rolled = GardenLights.isRolled(def),
         second = GardenLights.roll(def), lights = {}, count = GardenLights.COUNT }
     for i, light in ipairs(PZHarness.Fixtures.newSince(before, lightsAround(def))) do
         defer(function() removePlaced(light) end)

@@ -50,6 +50,13 @@ handler("generatorRead", function(player, args)
     return generatorRead(generatorOn(args))
 end)
 
+-- What the authority's ISTakeGenerator:complete() answers for the generator at x, y, z, as when a
+-- client's Take Generator reaches it, and whether the generator is still on its square after.
+handler("takeGenerator", function(player, args)
+    local done = ISTakeGenerator.complete({ character = player, generator = generatorOn(args) })
+    return { done = done == true, kept = Kinds.findOn({ x = args.x, y = args.y, z = args.z, kind = "generator" }) ~= nil }
+end)
+
 -- A bank's read and its generators' reads in one call. A job's reads before and after
 -- (T.job's `reads`) bracket the job with it in the same call, so no tick or explicit billing can
 -- repair a missing job-boundary settlement between them.

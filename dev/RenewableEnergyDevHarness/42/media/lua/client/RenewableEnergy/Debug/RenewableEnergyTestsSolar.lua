@@ -55,7 +55,9 @@ test("renewable_energy_solar_sun_year_matches_measured_insolation", {
 })
 
 -- The sun at noon on the June solstice stands at 90° less the latitude plus the axial tilt, sits
--- on the horizon at the end of the half day and makes nothing at night.
+-- on the horizon at the end of the half day and makes nothing at night. Under a clear sky a flat
+-- panel's direct, sky and ground shares add back up to the light on open ground, which falls off
+-- with the sun's height by the air-mass fit.
 test("renewable_energy_solar_sun_noon_night", {
     run = function(self)
         self.noon = math.deg(math.asin(Sun.position(SOLSTICE, 0, LATITUDE).up))
@@ -69,8 +71,42 @@ test("renewable_energy_solar_sun_noon_night", {
         expectNear("noon elevation on the solstice", self.noon, 90 - LATITUDE + 23.44, 0.1)
         expectNear("sun height at sunset", self.sunset, 0, 0.001)
         expectEqual("light at midnight", self.night, 0)
-        expect(self.noonWatts > self.morningWatts and self.noonWatts < Sun.FULL_SUN, string.format(
+        -- 1000 W/m² × sin(75.44°)^1.15 = 1000 × 0.96788^1.15 = 963.16 W/m².
+        expectNear("noon light on a flat panel on the solstice, W/m²", self.noonWatts, 963.16, 0.05)
+        expect(self.noonWatts > self.morningWatts and self.morningWatts > 0, string.format(
             "noon light on a flat panel is %.1f W/m², two hours earlier %.1f", self.noonWatts, self.morningWatts))
+    end,
+})
+
+-- The game draws its own dawn and dusk (ErosionSeason: dawn and dusk half the day's daylight either
+-- side of the day's high noon), and the sun the panels see rises at the game's dawn, stands at
+-- solar noon at the game's high noon and sets at its dusk, today, whatever the hour now. Catches a
+-- sun that makes power in the game's dark or none in its light. The day of the year counts from
+-- January 1st as 1, which the declination needs.
+test("renewable_energy_solar_sun_rises_and_sets_with_the_game", {
+    run = function(self)
+        local season, time = getClimateManager():getSeason(), getGameTime()
+        local now = time:getTimeOfDay()
+        local noon, halfDay = season:getDayHighNoon(), season:getDaylight() / 2
+        self.halfDay = halfDay
+        self.dayOfYear = Sun.dayOfYear(time:getMonth(), time:getDay())
+        self.latitude = season:getLat()
+        self.dawn = Sun.positionNow(now - (noon - halfDay)).up
+        self.noon = Sun.positionNow(now - noon).up
+        self.dusk = Sun.positionNow(now - (noon + halfDay)).up
+        self.beforeDawn = Sun.positionNow(now - (noon - halfDay) + 0.5).up
+        self.afterDusk = Sun.positionNow(now - (noon + halfDay) - 0.5).up
+        self.days = { Sun.dayOfYear(0, 0), Sun.dayOfYear(1, 27), Sun.dayOfYear(5, 20), Sun.dayOfYear(11, 30) }
+    end,
+    validate = function(self)
+        if not expect(self.halfDay > 0 and self.halfDay < 12, "the game's day lasts " .. 2 * self.halfDay .. " hours") then return end
+        expectNear("the sun's height at the game's dawn", self.dawn, 0, 1e-4)
+        expectNear("the sun's height at the game's dusk", self.dusk, 0, 1e-4)
+        expectNear("the sun's height at the game's high noon", self.noon, Sun.position(self.dayOfYear, 0, self.latitude).up, 1e-6)
+        expect(self.beforeDawn < 0 and self.afterDusk < 0, string.format(
+            "half an hour before the game's dawn the sun stands at %g, half an hour after its dusk at %g", self.beforeDawn, self.afterDusk))
+        -- January 1st, February 28th, June 21st (151 days before June, + 21), December 31st.
+        expectEqual("days of the year", table.concat(self.days, ","), "1,59,172,365")
     end,
 })
 
@@ -97,7 +133,8 @@ test("renewable_energy_solar_sun_whole_days_ago_same_hour", {
     end,
 })
 
--- Overcast lets some light through, all of it diffuse, so a rack loses its edge from facing the sun.
+-- Overcast lets a quarter of the light through, all of it diffuse, so a rack loses its edge from
+-- facing the sun: it sees the sky its tilt leaves it and some ground, whichever way it faces.
 test("renewable_energy_solar_sun_clouds", {
     run = function(self)
         local sun = Sun.position(SOLSTICE, 0, LATITUDE)
@@ -106,19 +143,45 @@ test("renewable_energy_solar_sun_clouds", {
             return Sun.planeIrradiance(sun, kind, facing, overcast) / Sun.planeIrradiance(sun, kind, facing, CLEAR)
         end
         self.flat, self.rack = ratio("flat"), ratio("rack", "S")
+        self.overcastFlat = Sun.planeIrradiance(sun, "flat", nil, overcast)
         self.south = Sun.planeIrradiance(sun, "rack", "S", overcast)
         self.north = Sun.planeIrradiance(sun, "rack", "N", overcast)
     end,
     validate = function(self)
-        expect(self.flat > 0 and self.flat < 1, "overcast leaves a flat panel " .. self.flat .. " of clear-sky light")
+        -- Full cloud stops 75% of the light (Sun.lua's cloud loss): 1 - 0.75.
+        expectNear("overcast against clear sky on a flat panel", self.flat, 0.25, 1e-9)
         expect(self.rack < self.flat, "clouds cost a rack less than a flat panel")
+        -- All diffuse: the sky a 38° tilt sees, (1 + cos 38°) / 2 = 0.89401, plus ground at albedo
+        -- 0.2, 0.2 × (1 - cos 38°) / 2 = 0.02120: 0.91520 of what a flat panel gets.
+        expectNear("overcast on a south rack against a flat panel", self.south / self.overcastFlat, 0.91520, 1e-5)
         expectNear("overcast on a south rack against a north one", self.south, self.north, 0.0001)
     end,
 })
 
--- A module makes its rating times the system efficiency in full sun, the Sunlight Multiplier
--- scales that and snow blocks it; a garden light's cell under a roof makes nothing, and one in the
--- open at noon makes some.
+-- A tilted panel takes the sun on the side it faces: at noon a south rack beats a north one, in
+-- the morning an east rack beats a west one, and a north wall, which the noon sun never reaches
+-- here, sees only sky and ground. Catches a facing turned the wrong way.
+test("renewable_energy_solar_sun_mounts_face_the_sun", {
+    run = function(self)
+        local december = 355
+        local noon, morning = Sun.position(december, 0, LATITUDE), Sun.position(SOLSTICE, -3, LATITUDE)
+        local function light(sun, kind, facing) return Sun.planeIrradiance(sun, kind, facing, CLEAR) end
+        self.south, self.north = light(noon, "rack", "S"), light(noon, "rack", "N")
+        self.east, self.west = light(morning, "rack", "E"), light(morning, "rack", "W")
+        self.northWall, self.flat = light(noon, "wall", "N"), light(noon, "flat")
+    end,
+    validate = function(self)
+        expect(self.south > self.north, string.format("at noon a south rack gets %.1f W/m², a north one %.1f", self.south, self.north))
+        expect(self.east > self.west, string.format("in the morning an east rack gets %.1f W/m², a west one %.1f", self.east, self.west))
+        -- Clear sky: the sky's 0.15 share over half a wall's view, 0.15 × (1 + cos 90°) / 2 = 0.075,
+        -- plus ground at albedo 0.2 over the other half, 0.2 × (1 - cos 90°) / 2 = 0.1.
+        expectNear("a north wall at noon in December against a flat panel", self.northWall / self.flat, 0.175, 1e-9)
+    end,
+})
+
+-- A module makes its rating times the system efficiency and the share of full sun, the Sunlight
+-- Multiplier scales that and snow blocks its share; a garden light's cell under a roof makes
+-- nothing, and one in the open makes what open flat ground's light gives it.
 test("renewable_energy_solar_sun_watts_multiplier_snow_roof", {
     hour = 12,
     sandbox = { SunlightMultiplier = 1 },
@@ -127,7 +190,9 @@ test("renewable_energy_solar_sun_watts_multiplier_snow_roof", {
         T.setSandbox(self, "SunlightMultiplier", 3)
         self.boosted = Sun.wattsFrom(50, Sun.FULL_SUN, 0)
         self.snowed = Sun.wattsFrom(50, Sun.FULL_SUN, 1)
+        self.partly = Sun.wattsFrom(50, Sun.FULL_SUN / 2, 0.25)
         local sky = Sun.skyNow()
+        self.sky = sky
         self.noSquare = Sun.squareWatts(nil, 50, sky)
         local indoor = T.square(self, { indoors = true }, "a free indoor square")
         local outdoor = T.square(self, {}, "a free outdoor square")
@@ -139,9 +204,13 @@ test("renewable_energy_solar_sun_watts_multiplier_snow_roof", {
         expectNear("a 50 W module in full sun", self.real, 50 * T.SOLAR_EFFICIENCY, 1e-9)
         expectNear("a 50 W module in full sun at x3", self.boosted, 3 * 50 * T.SOLAR_EFFICIENCY, 1e-9)
         expectEqual("the same under snow", self.snowed, 0)
+        -- 50 W × half sun 0.5 × 0.8 × 3 × a quarter snowed over (1 - 0.25) = 45 W.
+        expectNear("a 50 W module in half sun, a quarter snowed over, at x3", self.partly, 45, 1e-9)
         expectEqual("a cell with no square", self.noSquare, 0)
         expectEqual("a cell under a roof at noon", self.indoors, 0)
-        expect(self.outdoors > 0, "a cell in the open at noon makes nothing")
+        if not expect(self.sky.flat > 0, "no light on open ground at noon") then return end
+        expectNear("a 50 W cell in the open at noon at x3", self.outdoors,
+            50 * self.sky.flat / Sun.FULL_SUN * T.SOLAR_EFFICIENCY * 3, 1e-9)
     end,
 })
 
@@ -181,7 +250,7 @@ test("renewable_energy_solar_module_condition_sets_watts", {
         local whole = rack.watts
         expectNear("a rack with one whole module at 1000 W/m²", whole,
             T.fullSunW(Specs.modules[T.FACTORY_MODULE].watts), 1e-9)
-        expectNear("a module at condition 50 over a whole one", cracked.watts / whole, 0.5, 0.01)
+        expectNear("a module at condition 50 over a whole one", cracked.watts / whole, 0.5, 1e-9)
         expectNear("a homemade module at its best over a whole factory one", homemade.watts / whole,
             Specs.modules[T.HOMEMADE_MODULE].watts / Specs.modules[T.FACTORY_MODULE].watts, 1e-9)
         expectEqual("the half-cracked panel's reason", cracked.reason, "cracked")
@@ -235,7 +304,7 @@ test("renewable_energy_solar_panel_slots", {
         expectEqual("panel slots in all", slots.total, Specs.freeSlots)
         expectEqual("watts of a panel past the slots", past.watts, 0)
         expectEqual("the reason of a panel past the slots", past.reason, "noController")
-        expect(last.watts > 0, "the last panel within the free slots stopped making power")
+        expectNear("watts of the last panel within the free slots at 1000 W/m²", last.watts, T.flatPanelW(), 1e-9)
     end,
 })
 
@@ -288,16 +357,19 @@ local function showsSnow(panel)
     return false
 end
 
--- Snow falling on a frosty night settles on a flat panel and a rack, and this client's copies of
--- them show it. In the sun it takes its share of what a panel makes, beside a panel swept clean;
--- the sun melts it, the rack's tilt sheds it faster, and mild air takes the rest.
+-- Snow falling on a frosty night settles on a flat panel and a rack, not on a wall panel, and this
+-- client's copies of them show it. In the sun it takes its share of what a panel makes, beside a
+-- panel swept clean, and the status names it as the reason; the sun melts it, the rack's tilt
+-- sheds it faster, and mild air takes the rest. PanelSource's rates an hour: snowfall 0.5, sun
+-- melt 0.05 in full sun, shedding 0.5, mild-air melt 0.1.
 test("renewable_energy_solar_snow_settles_dims_and_melts", {
     run = function(self)
         local bank = T.bank(self, "batteryRackWood", { T.CAR_BATTERY, Specs.controller }, { charge = 0.2 })
         self.flat = bank and T.panel(self, Sprites.flat, { near = bank, connect = true })
         self.rack = self.flat and T.panel(self, Sprites.rack.wood.S, { near = bank, connect = true })
         self.clean = self.rack and T.panel(self, Sprites.flat, { near = bank, connect = true })
-        if not self.clean then return end
+        self.wall = self.clean and T.panel(self, Sprites.wall.wood.S, { near = bank, connect = true })
+        if not self.wall then return end
         self.bank = bank
         T.give(self, "broom", { { type = "Base.Broom" } })
         T.batch(function()
@@ -306,7 +378,7 @@ test("renewable_energy_solar_snow_settles_dims_and_melts", {
         end)
         T.waitFor(self, function() return showsSnow(self.flat) and showsSnow(self.rack) end,
             "this client's copies of the snowy panels showing snow")
-        T.step(function() self.cleanShowed = showsSnow(self.clean) end)
+        T.step(function() self.cleanShowed, self.wallShowed = showsSnow(self.clean), showsSnow(self.wall) end)
         T.bankPass(self, bank, Sun.FULL_SUN, { airC = -10, label = "sunny" })
         T.waitFor(self, function() return showsSnow(self.flat) and not showsSnow(self.rack) end,
             "this client's copy of the rack showing its snow shed")
@@ -314,23 +386,31 @@ test("renewable_energy_solar_snow_settles_dims_and_melts", {
         T.waitFor(self, function() return not showsSnow(self.flat) end, "this client's copy of the flat panel thawed")
     end,
     validate = function(self)
-        local connected = self.flat.connected and self.rack.connected and self.clean.connected
+        local connected = self.flat.connected and self.rack.connected and self.clean.connected and self.wall.connected
         if not expect(connected, "connecting the panels failed") then return end
         local function entryOf(label, panel) return T.stateSource(self.reads[label], panel) or {} end
         local flat, rack = entryOf("night", self.flat), entryOf("night", self.rack)
-        expect((flat.snow or 0) > 0, "a frosty night of snowfall left no snow on the flat panel")
-        expectEqual("snow on the rack after the night", rack.snow, flat.snow)
+        -- Two hours of snowfall at 0.5 an hour cover the panel: 2 × 0.5 = 1.
+        expectNear("snow on the flat panel after the night", flat.snow or -1, 1, 1e-9)
+        expectEqual("snow on the rack after the night, too cold and dark to shed", rack.snow, flat.snow)
+        expectEqual("snow on the wall panel after the night", entryOf("night", self.wall).snow, 0)
         expect(not self.cleanShowed, "this client's copy of the swept panel still shows snow")
-        local night = flat.snow
+        expect(not self.wallShowed, "this client's copy of the wall panel shows snow")
         flat, rack = entryOf("sunny", self.flat), entryOf("sunny", self.rack)
         local clean = entryOf("sunny", self.clean)
-        if not expect((clean.watts or 0) > 0, "the swept panel made nothing in full sun") then return end
+        expectEqual("snow on the swept panel after the sunny hour", clean.snow, 0)
+        if not expectNear("the swept panel's watts in full sun", clean.watts or 0, T.flatPanelW(), 1e-9) then return end
+        -- An hour of full sun at -10 °C: the flat panel 1 - 0.05 = 0.95, the rack sheds as well,
+        -- 1 - 0.05 - 0.5 = 0.45. The sweep brought the bank up to now first, which may melt or shed
+        -- a trace in the game's own weather.
+        expectNear("snow on the flat panel after an hour of full sun", flat.snow, 0.95, 0.005)
+        expectNear("snow on the rack after an hour of full sun", rack.snow, 0.45, 0.005)
         -- Snow covers its share of the panel, and that share of the sun goes nowhere.
         expectNear("the snowy flat panel's watts against the swept one's", flat.watts / clean.watts, 1 - flat.snow, 1e-6)
-        expectEqual("the snowy flat panel's share of full sun", flat.fullSunPct, round(100 * (1 - flat.snow)))
-        expect(flat.snow > 0 and flat.snow < night,
-            "an hour of full sun took the flat panel's snow from " .. night .. " to " .. flat.snow)
-        expect(rack.snow < flat.snow, "the rack, which sheds snow, kept " .. rack.snow .. " against the flat panel's " .. flat.snow)
+        expectEqual("the snowy flat panel's share of full sun", flat.fullSunPct, 5)
+        expectEqual("why the snowy flat panel makes little", flat.reason, "snow")
+        expectEqual("why the swept panel makes little", clean.reason, nil)
+        -- Ten more hours at 25 °C: 0.95 - 10 × (0.1 + 0.05) is below none.
         local thawed = T.stateSource(self.bank.state, self.flat) or {}
         expectEqual("snow on the flat panel after a mild sunny day", thawed.snow, 0)
         expectEqual("the thawed panel's share of full sun", thawed.fullSunPct, 100)
@@ -338,26 +418,28 @@ test("renewable_energy_solar_snow_settles_dims_and_melts", {
 })
 
 -- At night only air above freezing melts snow off a flat panel, which sheds none: an hour at 0 °C
--- keeps every bit of it, an hour just above takes some. Catches the thaw starting at freezing.
+-- keeps every bit of it, an hour just above takes its hour's melt. A dark pass says the panel is
+-- low for the night. Catches the thaw starting at freezing, and the snowfall or melt rate off.
 test("renewable_energy_solar_snow_melts_only_above_freezing", {
     run = function(self)
         local bank = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY }, { charge = 0.5 })
         self.panel = bank and T.panel(self, Sprites.flat, { near = bank, connect = true })
         if not self.panel then return end
         T.batch(function()
-            T.snowfall(self, bank, 2, "night")
+            T.snowfall(self, bank, 1, "night")
             T.bankPass(self, bank, 0, { airC = 0, label = "freezing" })
             T.bankPass(self, bank, 0, { airC = 0.1, label = "thawing" })
         end)
     end,
     validate = function(self)
         if not T.expectConnected(self.panel) then return end
-        local function snowAt(label) return (T.stateSource(self.reads[label], self.panel) or {}).snow or -1 end
-        local night = snowAt("night")
-        if not expect(night > 0, "a frosty night of snowfall left no snow on the panel") then return end
-        expectEqual("snow on the panel after a dark hour at 0 °C", snowAt("freezing"), night)
-        local thawed = snowAt("thawing")
-        expect(thawed >= 0 and thawed < night, "a dark hour at 0.1 °C took the snow from " .. night .. " to " .. thawed)
+        local function entryAt(label) return T.stateSource(self.reads[label], self.panel) or {} end
+        -- An hour of snowfall at 0.5 an hour, short of covering the panel, so its rate shows.
+        expectNear("snow on the panel after an hour of snowfall", entryAt("night").snow or -1, 0.5, 1e-9)
+        expectEqual("snow on the panel after a dark hour at 0 °C", entryAt("freezing").snow, entryAt("night").snow)
+        -- 0.5 - 0.1, a mild hour's melt.
+        expectNear("snow on the panel after a dark hour at 0.1 °C", entryAt("thawing").snow or -1, 0.4, 1e-9)
+        expectEqual("why the panel makes nothing in the dark", entryAt("thawing").reason, "night")
     end,
 })
 
@@ -385,7 +467,7 @@ test("renewable_energy_solar_roofed_panel_dropped_at_the_next_pass", {
     validate = function(self)
         if not T.expectConnected(self.panel) then return end
         local reads = self.reads
-        expect(reads.open.status.solarW > 0, "the panel in the open made nothing at 1000 W/m²")
+        expectNear("solar watts of the panel in the open at 1000 W/m²", reads.open.status.solarW, T.flatPanelW(), 1e-9)
         expectEqual("whether the roofed panel's square is outdoors", reads.roof.outside, false)
         expectEqual("sources before the Disconnect catches up", reads.before.sources, 1)
         T.expectRefused(reads.disconnect, "not connected", "Disconnect acted on the connection the catch-up dropped")
