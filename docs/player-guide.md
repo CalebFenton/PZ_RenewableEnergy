@@ -312,7 +312,7 @@ Six glass jars, one set of plates (three lead pipes cast a set), acid and water,
 
 ### In a car
 
-A deep cycle fits a car's battery slot. It runs the lights and radio twice as long and takes twice as long to fill from the alternator, but still charges all the way to full. L-16s and jar batteries are heavy items, like a generator: you can carry one in a car, but you can't take it into your inventory while you sit in the car. Get out and take it from the seat through the door.
+A deep cycle fits a car's battery slot. It runs the lights and radio twice as long and takes twice as long to fill from the alternator, but still charges all the way to full.
 
 ## Solar panels
 
