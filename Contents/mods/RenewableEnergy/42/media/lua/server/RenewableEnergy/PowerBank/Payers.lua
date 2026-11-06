@@ -316,7 +316,7 @@ local function backedW(payer)
     local watts = 0
     PowerBank.each(function(bank)
         local backup = bank.generator
-        if backup and backup.running and Squares.samePosition(backup, payer) and bank:shouldPower() then
+        if backup and bank:backupCarriesLoad() and Squares.samePosition(backup, payer) and bank:shouldPower() then
             watts = watts + bank.loadW
         end
     end)

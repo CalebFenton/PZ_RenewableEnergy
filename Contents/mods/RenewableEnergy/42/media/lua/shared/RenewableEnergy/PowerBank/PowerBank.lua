@@ -101,8 +101,9 @@ function PowerBank.acceptItem(container, item)
     return false
 end
 
--- A backup generator a failsafe can start is one plugged in within this many squares of its bank
--- on either axis, on the bank's floor.
+-- A running generator plugged in within this many squares of a bank on either axis, on the bank's
+-- floor, carries the bank's load in its place (Bank:backupCarriesLoad). A failsafe's generator
+-- need only reach the bank.
 PowerBank.BACKUP_REACH = 3
 
 --- The failsafe's thresholds, in percent of a bank's charge: below `start` it starts its generator,

@@ -111,14 +111,17 @@ end)
 
 -- A Base.Generator plugged in on the square at `args`, fuelled with `args.fuel` litres (full
 -- unless given) at `args.condition` (new unless given), started as a player starts one if
--- `args.running`, with a failsafe tile on its square if `args.failsafe`. Both are removed when the
--- test ends by what is new on the square, so a chunk reload's fresh objects go too.
+-- `args.running`, with a failsafe tile on its square if `args.failsafe`. Each fires
+-- OnObjectAdded, as a player placing it does (ISMoveableSpriteProps.placeMoveableInternal). Both
+-- are removed when the test ends by what is new on the square, so a chunk reload's fresh objects
+-- go too.
 handler("placeGenerator", function(player, args, defer)
     local square = PZHarness.squareAt(args)
     PZHarness.trackSquare(defer, player, args)
     local generator = SolarSites.placeGenerator(square, args.condition or 100, args.fuel or 10)
+    triggerEvent("OnObjectAdded", generator)
     if args.failsafe then
-        Fixtures.newTile(square, Sprites.failsafe)
+        triggerEvent("OnObjectAdded", Fixtures.newTile(square, Sprites.failsafe))
     end
     if args.running then
         ISActivateGenerator.complete({ generator = generator, activate = true })

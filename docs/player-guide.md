@@ -247,7 +247,7 @@ A running generator within 3 squares of the bank, on its floor, takes over the l
 
 ### Solar Failsafe
 
-Place it on a generator's square. It starts the generator when the bank drops to the start charge (20% by default) and stops it at the stop charge (80%). It won't start a generator with no fuel, or one worn enough to catch fire. Without a charger in the bank, the generator only carries the load, and the charge climbs only as fast as your sources fill it. Sandbox: **Failsafe Start Charge**, **Failsafe Stop Charge**.
+Place it on a plugged-in generator's square. The generator can stand anywhere its power reaches the bank, so you can keep it outdoors, away from the fumes; with more than one bank in reach, the failsafe answers to the nearest. It starts the generator when the bank drops to the start charge (20% by default) and stops it at the stop charge (80%). It won't start a generator with no fuel, or one worn enough to catch fire. The bank's status window shows a **Failsafe** row once it is set up. To fill the bank from the generator, wire a charger into the bank. A running generator within 3 squares of the bank, on its floor, also carries the bank's load; without a charger, the charge then climbs only as fast as your sources fill it. Sandbox: **Failsafe Start Charge**, **Failsafe Stop Charge**.
 
 ### Upkeep
 
@@ -692,7 +692,7 @@ Found inverters, the maintainer, the solar battery charger, garden lights, facto
 - **A digester makes no gas**: it's still starting up, too cold, sour, full of sludge, or its holder is torn. Its **Status** says which.
 - **A generator won't run on gas**: it needs a Gas Conversion Kit, a gas line (from a digester, one Rubber Hose for every 5 squares on the same floor; from a gasifier, right beside it, not diagonally), and its valve on **Run on Gas**. A gasifier must be lit, and a cold one needs bellows to light. When the gas runs out the generator stops and doesn't restart by itself.
 - **A generator on gas keeps stalling**: more than it carries is switched on, or its gasifier needs the ash cleaned or the packing changed.
-- **The Solar Failsafe doesn't start the generator**: it has no gasoline and no lit gasifier, it's worn enough to catch fire, or the failsafe isn't on the generator's square. The bank must drop to the start charge first (20% by default).
+- **The Solar Failsafe doesn't start or stop the generator**: the bank's status window shows no **Failsafe** row when the failsafe isn't on the square of a plugged-in generator whose power reaches the bank. The generator also won't start with no gasoline and no lit gasifier, or worn enough to catch fire, and the bank must drop to the start charge first (20% by default).
 
 ## Moving things and your save
 

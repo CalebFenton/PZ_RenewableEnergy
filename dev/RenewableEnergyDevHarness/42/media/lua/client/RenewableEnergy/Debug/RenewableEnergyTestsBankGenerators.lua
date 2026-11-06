@@ -319,9 +319,48 @@ test("renewable_energy_bank_failsafe_waits_for_a_working_bank", {
     end,
 })
 
+-- A failsafe generator outdoors past backup reach, as fumes keep generators, but whose power
+-- reaches the bank: the failsafe starts it below its start charge, the chargers fill the bank from
+-- it, the status shows the failsafe, and the failsafe stops it at its stop charge.
+test("renewable_energy_bank_failsafe_runs_generator_past_backup_reach", {
+    sandbox = { FailsafeStartCharge = 20, FailsafeStopCharge = 80 },
+    run = function(self)
+        T.setGrid(self, false)
+        local bank = T.bank(self, "batteryRackWood",
+            { T.CAR_BATTERY, T.CAR_BATTERY, Specs.charger, Specs.charger, T.INVERTER_CHARGER })
+        if not bank then return end
+        self.bank = bank
+        local range = SandboxVars.GeneratorTileRange - 2
+        local square = T.square(self, { indoors = false, near = bank.square, minDistance = BACKUP_REACH + 2,
+            accept = function(candidate)
+                return candidate:getZ() == bank.z and not inBackupReach(candidate, bank.square)
+                    and distanceSquared(candidate, bank.square) <= range * range
+            end }, "an outdoor square past the bank's backup reach and in a generator's reach of it")
+        if not square then return end
+        local generator = T.generator(self, { square = square, failsafe = true })
+        T.batch(function()
+            T.job(self, "bank", BankJobs.TURN_ON, bank)
+            T.setCharge(self, bank, belowFailsafeStart())
+            T.bankPass(self, bank, 0, { hours = 0.01 })
+            T.readGenerator(self, generator, "low")
+            T.bankPass(self, bank, 0, { hours = 0.01, label = "charging" })
+            T.setCharge(self, bank, SandboxVars.RenewableEnergy.FailsafeStopCharge / 100)
+            T.bankPass(self, bank, 0, { hours = 0.01 })
+            T.readGenerator(self, generator, "full")
+        end)
+    end,
+    validate = function(self)
+        local reads = self.reads
+        expect(reads.low.running, "the failsafe didn't start its generator past backup reach below its start charge")
+        expectEqual("the chargers' source", reads.charging.status.chargeSource, "generator")
+        expectEqual("the failsafe row", failsafeRow(reads.charging.status, self.bank), failsafeRange())
+        expect(not reads.full.running, "the failsafe didn't stop its generator past backup reach at its stop charge")
+    end,
+})
+
 -- Squares in a line for the nearest-bank test, every one free: a bank B, failsafe generators one and two
 -- squares on from it, and a bank A three squares past the farther. B and A stand indoors. Both
--- generators are nearer B than A, the farther one is in A's backup reach and the nearer isn't.
+-- generators reach both banks and are nearer B.
 -- Nil, and missing, without such a line near the character.
 local function relayLine(self)
     local isFree, origin = Debug.isFreeSquare, player():getSquare()
@@ -349,9 +388,9 @@ local function relayLine(self)
     return T.need(self, nil, "a line of free squares for two banks and two failsafe generators")
 end
 
--- A failsafe answers to the nearest bank with its generator in backup reach. Two failsafe
--- generators both answer to B, nearer them: a bank A with only the farther one in reach, run low,
--- doesn't start it while B is full, and says another bank runs it; once B runs low, it runs both.
+-- A failsafe answers to the nearest bank its generator reaches. Two failsafe generators both answer
+-- to B, nearer them: a bank A, run low, doesn't start the farther one while B is full, and says
+-- another bank runs it; once B runs low, it runs both.
 test("renewable_energy_bank_failsafe_answers_to_nearest_bank", {
     run = function(self)
         T.setGrid(self, false)
