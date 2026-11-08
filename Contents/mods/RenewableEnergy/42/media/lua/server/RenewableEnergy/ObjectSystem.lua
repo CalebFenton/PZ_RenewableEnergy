@@ -32,7 +32,7 @@ end
 --- Says whether the object fills its building with fumes now (Fumes).
 function Object:setFuming(isFuming)
     local isoObject = self:getIsoObject()
-    Fumes.set(self:key(), isoObject and Fumes.buildingOf(isoObject:getSquare()), isFuming)
+    Fumes.set(self:key(), isoObject and isoObject:getSquare(), isFuming)
 end
 
 -- The system removes a record whose tile is picked up or destroyed, and one whose tile is found

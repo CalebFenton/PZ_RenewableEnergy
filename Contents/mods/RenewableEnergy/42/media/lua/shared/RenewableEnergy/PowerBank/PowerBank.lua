@@ -17,6 +17,9 @@ RenewableEnergy.PowerBank = PowerBank
 PowerBank.SYSTEM_NAME = "renewable_energy_powerbank"
 -- The sendServerCommand module and command that carry a bank's status to the players watching it.
 PowerBank.COMMAND_MODULE, PowerBank.STATUS_COMMAND = "RenewableEnergyBankStatus", "status"
+-- The command a client sends with a bank's place, and the server answers in COMMAND_MODULE with
+-- whether the map building it stands in is toxic (BankFumes.lua).
+PowerBank.AIR_COMMAND = "air"
 -- Longer gaps than this between a bank's passes, or the storm clock's (PanelStorms), in hours (a
 -- save loaded after the clock jumped) count as this long, so no pass counts days of weather at once.
 PowerBank.LONGEST_PASS = 24

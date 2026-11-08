@@ -43,7 +43,7 @@ end
 --- `player` watches the status of `bank` (single player too): the server sends it now, after a
 --- fresh look at the bank, and after every change until unwatchStatus. The status window watches
 --- while it is open. Jobs that change a bank go through RenewableEnergyAction instead; besides
---- watching, the server takes no command from a client but "resync".
+--- watching, the server takes no command from a client but "resync" and BankFumes.lua's question.
 function BankSystem.watchStatus(player, bank)
     local position = Squares.positionOf(bank)
     local key = keyOf(position)

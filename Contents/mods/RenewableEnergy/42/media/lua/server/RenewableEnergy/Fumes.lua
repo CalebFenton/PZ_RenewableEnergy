@@ -7,6 +7,11 @@
 -- sets it again each hour (IsoGenerator.update). So each source says every pass whether it fumes,
 -- the building is toxic while any does, and it is cleared only when the last one stops with no
 -- generator running inside.
+--
+-- A room a player built is a building only where the game makes one of it: in single player and
+-- on a multiplayer client, anew each time it works the regions out again, never on a dedicated
+-- server (WorldRegionToMetaGrid). So a source is kept by its square, and its building looked up
+-- again when asked. What the game's remaking does to a bank's building is BankFumes.lua's.
 
 if isClient() then return end
 
@@ -16,8 +21,9 @@ local GeneratorReach = require "cf_commonlib/GeneratorReach"
 
 local Fumes = {}
 
--- Source key -> the building it fumes in now. Kept so a source can stop without its tile, which
--- is gone when its record is removed after its chunk loads.
+-- Source key -> { x, y, z, building }: the square it fumes from and the building it fumed in then,
+-- kept so a source can stop without its tile, which is gone when its record is removed after its
+-- chunk loads.
 local fuming = {}
 
 --- The building whose air an object on `square` fumes, or nil outdoors: vanilla's own test for a
@@ -26,15 +32,25 @@ function Fumes.buildingOf(square)
     return not square:isOutside() and square:getBuilding() or nil
 end
 
+-- The building `source` fumes in now: its square's, else, while that is unloaded or no longer in
+-- one, the one it fumed in.
+local function buildingNow(source)
+    local square = getSquare(source.x, source.y, source.z)
+    return square and Fumes.buildingOf(square) or source.building
+end
+
 local function stillFumed(building)
     local id = building:getID()
-    for _, other in pairs(fuming) do
-        if other:getID() == id then
+    for _, source in pairs(fuming) do
+        if buildingNow(source):getID() == id then
             return true
         end
     end
     return false
 end
+
+--- Whether one of the mod's sources fumes in `building` now.
+Fumes.sourceIn = stillFumed
 
 -- Whether a generator runs inside `building`, which vanilla keeps toxic itself.
 local function generatorRunsIn(building)
@@ -49,19 +65,21 @@ local function generatorRunsIn(building)
     return false
 end
 
---- Says whether the source `key` fumes now, in `building`. A source that stops needs no building;
---- one outdoors, or whose building isn't loaded, doesn't start.
-function Fumes.set(key, building, isFuming)
+--- Says whether the source `key` on `square` fumes now. A source that stops needs no square; one
+--- outdoors, or whose building isn't loaded, doesn't start.
+function Fumes.set(key, square, isFuming)
     local was = fuming[key]
-    if isFuming and building then
-        fuming[key] = building
+    local building = isFuming and square and Fumes.buildingOf(square)
+    if building then
+        fuming[key] = { x = square:getX(), y = square:getY(), z = square:getZ(), building = building }
         if not building:isToxic() then
             building:setToxic(true)
         end
     elseif not isFuming and was then
         fuming[key] = nil
-        if not stillFumed(was) and not generatorRunsIn(was) then
-            was:setToxic(false)
+        local wasIn = buildingNow(was)
+        if not stillFumed(wasIn) and not generatorRunsIn(wasIn) then
+            wasIn:setToxic(false)
         end
     end
 end

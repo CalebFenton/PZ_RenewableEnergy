@@ -215,9 +215,9 @@ local function mayRefresh(bank, player)
     return true
 end
 
--- A client sends only "watch", "unwatch" and "resync". Every job that changes a bank comes as a
--- RenewableEnergyAction, whose complete() checks the character is at it, so a forged command
--- packet can't reach a bank from afar.
+-- A client sends only "watch", "unwatch", "resync" and PowerBank.AIR_COMMAND. Every job that
+-- changes a bank comes as a RenewableEnergyAction, whose complete() checks the character is at it,
+-- so a forged command packet can't reach a bank from afar.
 function BankSystem:OnClientCommand(command, player, args)
     local bank = player and type(args) == "table" and BankSystem.bankAt(args.bank)
     if not bank then return end
@@ -235,6 +235,15 @@ function BankSystem:OnClientCommand(command, player, args)
         local isoObject = bank:getIsoObject()
         if isoObject then
             isoObject:sync()
+        end
+    elseif command == PowerBank.AIR_COMMAND and bank:inViewOf(player) then
+        -- The client's copy of the bank's building turned toxic as the game made the rooms players
+        -- built into buildings again; this one is the truth (BankFumes.lua).
+        local square = bank:getSquare()
+        local building = square and Fumes.buildingOf(square)
+        if building then
+            sendServerCommand(player, PowerBank.COMMAND_MODULE, PowerBank.AIR_COMMAND,
+                { x = bank.x, y = bank.y, z = bank.z, toxic = building:isToxic() })
         end
     end
 end
