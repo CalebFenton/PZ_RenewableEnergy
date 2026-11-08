@@ -99,10 +99,18 @@ end
 
 function DigesterObject:loaded(isoObject)
     ObjectSystem.Object.loaded(self, isoObject)
-    self.inRoom = isoObject:getSquare():isInARoom()
     self:snapshotHopper(isoObject:getContainer())
     self:show()
     self:sendSummary()
+end
+
+--- Also whether it stands in a room (IsoGridSquare.isInARoom), whose air it takes while unloaded.
+function DigesterObject:lookIndoors(isoObject)
+    ObjectSystem.Object.lookIndoors(self, isoObject)
+    isoObject = isoObject or self:getIsoObject()
+    if isoObject then
+        self.inRoom = isoObject:getSquare():isInARoom()
+    end
 end
 
 -- Puts out the lit heater beside the digester `isoObject`, if any.
@@ -373,6 +381,7 @@ end
 
 --- Shows and tells what changed, after a pass or a job.
 function DigesterObject:afterChange()
+    self:lookIndoors()
     Stink.set(self:key(), self.x, self.y, self.z, DigesterObject.corpsesFor(self:stinkScore()))
     self:setFuming(self:fuming())
     self:show()

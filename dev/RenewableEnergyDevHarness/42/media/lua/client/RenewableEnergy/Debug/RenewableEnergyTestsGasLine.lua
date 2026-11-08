@@ -512,7 +512,7 @@ test("renewable_energy_gasline_fumes_clear_with_the_last_source", {
 
 -- Vanilla keeps a building with a generator running inside toxic, so the last of the mod's sources
 -- going out leaves it toxic; and a generator the gas line stops, which vanilla clears it for, leaves
--- it toxic while one of the mod's sources still fumes there.
+-- it toxic from the next tick on while one of the mod's sources still fumes there.
 test("renewable_energy_gasline_fumes_kept_with_a_running_generator", {
     instant = true,
     run = function(self)
@@ -536,11 +536,14 @@ test("renewable_energy_gasline_fumes_kept_with_a_running_generator", {
             T.setRecord(self, digester, T.sourDigester("barrel"))
             T.stallLine(self, generator, "stalled")
         end)
+        -- Fumes puts the air back each tick, not inside the stop.
+        T.awaitServerFrame(self)
+        T.readGenerator(self, generator, "afterStall")
     end,
     validate = function(self)
         local reads = self.reads
         T.expect(reads.gasifierOut.toxic, "the building cleared with a generator running inside once the gasifier went out")
         T.expect(T.isStalled(reads.stalled), "the generator didn't stall, so this tests nothing")
-        T.expect(reads.stalled.toxic, "the building cleared as the gas line stopped its generator, with a sour digester inside")
+        T.expect(reads.afterStall.toxic, "the building cleared as the gas line stopped its generator, with a sour digester inside")
     end,
 })

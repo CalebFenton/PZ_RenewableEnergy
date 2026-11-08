@@ -7,7 +7,6 @@ if isClient() then return end
 
 local Places = require "RenewableEnergy/Places"
 local Sprites = require "RenewableEnergy/Sprites"
-local Fumes = require "RenewableEnergy/Fumes"
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local Payers = require "RenewableEnergy/PowerBank/Payers"
 local GasKit = require "RenewableEnergy/GasLine/GasKit"
@@ -99,7 +98,7 @@ local function runFailsafe(generator, wanted, charge)
     local wantsOff = not wanted or percent >= stopPercent
     if generator:isActivated() then
         if wantsOff then
-            Fumes.setRunning(generator, false)
+            generator:setActivated(false)
         end
     elseif gas and gas.stalled then
         if wantsOff then
@@ -107,7 +106,7 @@ local function runFailsafe(generator, wanted, charge)
         end
     elseif wanted and percent < startPercent and generator:getFuel() > 0
         and generator:getCondition() > FIRE_CONDITION then
-        Fumes.setRunning(generator, true)
+        generator:setActivated(true)
     end
 end
 

@@ -29,8 +29,8 @@ Owners after the restructure (paths under RE `media/lua/`):
 | Source and treadmill jobs | `PowerBank/SourceSite` (JobSites.lua is gone) |
 | Wiring, panel module records | `PowerBank/Wiring`, `Panel` |
 | Storm clock | `PowerBank/PanelStorms` (one ledger; the bank record and the loose object hand a mark over) |
-| Generator start/stop and building fumes | `Fumes.setRunning` / `setBankRunning`; `client/.../PowerBank/BankFumes` clears what the game's remaking of player-built rooms marks toxic for a bank |
-| Indoors: a map building's room or a player's walled, roofed one, every side | cf_commonlib `Squares.inRoom`; banks through `PowerBank.indoorsAt` |
+| Building fumes | `Fumes` (sources set by pass, held each tick against the engine's clears; `setBankRunning`); `client/.../PowerBank/BankFumes` takes back what the engine's remaking of player-built rooms marks toxic for a bank |
+| Indoors: a map building's room or a player's walled, roofed one, every side | vanilla `IsoGridSquare.isInARoom` (`PowerBank.canPlaceBank`, `Bank:lookIndoors` each pass) |
 | Found-item wear, charge and rarity | `server/.../Items/Finds` |
 | Placing world objects | `World/Place`, cf_commonlib `Tiles.addToWorld` |
 | Arrow board | `shared/.../ArrowBoard/*` (one trailer registry, one OnTick) |
@@ -111,7 +111,7 @@ Paths below are under `Contents/mods/RenewableEnergy/42/media/lua/server/Renewab
 | `PowerBank/Payers.billGenerators` | Builds running-payer list; for each generator checks overlap/backup/chargers/treadmills, measures its load and applies its fuel bill. Payers owns generator demand: `scan` (Loads.scan with its `pays` predicate), `deliveredW`, `chargerLimitW` and the charger allocation; Loads no longer requires Payers. | Plain unshared generators with no extra demand retain vanilla billing; preserve that no-scan fast path. |
 | `Payers` allocation | One capped allocation (cap from `GasKit.capW`) for total demand and individual limits. Total queries iterate bank records directly; only individual limits collect/sort charging banks. No per-bank shares table. | No yield or state mutation between measurement and allocation, except discovery tracking after the scan. Preserve nearest-bank priority only where it affects the answer. |
 | `Payers.keepShares` | OnTick corrects native bill rebuilds from stored base/others/extra fuel. | Necessary engine integration, not a redundant periodic scan; preserve it. |
-| `GasLines.updateAll/run` | Every ten minutes settles real/phantom fuel for each kitted generator Payers tracks, measures gas load (`Payers.deliveredW`), can stall/restart generators through `Fumes.setRunning`. | Running state and gas supply can change; no cross-pass cache without a complete invalidation contract. |
+| `GasLines.updateAll/run` | Every ten minutes settles real/phantom fuel for each kitted generator Payers tracks, measures gas load (`Payers.deliveredW`), can stall/restart generators (`setActivated`). | Running state and gas supply can change; no cross-pass cache without a complete invalidation contract. |
 | `BankSystem.jobSite` | cf_commonlib `ObjectSystem.jobSite`: catches up at the old state (`Bank:catchUp`); the mutation reconciles hardware and activation; tell runs `afterChange` once, including refused jobs whose catch-up changed state. | Post-mutation demand cannot exceed remaining charger capacity, or survive removal of all batteries. No second elapsed integration. |
 | `GasLines.jobSite` | Catches up old fuel, applies the job, then settles once before publishing. | A disconnect/removal or catch-up stall/restart can change ownership without going through the vanilla activation action. |
 

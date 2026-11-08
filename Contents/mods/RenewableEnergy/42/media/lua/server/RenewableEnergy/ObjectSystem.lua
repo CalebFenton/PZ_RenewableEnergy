@@ -23,10 +23,20 @@ function Object:tierSpec()
     return self.luaSystem.owner.TIERS[self.tier]
 end
 
---- Its tile is in the world, just placed or its chunk loaded: notes whether it stands indoors, where
---- its fumes fill the building.
+--- Its tile is in the world, just placed or its chunk loaded.
 function Object:loaded(isoObject)
-    self.indoors = Fumes.buildingOf(isoObject:getSquare()) ~= nil
+    self:lookIndoors(isoObject)
+end
+
+--- Looks whether the object, `isoObject` if given, stands indoors, where its fumes fill the
+--- building (Fumes.buildingOf): as it loads, and before each change it tells. A room a player
+--- built is a building only once the game has made one of it, which a loading game does after its
+--- first chunks load (IsoWorld.init), and never on a dedicated server; a wall knocked down ends it.
+function Object:lookIndoors(isoObject)
+    isoObject = isoObject or self:getIsoObject()
+    if isoObject then
+        self.indoors = Fumes.buildingOf(isoObject:getSquare()) ~= nil
+    end
 end
 
 --- Says whether the object fills its building with fumes now (Fumes).

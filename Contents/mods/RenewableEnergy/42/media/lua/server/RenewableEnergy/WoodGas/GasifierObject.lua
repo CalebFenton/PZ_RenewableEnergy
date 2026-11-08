@@ -196,6 +196,7 @@ end
 
 --- Shows and tells what changed, after a pass or a job.
 function GasifierObject:afterChange()
+    self:lookIndoors()
     self:setFuming(self.lit and self.indoors)
     local isoObject = self:getIsoObject()
     if isoObject then

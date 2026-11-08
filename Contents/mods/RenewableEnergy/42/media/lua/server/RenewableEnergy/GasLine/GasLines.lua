@@ -14,7 +14,6 @@ local Sprites = require "RenewableEnergy/Sprites"
 local GasKit = require "RenewableEnergy/GasLine/GasKit"
 local Gasifier = require "RenewableEnergy/WoodGas/Gasifier"
 local Payers = require "RenewableEnergy/PowerBank/Payers"
-local Fumes = require "RenewableEnergy/Fumes"
 local Action = require "RenewableEnergy/TimedActions/RenewableEnergyAction"
 local Chance = require "cf_commonlib/Chance"
 local Clock = require "cf_commonlib/Clock"
@@ -203,17 +202,17 @@ function GasLines.run(generator, state, hours)
     -- Read after the supply, whose burn can choke a gasifier's output.
     local cap = record and record:capW() or GasKit.CAP_W
     if ranDry and hasGas then
-        Fumes.setRunning(generator, true)
+        generator:setActivated(true)
     end
     if record and state.onGas and not hasGas and (ranDry or generator:isActivated()) then
-        Fumes.setRunning(generator, false)
+        generator:setActivated(false)
         state.outOfGas = true
     end
     if generator:isActivated() and state.onGas then
         local watts = Payers.deliveredW(generator)
         state.watts = watts
         if watts > cap then
-            Fumes.setRunning(generator, false)
+            generator:setActivated(false)
             state.stalled = true
         elseif record then
             wear(generator, state, record:wearFactor(), hours)
@@ -222,7 +221,7 @@ function GasLines.run(generator, state, hours)
         local watts = Payers.deliveredW(generator)
         state.watts = watts
         if watts <= cap then
-            Fumes.setRunning(generator, true)
+            generator:setActivated(true)
             state.stalled = false
         end
     end
@@ -320,7 +319,7 @@ local function disconnect(character, generator, state)
     end
     settleFuel(generator, state, false)
     if state.mode ~= "petrol" then
-        Fumes.setRunning(generator, false)
+        generator:setActivated(false)
     end
 end
 

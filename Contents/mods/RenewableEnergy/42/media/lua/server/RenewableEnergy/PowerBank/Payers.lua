@@ -19,6 +19,7 @@
 
 if isClient() then return end
 
+require "TimedActions/ISActivateGenerator"
 local Places = require "RenewableEnergy/Places"
 local Sprites = require "RenewableEnergy/Sprites"
 local Specs = require "RenewableEnergy/Specs"
@@ -43,8 +44,8 @@ local function generatorSprites()
     return sprites
 end
 
--- Generators found as their chunk loads, as a player starts one (ISActivateGenerator.complete, in
--- Fumes), and as a bank comes on one in its reach. A generator dropped from the hands fires no
+-- Generators found as their chunk loads, as a player starts one (ISActivateGenerator.complete,
+-- below), and as a bank comes on one in its reach. A generator dropped from the hands fires no
 -- event, so it is found once started.
 local generators = PlaceTracker.new({ sprites = generatorSprites(), matches = GeneratorReach.isVanillaGenerator })
 
@@ -454,6 +455,19 @@ function Payers.billGenerators()
     for key in pairs(billed) do
         if not running[key] then unbill(key) end
     end
+end
+
+-- A player starting or stopping a generator (ISActivateGenerator.complete): who pays nearby
+-- changes at once.
+local vanillaComplete = ISActivateGenerator.complete
+function ISActivateGenerator:complete()
+    local result = vanillaComplete(self)
+    local generator = self.generator
+    if GeneratorReach.isVanillaGenerator(generator) then
+        Payers.track(generator)
+        Payers.billGenerators()
+    end
+    return result
 end
 
 -- After vanilla rebuilds a billed generator's bill, take off what others pay and add what it

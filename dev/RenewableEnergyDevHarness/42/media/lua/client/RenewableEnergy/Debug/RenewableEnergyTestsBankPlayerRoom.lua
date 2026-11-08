@@ -52,18 +52,14 @@ test("renewable_energy_bank_player_room_takes_a_bank", {
     end,
 })
 
--- Queues a running bank on the first square inside `room`, the character standing on the last,
--- then a change to the map nearby that has the game make the rooms players built into buildings
--- again (WorldRegionToMetaGrid), which marks one toxic for every generator running in it. Waits
--- for this client's new building of the room; whether its air is toxic then lands in self.toxic,
--- and the authority's view of the room in self.reads.authority.
-local function runBankThenRebuild(self, room)
-    local bank = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY, T.PLUG_IN_INVERTER }, { square = room.inside[1] })
-    local elsewhere = bank and T.square(self, { near = room, minDistance = 6 }, "an outdoor square away from the room")
+-- Queues a change to the map near `room` that has the game make the rooms players built into
+-- buildings again (WorldRegionToMetaGrid), which marks one toxic for every generator running in it,
+-- and a wait for this client's new building of the room. Whether its air is toxic a few ticks later
+-- lands in self.toxic, and the authority's view of the room in self.reads.authority.
+local function rebuild(self, room)
+    local elsewhere = T.square(self, { near = room, minDistance = 6 }, "an outdoor square away from the room")
     if not elsewhere then return end
     local inside = room.inside[#room.inside]
-    T.switchOn(self, bank)
-    T.step(function() T.standOn(inside) end)
     T.waitFor(self, function()
         local building = inside:getBuilding()
         self.before = building and building:getID()
@@ -74,10 +70,17 @@ local function runBankThenRebuild(self, room)
         local building = inside:getBuilding()
         return building ~= nil and building:getID() ~= self.before
     end, "this client's building of the room made again")
-    -- Long enough for a correction a few ticks late to land.
     T.waitUntil(function() return false end, 250)
     T.step(function() self.toxic = inside:getBuilding():isToxic() end)
     T.read(self, "roomRead", T.at(inside), "authority")
+end
+
+-- Queues a running bank on the first square inside `room`, then rebuild.
+local function runBankThenRebuild(self, room)
+    local bank = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY, T.PLUG_IN_INVERTER }, { square = room.inside[1] })
+    if not bank then return end
+    T.switchOn(self, bank)
+    rebuild(self, room)
 end
 
 -- A bank burns nothing, so the room a player built that it stands in never fills with fumes, even
@@ -115,24 +118,21 @@ test("renewable_energy_bank_fumes_player_room_generator_stays", {
 })
 
 -- The game marks a map building toxic for a bank running in it too, as it makes a room a player
--- built in the same chunk into a building again. Marked where a player stands, it clears at once;
--- a sour digester in it fumes, which the bank's being there doesn't clear.
+-- built in the same chunk into a building again. Marked so, it clears; a sour digester in it fumes,
+-- which the bank's being there doesn't clear.
 test("renewable_energy_bank_fumes_map_building_cleared_unless_a_source_fumes", {
     run = function(self)
         T.setGrid(self, false)
         local bank = T.bank(self, "batteryBoxWood", { T.CAR_BATTERY, T.PLUG_IN_INVERTER })
         local digester = bank and T.placeRecord(self, "digester", "barrel.MetalDrum", { indoors = true, near = bank.square })
-        local stand = digester and T.square(self, { indoors = true, near = bank.square }, "an indoor square to stand on")
-        if not stand then return end
-        local building = stand:getBuilding()
-        if not T.need(self, bank.square:getBuilding() == building and digester.square:getBuilding() == building,
-            "the bank, the digester and the character in one building") then return end
+        if not digester then return end
+        local building = bank.square:getBuilding()
+        if not T.need(self, digester.square:getBuilding() == building, "the bank and the digester in one building") then
+            return
+        end
         T.switchOn(self, bank)
-        T.step(function()
-            T.standOn(stand)
-            -- As WorldRegionToMetaGrid marks it.
-            building:setToxic(true)
-        end)
+        -- As WorldRegionToMetaGrid marks it.
+        T.step(function() building:setToxic(true) end)
         T.waitUntil(function() return not building:isToxic() end, 2000)
         T.step(function() self.marked = building:isToxic() end)
         T.setRecord(self, digester, T.sourDigester("barrel"))
@@ -145,5 +145,23 @@ test("renewable_energy_bank_fumes_map_building_cleared_unless_a_source_fumes", {
         if not expect(self.marked ~= nil, "a read of the marked building") then return end
         expect(not self.marked, "the building the game marked toxic for the bank stayed toxic")
         expect(self.fuming, "the building cleared with a sour digester in it")
+    end,
+})
+
+-- A sour digester in a room a player built keeps it toxic when the game makes the room into a
+-- building again with clear air, without waiting for the digester's next pass. A dedicated server
+-- makes no building of a player's room, so there the digester fumes nowhere.
+test("renewable_energy_bank_fumes_player_room_source_stays", {
+    spOnly = "a dedicated server keeps no building for a room a player built, so the digester fumes in none",
+    run = function(self)
+        local room = T.playerRoom(self)
+        local digester = room and T.placeRecord(self, "digester", "barrel.MetalDrum", { square = room.inside[1] })
+        if not digester then return end
+        T.setRecord(self, digester, T.sourDigester("barrel"))
+        rebuild(self, room)
+    end,
+    validate = function(self)
+        if not expect(self.toxic ~= nil, "a read of the room's air") then return end
+        expect(self.toxic, "the room a player built cleared with a sour digester in it")
     end,
 })

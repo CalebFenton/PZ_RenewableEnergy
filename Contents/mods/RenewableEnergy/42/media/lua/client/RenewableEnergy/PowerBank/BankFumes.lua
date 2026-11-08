@@ -1,30 +1,43 @@
--- The fumes the game gives a building for a bank running in it, cleared where this game's players
--- would breathe them. A bank is a generator to the game, and as a client or single player works
--- out the regions again after any wall, floor or stairs change nearby, it makes the rooms players
--- built into buildings anew and marks toxic each building with a generator running in its rooms
--- (WorldRegionToMetaGrid.updateSquares): a bank's room a player built, and a map building sharing
--- a chunk with such a room. No Lua event follows, and toxic air hurts every tick
--- (IsoGameCharacter.update). The game does this after the characters' update and before OnTick,
--- so a building a local player stands in that turned toxic is looked at in that same tick.
+-- A bank is a generator to the game, so the game's fumes for a generator running in a building
+-- reach a bank's building too. Of the three places the game writes a building's toxicity, the
+-- authority keeps two off banks: their switch (Fumes.setBankRunning) and the hourly update they are
+-- kept out of (Bank:loaded). The third is here. A client or single player, after any wall, floor or
+-- stairs change nearby and as a loading game reads its regions in, makes the rooms players built
+-- into buildings anew and marks toxic each building with an activated generator on a roofed square
+-- of its rooms in the chunks it touched (WorldRegionToMetaGrid.updateSquares): a bank's room a
+-- player built, or a map building sharing a chunk with one. A dedicated server never does. No Lua
+-- event follows, but it runs after the characters' update and before OnTick (IsoWorld.updateWorld),
+-- so each tick every bank loaded here whose building has turned toxic is looked at, in that tick.
 --
--- A building is cleared only with a bank in it and nothing else to fume: no other generator running
--- on a roofed square of it, as the game counts one, and in single player none of the mod's sources
--- (Fumes). A multiplayer client knows the mod's sources only through the server's toxicity of a
--- map building, so it asks the server for that; the server keeps no building for a room a player
--- built, so none of the mod's sources fumes in one there.
+-- The building is put back to the rule Fumes keeps: toxic while another generator runs on a roofed
+-- square of it or, in single player, one of the mod's sources fumes there. A multiplayer client's
+-- toxicity hurts nobody, since the server deals the damage, but it shows the noxious smell moodle.
+-- The server keeps no building for a room a player built, so none of the mod's sources fumes in
+-- one there; a map building's air is the server's, which the client asks for.
 
 local PowerBank = require "RenewableEnergy/PowerBank/PowerBank"
 local ClientBankSystem = require "RenewableEnergy/PowerBank/ClientBankSystem"
+local PlaceTracker = require "cf_commonlib/PlaceTracker"
 local Squares = require "cf_commonlib/Squares"
+
+-- Place key of a bank -> the ID of its toxic building, already looked at.
+local lookedAt = {}
+
+local banks = PlaceTracker.new({
+    sprites = PowerBank.feature.sprites,
+    matches = PowerBank.isBank,
+    onLost = function(x, y, z)
+        lookedAt[Squares.placeKey(x, y, z)] = nil
+    end,
+})
 
 local function isGenerator(object)
     return instanceof(object, "IsoGenerator")
 end
 
--- A bank standing in `building`, or nil; and nil too once a generator besides the banks is found
--- running on a roofed square of it, which fumes.
-local function bankAlone(building)
-    local bank
+-- Whether a generator besides the banks runs on a roofed square of `building`, as the game counts
+-- one for its fumes.
+local function otherGeneratorRuns(building)
     local rooms = building:getDef():getRooms()
     for i = 0, rooms:size() - 1 do
         local room = rooms:get(i)
@@ -35,22 +48,20 @@ local function bankAlone(building)
                 for y = rect:getY(), rect:getY() + rect:getH() - 1 do
                     local square = getSquare(x, y, z)
                     local generator = Squares.findObjectOn(square, isGenerator)
-                    if generator and PowerBank.isBank(generator) then
-                        bank = bank or generator
-                    elseif generator and generator:isActivated() and not square:isOutside() then
-                        return nil
+                    if generator and not PowerBank.isBank(generator) and generator:isActivated()
+                        and not square:isOutside() then
+                        return true
                     end
                 end
             end
         end
     end
-    return bank
+    return false
 end
 
--- Clears the toxic `building` that `player` stands in if only its banks make it so.
-local function settle(building, player)
-    local bank = bankAlone(building)
-    if not bank then
+-- Puts the toxic `building` that `bank` stands in back to the rule.
+local function settle(building, bank)
+    if otherGeneratorRuns(building) then
         return
     end
     if not isClient() then
@@ -60,27 +71,32 @@ local function settle(building, player)
     elseif building:getDef():isUserDefined() then
         building:setToxic(false)
     else
-        ClientBankSystem.instance:sendCommand(player, PowerBank.AIR_COMMAND, { bank = Squares.positionOf(bank) })
+        local player = getPlayer()
+        if player then
+            ClientBankSystem.instance:sendCommand(player, PowerBank.AIR_COMMAND, { bank = Squares.positionOf(bank) })
+        end
     end
 end
 
--- Player number -> the ID of the toxic building they last stood in, already looked at.
-local lookedAt = {}
-
 Events.OnTick.Add(function()
-    for playerNum = 0, getNumActivePlayers() - 1 do
-        local player = getSpecificPlayer(playerNum)
-        local building = player and player:getCurrentBuilding()
+    local settled = {}
+    banks:each(function(bank)
+        local key = Squares.placeKey(bank:getX(), bank:getY(), bank:getZ())
+        local square = bank:getSquare()
+        local building = not square:isOutside() and square:getBuilding()
         if building and building:isToxic() then
             local id = building:getID()
-            if lookedAt[playerNum] ~= id then
-                lookedAt[playerNum] = id
-                settle(building, player)
+            if lookedAt[key] ~= id then
+                lookedAt[key] = id
+                if not settled[id] then
+                    settled[id] = true
+                    settle(building, bank)
+                end
             end
         else
-            lookedAt[playerNum] = nil
+            lookedAt[key] = nil
         end
-    end
+    end)
 end)
 
 -- The server's toxicity of the map building a bank stands in, which this client asked for.
