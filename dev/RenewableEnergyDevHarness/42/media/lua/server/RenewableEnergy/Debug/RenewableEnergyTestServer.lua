@@ -129,6 +129,57 @@ handler("placeGenerator", function(player, args, defer)
     return {}
 end)
 
+-- The wooden wall a player builds, west and north faces.
+local WALL_W, WALL_N = "walls_exterior_wooden_01_24", "walls_exterior_wooden_01_25"
+
+-- RenewableEnergyTest.playerRoom's handlers, for the `args.size` by `args.size` squares from x, y
+-- on level z: a floor laid over each of them on the level above that has none, the roof, then
+-- walls round them, as a player builds them. All of it goes when the test ends. A chunk's regions
+-- are read from the chunk as its first change finds it, and the changes after that one in the same
+-- tick are lost (IsoRegionWorker.readSurroundingChunks; "trying to change a square on a unknown
+-- chunk"), so the client lays one floor and waits for the region before the rest.
+handler("playerRoof", function(_, args, defer)
+    for dx = 0, args.size - 1 do
+        for dy = 0, args.size - 1 do
+            PZHarness.squareFor({ x = args.x + dx, y = args.y + dy, z = args.z + 1 }, defer, true)
+        end
+    end
+    return {}
+end)
+
+handler("playerWalls", function(player, args, defer)
+    local function wall(x, y, sprite)
+        local object = Fixtures.newTile(PZHarness.squareAt({ x = x, y = y, z = args.z }), sprite)
+        defer(function() Fixtures.removePlaced(object, player) end)
+    end
+    local far = args.size
+    for i = 0, far - 1 do
+        wall(args.x + i, args.y, WALL_N)
+        wall(args.x + i, args.y + far, WALL_N)
+        wall(args.x, args.y + i, WALL_W)
+        wall(args.x + far, args.y + i, WALL_W)
+    end
+    return {}
+end)
+
+-- RenewableEnergyTest.openPlayerRoom's handler: takes away the west wall on the square x, y, z, as
+-- a player knocking it down does.
+handler("openPlayerRoom", function(player, args)
+    Fixtures.removePlaced(need(Fixtures.objectWithSprite(PZHarness.squareAt(args), WALL_W),
+        "the room's west wall on the server"), player)
+    return {}
+end)
+
+-- How the authority sees the square x, y, z: whether it has worked out its region yet, whether it
+-- is in a room (IsoGridSquare.isInARoom) and in a building, and whether that building's air is
+-- toxic.
+handler("roomRead", function(_, args)
+    local square = PZHarness.squareAt(args)
+    local building = square:getBuilding()
+    return { region = square:getIsoWorldRegion() ~= nil, inRoom = square:isInARoom(), building = building ~= nil,
+        toxic = building ~= nil and building:isToxic() }
+end)
+
 -- Banks ------------------------------------------------------------------------------------------
 
 -- RenewableEnergyTest.setCharge's handler. Answers the bank's read.

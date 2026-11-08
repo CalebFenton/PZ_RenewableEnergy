@@ -191,7 +191,7 @@ For a fridge through a twelve-hour night you need about 2 kWh out of the batteri
 
 ### Placing
 
-A box, rack or cabinet works only inside a building's room. A box is small enough to go on a table, counter or shelf, as a microwave does; racks and cabinets stand on the floor. Like furniture, it turns to face any way as you place it: hold the mouse button and move the cursor the way it should face. Its charge meter is on the front. One you find stands with its back to a wall, already connected but switched off.
+A box, rack or cabinet works only indoors: in a building's room, or in a room you built yourself, walled all round and roofed all over. Knock a wall out of your own room, or take part of its roof off, and the bank stops at its next charge pass until the room is closed again. A bank burns nothing, so it never fills a room with fumes. A box is small enough to go on a table, counter or shelf, as a microwave does; racks and cabinets stand on the floor. Like furniture, it turns to face any way as you place it: hold the mouse button and move the cursor the way it should face. Its charge meter is on the front. One you find stands with its back to a wall, already connected but switched off.
 
 ### Wiring parts in
 

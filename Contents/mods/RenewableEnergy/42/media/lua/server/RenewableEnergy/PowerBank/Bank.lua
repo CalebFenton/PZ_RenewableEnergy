@@ -81,7 +81,8 @@ end
 function Bank:initNew()
     self.on = false
     self.overloaded = false
-    self.indoors = true
+    -- Until its tile says otherwise (lookIndoors).
+    self.indoors = false
     self.gridPowered = false
     self.connected = false
     self.charge = 0
@@ -125,11 +126,22 @@ end
 function Bank:loaded(isoObject)
     -- IsoGenerator.update would burn fuel, wear the condition and run an engine sound.
     isoObject:getCell():addToProcessIsoObjectRemove(isoObject)
-    self.indoors = PowerBank.canPlaceBank(isoObject:getSquare())
+    self:lookIndoors()
     -- The truth is the generator's own connected flag; the record keeps it for while it's unloaded.
     self.connected = isoObject:isConnected()
     GpbBuildings.topUp(self, isoObject, false)
     self:refresh()
+end
+
+--- Looks again whether the bank stands indoors: a wall knocked down or the roof taken off a room
+--- a player built changes it. Keeps what it knew while the game can't tell yet, as early in a
+--- loading game (PowerBank.indoorsAt), or while the tile is unloaded.
+function Bank:lookIndoors()
+    local square = self:getSquare()
+    local indoors = square and PowerBank.indoorsAt(square)
+    if indoors ~= nil then
+        self.indoors = indoors
+    end
 end
 
 --- Look at the container again, whatever filled or emptied it: the parts it holds, whether the
@@ -439,6 +451,7 @@ end
 function Bank:advance(hours, context)
     local started = passLog.on and Telemetry.now()
     local container = self:container()
+    self:lookIndoors()
     self:recount()
 
     local watts = self:updateSources(hours, context)

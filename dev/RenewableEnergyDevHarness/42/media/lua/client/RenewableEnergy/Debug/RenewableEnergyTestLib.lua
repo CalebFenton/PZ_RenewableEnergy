@@ -90,6 +90,88 @@ function T.bank(self, kind, items, opts)
     return bank
 end
 
+-- A player's room is this many squares each way inside its walls.
+local ROOM_SIZE = 3
+-- Squares kept clear of any map building's rooms around a player's room: the game makes no
+-- building of a room built against one (WorldRegionToMetaGrid.isAdjacentToOrOverlappingAPredefinedBuilding).
+local ROOM_MARGIN = 3
+
+-- Whether the square at x, y, z is open ground where a player could wall and roof: loaded,
+-- outdoors, free, with no wall, fence or tree, nothing above it, and no other fixture's.
+local function openGround(self, x, y, z)
+    local square = getSquare(x, y, z)
+    local above = getSquare(x, y, z + 1)
+    local props = square and square:getProperties()
+    return square ~= nil and not self.used[square] and square:isOutside() and square:isFree(false)
+        and not square:HasTree() and not props:has(IsoFlagType.cutN) and not props:has(IsoFlagType.cutW)
+        and (above == nil or above:getObjects():size() == 0)
+end
+
+-- Whether a player's room fits with its inside's north-west corner on `corner`: its inside and the
+-- squares its south and east walls stand on are open ground, and no map building is near.
+local function roomFits(self, corner)
+    local x0, y0, z = corner:getX(), corner:getY(), corner:getZ()
+    for x = x0 - ROOM_MARGIN, x0 + ROOM_SIZE + ROOM_MARGIN do
+        for y = y0 - ROOM_MARGIN, y0 + ROOM_SIZE + ROOM_MARGIN do
+            local square = getSquare(x, y, z)
+            if not square or square:getRoom() then
+                return false
+            end
+            local footprint = x >= x0 and x <= x0 + ROOM_SIZE and y >= y0 and y <= y0 + ROOM_SIZE
+            if footprint and not openGround(self, x, y, z) then
+                return false
+            end
+        end
+    end
+    return true
+end
+
+--- Queues a room a player built on open ground near the character: wooden walls round
+--- ROOM_SIZE by ROOM_SIZE squares and a floor laid over them for a roof, built by the authority,
+--- until the test ends. Returns its handle { x, y, z, inside = the squares inside, row by row from
+--- the north-west corner } at once, or nil, and missing, without room for it; the queue then waits
+--- until this client counts the inside a room (IsoGridSquare.isInARoom).
+function T.playerRoom(self)
+    local corner = T.square(self, { accept = function(square) return roomFits(self, square) end },
+        "open ground away from buildings for a room a player builds")
+    if not corner then
+        return nil
+    end
+    local room = T.where(corner)
+    room.inside = {}
+    for x = room.x, room.x + ROOM_SIZE do
+        for y = room.y, room.y + ROOM_SIZE do
+            self.used[getSquare(x, y, room.z)] = true
+        end
+    end
+    for dy = 0, ROOM_SIZE - 1 do
+        for dx = 0, ROOM_SIZE - 1 do
+            table.insert(room.inside, getSquare(room.x + dx, room.y + dy, room.z))
+        end
+    end
+    -- One floor first, then the rest once the authority has the chunk's regions (playerRoof).
+    local at = T.at(room)
+    T.server(self, "playerRoof", T.at(room, { size = 1 }))
+    T.serverUntil(self, "roomRead", at, function(read) return read ~= nil and read.region end)
+    T.step(function()
+        local read = self.server.roomRead
+        T.need(self, read and read.region, "the authority's region of the room's floor")
+    end)
+    T.server(self, "playerRoof", T.at(room, { size = ROOM_SIZE }))
+    T.server(self, "playerWalls", T.at(room, { size = ROOM_SIZE }), function()
+        return room.inside[1]:isInARoom()
+    end, "this client's copy of the room the walls and roof close")
+    return room
+end
+
+--- Queues knocking down a wall of the room `room` (T.playerRoom), and a wait until this client no
+--- longer counts its inside a room.
+function T.openPlayerRoom(self, room)
+    T.server(self, "openPlayerRoom", { x = room.x, y = room.y + 1, z = room.z }, function()
+        return not room.inside[1]:isInARoom()
+    end, "this client's copy of the room opened")
+end
+
 -- A source on the square, or a treadmill not yet wired to be one.
 local function placedOn(square)
     return Sources.findOn(square) or Treadmill.findOn(square)

@@ -58,10 +58,16 @@ function PowerBank.findOn(square)
     return Squares.findObjectOn(square, PowerBank.isBank)
 end
 
---- Where a bank may stand: inside a building, out of the weather. Returns true, or false and
---- the translation key of the reason.
+--- Whether a bank on `square` stands indoors, where it may run: inside a room, a map building's or
+--- one a player built walled and roofed (Squares.inRoom). Nil while the game can't tell yet.
+function PowerBank.indoorsAt(square)
+    return Squares.inRoom(square)
+end
+
+--- Where a bank may be placed: indoors (PowerBank.indoorsAt), out of the weather. Returns true, or
+--- false and the translation key of the reason.
 function PowerBank.canPlaceBank(square)
-    if square and square:getRoom() ~= nil and not square:isOutside() then
+    if square and PowerBank.indoorsAt(square) then
         return true
     end
     return false, "Tooltip_RenewableEnergy_BankIndoorsOnly"
